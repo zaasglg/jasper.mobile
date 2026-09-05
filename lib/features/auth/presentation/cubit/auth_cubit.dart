@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/auth/auth_session.dart';
 import '../../data/models/login_request.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -28,11 +29,25 @@ class AuthCubit extends Cubit<AuthState> {
       final token = await _repository.login(
         LoginRequest(email: normalizedEmail, password: password),
       );
+      authSession.markAuthenticated();
       emit(AuthAuthenticated(token));
     } on AuthException catch (error) {
       emit(AuthFailure(error.message));
     } catch (_) {
       emit(const AuthFailure('Не удалось выполнить вход. Попробуйте ещё раз.'));
+    }
+  }
+
+  Future<void> logout() async {
+    if (state is AuthLoading) return;
+
+    emit(const AuthLoading());
+    try {
+      await _repository.logout();
+      authSession.markUnauthenticated();
+      emit(const AuthUnauthenticated());
+    } catch (_) {
+      emit(const AuthFailure('Не удалось выйти. Попробуйте ещё раз.'));
     }
   }
 

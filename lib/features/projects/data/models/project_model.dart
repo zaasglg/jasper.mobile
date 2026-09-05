@@ -12,6 +12,7 @@ class ProjectModel extends Equatable {
     this.progress = 0,
     this.parentId,
     this.isPinned = false,
+    this.children = const <ProjectModel>[],
   });
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +30,7 @@ class ProjectModel extends Equatable {
       progress: _parseProgress(json['progress']),
       parentId: _optionalString(json['parentId'] ?? json['parent_id']),
       isPinned: _parseBool(json['isPinned'] ?? json['is_pinned']),
+      children: _parseChildren(json['children']),
     );
   }
 
@@ -42,6 +44,15 @@ class ProjectModel extends Equatable {
   final double progress;
   final String? parentId;
   final bool isPinned;
+  final List<ProjectModel> children;
+
+  static List<ProjectModel> _parseChildren(dynamic value) {
+    if (value is! List) return const <ProjectModel>[];
+    return value
+        .whereType<Map>()
+        .map((item) => ProjectModel.fromJson(Map<String, dynamic>.from(item)))
+        .toList(growable: false);
+  }
 
   static String? _optionalString(dynamic value) {
     final text = value?.toString().trim();
@@ -77,6 +88,7 @@ class ProjectModel extends Equatable {
     'progress': progress,
     if (parentId != null) 'parentId': parentId,
     'isPinned': isPinned,
+    'children': children.map((child) => child.toJson()).toList(growable: false),
   };
 
   ProjectModel copyWith({
@@ -90,6 +102,7 @@ class ProjectModel extends Equatable {
     double? progress,
     String? parentId,
     bool? isPinned,
+    List<ProjectModel>? children,
   }) {
     return ProjectModel(
       id: id ?? this.id,
@@ -102,6 +115,7 @@ class ProjectModel extends Equatable {
       progress: progress ?? this.progress,
       parentId: parentId ?? this.parentId,
       isPinned: isPinned ?? this.isPinned,
+      children: children ?? this.children,
     );
   }
 
@@ -117,5 +131,6 @@ class ProjectModel extends Equatable {
     progress,
     parentId,
     isPinned,
+    children,
   ];
 }

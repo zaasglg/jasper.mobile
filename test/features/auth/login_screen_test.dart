@@ -33,4 +33,9 @@ class _NeverCalledRepository implements AuthRepository {
   Future<String> login(LoginRequest request) {
     throw StateError('Repository should not be called for invalid input');
   }
+
+  @override
+  Future<void> logout() {
+    throw StateError('Repository should not be called from the login screen');
+  }
 }

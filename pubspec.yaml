@@ -1,5 +1,5 @@
 name: jospar
-description: "Jospar"
+description: "josparbee"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -45,6 +45,7 @@ dependencies:
   flutter_svg: ^2.3.0
   google_fonts: ^8.2.1
   lucide_icons_flutter: ^3.1.15
+  home_widget: ^0.9.4
 
 dev_dependencies:
   flutter_test:

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -55,9 +56,14 @@ class _SplashScreenState extends State<SplashScreen>
     ]);
     if (!mounted) return;
     final token = results[1] as String?;
-    context.go(
-      token != null && token.trim().isNotEmpty ? '/dashboard' : '/login',
-    );
+    if (token == null || token.trim().isEmpty) {
+      context.go('/login');
+      return;
+    }
+
+    final isValid = await _validateStoredToken();
+    if (!mounted) return;
+    context.go(isValid ? '/dashboard' : '/login');
   }
 
   Future<String?> _readToken() async {
@@ -65,6 +71,23 @@ class _SplashScreenState extends State<SplashScreen>
       return await sl<AuthTokenStorage>().read();
     } catch (_) {
       return null;
+    }
+  }
+
+  Future<bool> _validateStoredToken() async {
+    try {
+      await sl<Dio>().get<dynamic>('users/me');
+      return true;
+    } on DioException catch (error) {
+      final statusCode = error.response?.statusCode;
+      if (statusCode == 401) return false;
+
+      // Keep a locally authenticated session during temporary network errors.
+      // Normal screen-level retry states can then recover when connectivity is
+      // restored without forcing the user to enter credentials again.
+      return true;
+    } catch (_) {
+      return true;
     }
   }
 
@@ -103,9 +126,9 @@ class _SplashScreenState extends State<SplashScreen>
                     letterSpacing: -0.5,
                   ),
                   children: const [
-                    TextSpan(text: 'Jospar'),
+                    TextSpan(text: 'jospar'),
                     TextSpan(
-                      text: '.me',
+                      text: 'bee',
                       style: TextStyle(color: Color(0xFF5B5FEF)),
                     ),
                   ],

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../../core/storage/auth_token_storage.dart';
+import '../../../../core/storage/workspace_selection_storage.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../models/login_request.dart';
 
@@ -8,11 +9,14 @@ class AuthRepositoryImpl implements AuthRepository {
   const AuthRepositoryImpl({
     required Dio dio,
     required AuthTokenStorage storage,
+    required WorkspaceSelectionStorage workspaceSelectionStorage,
   }) : _dio = dio,
-       _storage = storage;
+       _storage = storage,
+       _workspaceSelectionStorage = workspaceSelectionStorage;
 
   final Dio _dio;
   final AuthTokenStorage _storage;
+  final WorkspaceSelectionStorage _workspaceSelectionStorage;
 
   @override
   Future<String> login(LoginRequest request) async {
@@ -33,6 +37,14 @@ class AuthRepositoryImpl implements AuthRepository {
         'Не удалось выполнить вход. Попробуйте ещё раз.',
       );
     }
+  }
+
+  @override
+  Future<void> logout() async {
+    await Future.wait<void>(<Future<void>>[
+      _storage.clear(),
+      _workspaceSelectionStorage.clear(),
+    ]);
   }
 
   String _extractToken(dynamic data) {

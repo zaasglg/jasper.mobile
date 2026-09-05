@@ -14,11 +14,13 @@ class ProfileCubit extends Cubit<ProfileState> {
     emit(const ProfileLoading());
     try {
       final profile = await _repository.getCurrentUser();
-      emit(ProfileLoaded(profile));
+      if (!isClosed) emit(ProfileLoaded(profile));
     } on ProfileException catch (error) {
-      emit(ProfileFailure(error.message));
+      if (!isClosed) emit(ProfileFailure(error.message));
     } catch (_) {
-      emit(const ProfileFailure('Не удалось загрузить данные профиля.'));
+      if (!isClosed) {
+        emit(const ProfileFailure('Не удалось загрузить данные профиля.'));
+      }
     }
   }
 }

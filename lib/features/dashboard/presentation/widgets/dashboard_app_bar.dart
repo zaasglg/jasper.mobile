@@ -11,6 +11,9 @@ import '../../../shell/presentation/screens/main_shell.dart';
 class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
   const DashboardAppBar({super.key});
 
+  static const double _iconSize = 22;
+  static const Color _iconColor = Color(0xFF1A1A1A);
+
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
@@ -26,7 +29,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
       leading: IconButton(
         onPressed: MainShell.openDrawer,
         tooltip: 'Меню',
-        icon: const Icon(LucideIcons.menu, color: Color(0xFF1A1A1A)),
+        icon: const Icon(LucideIcons.menu, size: _iconSize, color: _iconColor),
       ),
       title: Text(
         'Дашборд',
@@ -40,32 +43,24 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
         IconButton(
           onPressed: () {},
           tooltip: 'Поиск',
-          icon: const Icon(LucideIcons.search, color: Color(0xFF1A1A1A)),
-        ),
-        IconButton(
-          onPressed: () {},
-          tooltip: 'AI',
-          icon: Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFD9DCE3)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              'AI',
-              style: GoogleFonts.manrope(
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-                color: const Color(0xFF4A4F58),
-              ),
-            ),
+          icon: const Icon(
+            LucideIcons.search,
+            size: _iconSize,
+            color: _iconColor,
           ),
         ),
         IconButton(
           onPressed: () {},
-          icon: const Icon(LucideIcons.bell, color: Color(0xFF1A1A1A)),
+          tooltip: 'AI',
+          icon: const Icon(LucideIcons.sparkles, size: 18, color: _iconColor),
+        ),
+        IconButton(
+          onPressed: () {},
+          icon: const Icon(
+            LucideIcons.bell,
+            size: _iconSize,
+            color: _iconColor,
+          ),
           tooltip: 'Уведомления',
         ),
         Padding(
@@ -81,7 +76,8 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
                     : null;
                 return ProfileAvatar(
                   size: 32,
-                  iconSize: 18,
+                  iconSize: _iconSize,
+                  iconColor: _iconColor,
                   avatarUrl: avatarUrl,
                 );
               },

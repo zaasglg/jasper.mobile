@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,91 +20,88 @@ import 'package:google_fonts/google_fonts.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('short drawer keeps workspace form and projects in one scroll', (
-    tester,
-  ) async {
-    final bytes = await File('/tmp/jospar-manrope.ttf').readAsBytes();
-    await (FontLoader(
-      'Manrope',
-    )..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)))).load();
-    print('eval: font loaded');
-    GoogleFonts.config.allowRuntimeFetching = false;
-    FlutterSecureStorage.setMockInitialValues(<String, String>{});
-    tester.view.physicalSize = const Size(375, 667);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'short drawer keeps workspace form and projects in one scroll',
+    (tester) async {
+      final bytes = await File('/tmp/jospar-manrope.ttf').readAsBytes();
+      await (FontLoader(
+        'Manrope',
+      )..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)))).load();
+      GoogleFonts.config.allowRuntimeFetching = false;
+      FlutterSecureStorage.setMockInitialValues(<String, String>{});
+      tester.view.physicalSize = const Size(375, 667);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    final workspaceCubit = WorkspaceCubit(
-      repository: _WorkspaceRepo(),
-      selectionStorage: WorkspaceSelectionStorage(const FlutterSecureStorage()),
-    );
-    final projectsCubit = ProjectsCubit(_ProjectRepo());
-    await workspaceCubit.load();
-    print('eval: workspaces loaded');
-    await projectsCubit.loadForWorkspace('ws-digital');
-    print('eval: projects loaded');
-    addTearDown(workspaceCubit.close);
-    addTearDown(projectsCubit.close);
+      final workspaceCubit = WorkspaceCubit(
+        repository: _WorkspaceRepo(),
+        selectionStorage: WorkspaceSelectionStorage(
+          const FlutterSecureStorage(),
+        ),
+      );
+      final projectsCubit = ProjectsCubit(_ProjectRepo());
+      await workspaceCubit.load();
+      await projectsCubit.loadForWorkspace('ws-digital');
+      addTearDown(workspaceCubit.close);
+      addTearDown(projectsCubit.close);
 
-    final scaffoldKey = GlobalKey<ScaffoldState>();
-    await tester.pumpWidget(
-      MultiBlocProvider(
-        providers: <BlocProvider<dynamic>>[
-          BlocProvider<WorkspaceCubit>.value(value: workspaceCubit),
-          BlocProvider<ProjectsCubit>.value(value: projectsCubit),
-        ],
-        child: MaterialApp(
-          home: Scaffold(
-            key: scaffoldKey,
-            drawer: AppDrawer(onCreateProject: () async {}),
-            body: const SizedBox.expand(),
+      final scaffoldKey = GlobalKey<ScaffoldState>();
+      await tester.pumpWidget(
+        MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<WorkspaceCubit>.value(value: workspaceCubit),
+            BlocProvider<ProjectsCubit>.value(value: projectsCubit),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              key: scaffoldKey,
+              drawer: AppDrawer(onCreateProject: () async {}),
+              body: const SizedBox.expand(),
+            ),
           ),
         ),
-      ),
-    );
-    print('eval: pumped widget');
-    scaffoldKey.currentState!.openDrawer();
-    await tester.pump(const Duration(milliseconds: 500));
-    print('eval: drawer open');
+      );
+      scaffoldKey.currentState!.openDrawer();
+      await tester.pump(const Duration(milliseconds: 500));
 
-    await tester.tap(find.text('Цифровизация').first);
-    await tester.pump(const Duration(milliseconds: 300));
-    print('eval: workspace expanded');
-    await tester.ensureVisible(find.byKey(const Key('add-workspace-row')));
-    await tester.tap(find.byKey(const Key('add-workspace-row')));
-    await tester.pump(const Duration(milliseconds: 300));
-    print('eval: form open');
+      await tester.tap(find.text('Цифровизация').first);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.ensureVisible(find.byKey(const Key('add-workspace-row')));
+      await tester.tap(find.byKey(const Key('add-workspace-row')));
+      await tester.pump(const Duration(milliseconds: 300));
 
-    final createButton = find.byKey(const Key('create-workspace-button'));
-    final cancelButton = find.byKey(const Key('cancel-workspace-button'));
-    final projectsContent = find.byKey(const Key('drawer-projects-content'));
-    final projectPlus = find.byKey(const Key('create-project-button'));
-    expect(createButton, findsOneWidget);
-    expect(cancelButton, findsOneWidget);
-    expect(projectsContent, findsOneWidget);
-    expect(
-      tester.getBottomLeft(cancelButton).dy,
-      lessThanOrEqualTo(tester.getTopLeft(projectsContent).dy),
-    );
+      final createButton = find.byKey(const Key('create-workspace-button'));
+      final cancelButton = find.byKey(const Key('cancel-workspace-button'));
+      final projectsContent = find.byKey(const Key('drawer-projects-content'));
+      final projectPlus = find.byKey(const Key('create-project-button'));
+      expect(createButton, findsOneWidget);
+      expect(cancelButton, findsOneWidget);
+      expect(projectsContent, findsOneWidget);
+      expect(
+        tester.getBottomLeft(cancelButton).dy,
+        lessThanOrEqualTo(tester.getTopLeft(projectsContent).dy),
+      );
 
-    await tester.ensureVisible(cancelButton);
-    await tester.pump(const Duration(milliseconds: 300));
-    print('eval: cancel visible');
-    expect(cancelButton, findsOneWidget);
-    await expectLater(
-      find.byType(MaterialApp),
-      matchesGoldenFile('goldens/drawer_form_reachable.png'),
-    );
+      await tester.ensureVisible(cancelButton);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(cancelButton, findsOneWidget);
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/drawer_form_reachable.png'),
+      );
 
-    await tester.ensureVisible(projectPlus);
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(projectPlus, findsOneWidget);
-    await expectLater(
-      find.byType(MaterialApp),
-      matchesGoldenFile('goldens/drawer_projects_reachable.png'),
-    );
-  });
+      await tester.ensureVisible(projectPlus);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(projectPlus, findsOneWidget);
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/drawer_projects_reachable.png'),
+      );
+    },
+    // This manual golden evaluation needs a font fixture outside the repo.
+    skip: !File('/tmp/jospar-manrope.ttf').existsSync(),
+  );
 }
 
 class _WorkspaceRepo implements WorkspaceRepository {

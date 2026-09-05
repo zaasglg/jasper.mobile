@@ -132,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildWordmark() {
     return Semantics(
       header: true,
-      label: 'Jospar.me',
+      label: 'josparbee',
       child: ExcludeSemantics(
         child: RichText(
           text: TextSpan(
@@ -144,9 +144,9 @@ class _LoginScreenState extends State<LoginScreen> {
               fontWeight: FontWeight.w700,
             ),
             children: const <InlineSpan>[
-              TextSpan(text: 'Jospar'),
+              TextSpan(text: 'jospar'),
               TextSpan(
-                text: '.me',
+                text: 'bee',
                 style: TextStyle(color: _accent),
               ),
             ],

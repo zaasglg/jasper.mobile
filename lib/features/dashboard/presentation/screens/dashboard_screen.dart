@@ -1,20 +1,74 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../profile/presentation/cubit/profile_cubit.dart';
 import '../../../profile/presentation/cubit/profile_state.dart';
+import '../../../projects/presentation/cubit/projects_cubit.dart';
+import '../../../projects/presentation/cubit/projects_state.dart';
+import '../../../tasks/presentation/cubit/my_tasks_cubit.dart';
 import '../widgets/dashboard_app_bar.dart';
+import '../widgets/dashboard_projects_card.dart';
 import '../widgets/dashboard_welcome_header.dart';
+import '../../../tasks/presentation/widgets/my_tasks_widget.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<ProfileCubit>(
-      create: (_) => sl<ProfileCubit>()..load(),
+    return MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<ProfileCubit>(create: (_) => sl<ProfileCubit>()..load()),
+        BlocProvider<MyTasksCubit>(
+          create: (_) => sl<MyTasksCubit>()..initializeFields(),
+        ),
+      ],
+      child: const _DashboardCoordinator(),
+    );
+  }
+}
+
+class _DashboardCoordinator extends StatefulWidget {
+  const _DashboardCoordinator();
+
+  @override
+  State<_DashboardCoordinator> createState() => _DashboardCoordinatorState();
+}
+
+class _DashboardCoordinatorState extends State<_DashboardCoordinator> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncTasks());
+  }
+
+  void _syncTasks() {
+    if (!mounted) return;
+    final profileState = context.read<ProfileCubit>().state;
+    final projectsState = context.read<ProjectsCubit>().state;
+    if (profileState is! ProfileLoaded ||
+        projectsState.isLoading ||
+        projectsState.workspaceId == null) {
+      return;
+    }
+    context.read<MyTasksCubit>().configure(
+      userId: profileState.profile.id,
+      projects: projectsState.projects,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiBlocListener(
+      listeners: <BlocListener<dynamic, dynamic>>[
+        BlocListener<ProfileCubit, ProfileState>(
+          listener: (_, _) => _syncTasks(),
+        ),
+        BlocListener<ProjectsCubit, ProjectsState>(
+          listener: (_, _) => _syncTasks(),
+        ),
+      ],
       child: const _DashboardView(),
     );
   }
@@ -49,15 +103,13 @@ class _DashboardView extends StatelessWidget {
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               clipBehavior: Clip.antiAlias,
-              child: Center(
-                child: Text(
-                  'Контент дашборда',
-                  style: GoogleFonts.manrope(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF9AA0A6),
-                  ),
-                ),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+                children: const <Widget>[
+                  DashboardProjectsCard(),
+                  SizedBox(height: 16),
+                  MyTasksWidget(),
+                ],
               ),
             ),
           ),

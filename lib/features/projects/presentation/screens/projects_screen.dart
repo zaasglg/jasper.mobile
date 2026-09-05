@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -29,7 +30,7 @@ class ProjectsScreen extends StatelessWidget {
             ? workspaceState.selected
             : null;
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: Theme.of(context).colorScheme.surface,
           appBar: AppBar(
             leading: IconButton(
               tooltip: 'Открыть меню',
@@ -39,9 +40,10 @@ class ProjectsScreen extends StatelessWidget {
             title: Text(
               'Проекты',
               style: GoogleFonts.manrope(
-                fontSize: 22,
+                fontSize: 21,
                 fontWeight: FontWeight.w700,
                 color: _ink,
+                letterSpacing: -0.35,
               ),
             ),
             actions: <Widget>[
@@ -91,22 +93,13 @@ class _ProjectsBody extends StatelessWidget {
         return Column(
           children: <Widget>[
             Container(
-              height: 45,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: const BoxDecoration(
-                color: _surface,
-                border: Border.symmetric(
-                  horizontal: BorderSide(color: _border),
-                ),
-              ),
+              height: 42,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              color: _surface,
               child: Row(
                 children: <Widget>[
-                  const Icon(
-                    LucideIcons.panelsTopLeft,
-                    size: 15,
-                    color: _accent,
-                  ),
-                  const SizedBox(width: 8),
+                  const Icon(LucideIcons.folder, size: 14, color: _accent),
+                  const SizedBox(width: 7),
                   Expanded(
                     child: Text(
                       workspace.name,
@@ -166,10 +159,22 @@ class _ProjectsBody extends StatelessWidget {
           context.read<ProjectsCubit>().loadForWorkspace(workspace.id),
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
         itemCount: state.projects.length,
-        separatorBuilder: (_, _) => const Divider(height: 1, color: _border),
-        itemBuilder: (_, index) => _ProjectRow(project: state.projects[index]),
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (_, index) {
+          final project = state.projects[index];
+          return _ProjectRow(
+            project: project,
+            isActive: project.id == state.selectedProjectId,
+            calculatedProgress: state.projectTaskProgress[project.id],
+            taskSummary: state.projectTaskSummaries[project.id],
+            onTap: () {
+              context.read<ProjectsCubit>().selectProject(project.id);
+              context.push('/projects/${project.id}', extra: project);
+            },
+          );
+        },
       ),
     );
   }
@@ -189,105 +194,185 @@ class _ProjectsBody extends StatelessWidget {
 }
 
 class _ProjectRow extends StatelessWidget {
-  const _ProjectRow({required this.project});
+  const _ProjectRow({
+    required this.project,
+    required this.isActive,
+    required this.calculatedProgress,
+    required this.taskSummary,
+    required this.onTap,
+  });
 
   final ProjectModel project;
+  final bool isActive;
+  final int? calculatedProgress;
+  final ProjectTaskSummary? taskSummary;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final progress = project.progress.clamp(0, 100).toDouble();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Container(
-                constraints: const BoxConstraints(minWidth: 42),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _accent.withValues(alpha: 0.09),
-                  borderRadius: BorderRadius.circular(7),
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final progress = (calculatedProgress ?? project.progress)
+        .clamp(0, 100)
+        .toDouble();
+    final status = _statusFor(project, progress);
+    final cardColor = isDark
+        ? colorScheme.surfaceContainerLow
+        : const Color(0xFFFAFAF9);
+    final textColor = isDark ? const Color(0xFFF4F4F5) : _ink;
+    final mutedColor = isDark ? const Color(0xFFA4A7B0) : _secondary;
+    return Semantics(
+      button: true,
+      selected: isActive,
+      label: '${project.name}, ${status.label}',
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: isActive
+              ? Color.alphaBlend(
+                  _accent.withValues(alpha: isDark ? 0.11 : 0.055),
+                  cardColor,
+                )
+              : cardColor,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: InkWell(
+          key: Key('project-row-${project.id}'),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        project.code.isEmpty
+                            ? 'БЕЗ КОДА'
+                            : project.code.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.manrope(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: _accent,
+                          letterSpacing: 0.65,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _ProjectStatusBadge(status: status, isDark: isDark),
+                  ],
                 ),
-                child: Text(
-                  project.code.isEmpty ? '—' : project.code.toUpperCase(),
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.manrope(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: _accent,
-                    letterSpacing: 0.5,
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        project.name.trim().isEmpty
+                            ? 'Без названия'
+                            : project.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.manrope(
+                          fontSize: 16,
+                          height: 1.22,
+                          fontWeight: FontWeight.w700,
+                          color: textColor,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                    if (project.isPinned) ...<Widget>[
+                      const SizedBox(width: 10),
+                      Icon(LucideIcons.pin, size: 15, color: mutedColor),
+                    ],
+                  ],
+                ),
+                if (project.description?.trim() case final description?
+                    when description.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: mutedColor,
+                    ),
                   ),
+                ],
+                const SizedBox(height: 11),
+                Row(
+                  children: <Widget>[
+                    Icon(LucideIcons.calendar, size: 13, color: mutedColor),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        _dateRange(project.start, project.end),
+                        style: GoogleFonts.manrope(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: mutedColor,
+                        ),
+                      ),
+                    ),
+                    Icon(LucideIcons.circleCheck, size: 13, color: mutedColor),
+                    const SizedBox(width: 5),
+                    Text(
+                      taskSummary == null
+                          ? '…'
+                          : '${taskSummary!.completed}/${taskSummary!.total}',
+                      style: GoogleFonts.manrope(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: mutedColor,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  project.name,
-                  style: GoogleFonts.manrope(
-                    fontSize: 16,
-                    height: 1.35,
-                    fontWeight: FontWeight.w700,
-                    color: _ink,
-                  ),
-                ),
-              ),
-              if (project.isPinned) ...<Widget>[
-                const SizedBox(width: 8),
-                const Padding(
-                  padding: EdgeInsets.only(top: 2),
-                  child: Icon(LucideIcons.pin, size: 15, color: _secondary),
+                const SizedBox(height: 10),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: progress / 100,
+                          minHeight: 4,
+                          backgroundColor: isDark
+                              ? const Color(0xFF303139)
+                              : const Color(0xFFE8E9ED),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            _accent,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 32,
+                      child: Text(
+                        '${progress.round()}%',
+                        textAlign: TextAlign.end,
+                        style: GoogleFonts.manrope(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: textColor,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
-            ],
-          ),
-          if (project.description case final description?) ...<Widget>[
-            const SizedBox(height: 9),
-            Text(
-              description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.manrope(
-                fontSize: 13,
-                height: 1.45,
-                color: _secondary,
-              ),
-            ),
-          ],
-          const SizedBox(height: 13),
-          Row(
-            children: <Widget>[
-              const Icon(LucideIcons.calendarDays, size: 14, color: _secondary),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  _dateRange(project.start, project.end),
-                  style: GoogleFonts.manrope(fontSize: 12, color: _secondary),
-                ),
-              ),
-              Text(
-                '${progress.round()}%',
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: _ink,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              value: progress / 100,
-              minHeight: 3,
-              backgroundColor: _border,
-              valueColor: const AlwaysStoppedAnimation<Color>(_accent),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -297,9 +382,69 @@ class _ProjectRow extends StatelessWidget {
     return '${_date(start)} — ${_date(end)}';
   }
 
+  _ProjectStatus _statusFor(ProjectModel project, double progress) {
+    if (progress >= 100) return _ProjectStatus.completed;
+    final start = project.start;
+    if (start != null && start.isAfter(DateTime.now())) {
+      return _ProjectStatus.pending;
+    }
+    return _ProjectStatus.active;
+  }
+
   String _date(DateTime? date) {
     if (date == null) return '—';
     return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+  }
+}
+
+enum _ProjectStatus {
+  active('Активный'),
+  pending('В ожидании'),
+  completed('Завершён');
+
+  const _ProjectStatus(this.label);
+  final String label;
+}
+
+class _ProjectStatusBadge extends StatelessWidget {
+  const _ProjectStatusBadge({required this.status, required this.isDark});
+
+  final _ProjectStatus status;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == _ProjectStatus.active) {
+      return const SizedBox.shrink();
+    }
+
+    final foreground = switch (status) {
+      _ProjectStatus.active =>
+        isDark ? const Color(0xFFA9ACFF) : const Color(0xFF565A73),
+      _ProjectStatus.pending =>
+        isDark ? const Color(0xFFF3C96B) : const Color(0xFF80692F),
+      _ProjectStatus.completed =>
+        isDark ? const Color(0xFF8DD5A1) : const Color(0xFF477354),
+    };
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Container(
+          width: 5,
+          height: 5,
+          decoration: BoxDecoration(color: foreground, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          status.label,
+          style: GoogleFonts.manrope(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: foreground,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -309,9 +454,9 @@ class _ProjectsLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 32),
       itemCount: 5,
-      separatorBuilder: (_, _) => const SizedBox(height: 18),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (_, _) => const _LoadingRow(),
     );
   }

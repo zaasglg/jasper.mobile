@@ -94,6 +94,7 @@ class _DrawerProjects extends StatelessWidget {
                 ...pinned.map(
                   (project) => _ProjectDrawerItem(
                     project: project,
+                    isActive: project.id == state.selectedProjectId,
                     icon: LucideIcons.pin,
                     iconColor: AppDrawer._purple,
                   ),
@@ -135,6 +136,7 @@ class _DrawerProjects extends StatelessWidget {
                 ...regular.map(
                   (project) => _ProjectDrawerItem(
                     project: project,
+                    isActive: project.id == state.selectedProjectId,
                     icon: LucideIcons.folder,
                     iconColor: AppDrawer._muted,
                   ),
@@ -162,11 +164,13 @@ class _DrawerProjects extends StatelessWidget {
 class _ProjectDrawerItem extends StatelessWidget {
   const _ProjectDrawerItem({
     required this.project,
+    required this.isActive,
     required this.icon,
     required this.iconColor,
   });
 
   final ProjectModel project;
+  final bool isActive;
   final IconData icon;
   final Color iconColor;
 
@@ -176,7 +180,11 @@ class _ProjectDrawerItem extends StatelessWidget {
       icon: icon,
       iconColor: iconColor,
       label: project.name.isEmpty ? project.code : project.name,
-      onTap: () => _DrawerProjects._openProjects(context),
+      isActive: isActive,
+      onTap: () {
+        context.read<ProjectsCubit>().selectProject(project.id);
+        _DrawerProjects._openProjects(context);
+      },
     );
   }
 }
@@ -900,37 +908,66 @@ class _SidebarItem extends StatelessWidget {
     required this.iconColor,
     required this.label,
     required this.onTap,
+    this.isActive = false,
   });
 
   final IconData icon;
   final Color iconColor;
   final String label;
   final VoidCallback onTap;
+  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: iconColor),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.manrope(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppDrawer._text,
+    return Semantics(
+      button: true,
+      selected: isActive,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        margin: const EdgeInsets.symmetric(vertical: 1),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppDrawer._purple.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(9),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: isActive ? AppDrawer._purple : iconColor,
                 ),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.manrope(
+                      fontSize: 14,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      color: isActive ? AppDrawer._purple : AppDrawer._text,
+                    ),
+                  ),
+                ),
+                if (isActive) ...[
+                  const SizedBox(width: 6),
+                  const Icon(
+                    LucideIcons.check,
+                    size: 16,
+                    color: AppDrawer._purple,
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

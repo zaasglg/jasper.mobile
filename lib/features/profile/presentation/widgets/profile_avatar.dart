@@ -8,11 +8,13 @@ class ProfileAvatar extends StatelessWidget {
     required this.size,
     this.avatarUrl,
     this.iconSize,
+    this.iconColor,
   });
 
   final double size;
   final String? avatarUrl;
   final double? iconSize;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +45,7 @@ class ProfileAvatar extends StatelessWidget {
       child: Icon(
         LucideIcons.user,
         size: iconSize ?? size * 0.52,
-        color: const Color(0xFF9AA0A6),
+        color: iconColor ?? const Color(0xFF9AA0A6),
       ),
     );
   }

@@ -29,6 +29,7 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
         _repository.getWorkspaces(),
         _selectionStorage.read(),
       ]);
+      if (isClosed) return;
       final workspaces = results[0] as List<WorkspaceModel>;
       final savedId = results[1] as String?;
       final selected = _findSelected(workspaces, savedId);
@@ -36,11 +37,14 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
       if (selected != null && selected.id != savedId) {
         await _selectionStorage.save(selected.id);
       }
+      if (isClosed) return;
       emit(WorkspaceLoaded(workspaces: workspaces, selected: selected));
     } on WorkspaceException catch (error) {
-      emit(WorkspaceFailure(error.message));
+      if (!isClosed) emit(WorkspaceFailure(error.message));
     } catch (_) {
-      emit(const WorkspaceFailure('Не удалось загрузить workspace.'));
+      if (!isClosed) {
+        emit(const WorkspaceFailure('Не удалось загрузить workspace.'));
+      }
     }
   }
 
@@ -70,6 +74,7 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
       final workspace = await _repository.createWorkspace(
         CreateWorkspaceRequest(name: trimmedName, color: color),
       );
+      if (isClosed) return false;
       final latest = state;
       if (latest is! WorkspaceLoaded) return false;
       final workspaces = <WorkspaceModel>[
@@ -87,12 +92,14 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
       await _selectionStorage.save(workspace.id);
       return true;
     } on WorkspaceException catch (error) {
+      if (isClosed) return false;
       final latest = state;
       if (latest is WorkspaceLoaded) {
         emit(latest.copyWith(isCreating: false, creationError: error.message));
       }
       return false;
     } catch (_) {
+      if (isClosed) return false;
       final latest = state;
       if (latest is WorkspaceLoaded) {
         emit(

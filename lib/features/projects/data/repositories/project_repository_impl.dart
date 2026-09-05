@@ -53,6 +53,7 @@ class ProjectRepositoryImpl implements ProjectRepository {
         isPinned: payload['isPinned'] == null
             ? request.isPinned
             : parsed.isPinned,
+        children: parsed.children,
       );
     } on DioException catch (error) {
       throw ProjectException(_messageFor(error, creating: true));

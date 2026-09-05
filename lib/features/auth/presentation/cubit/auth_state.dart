@@ -24,6 +24,10 @@ final class AuthAuthenticated extends AuthState {
   List<Object?> get props => <Object?>[token];
 }
 
+final class AuthUnauthenticated extends AuthState {
+  const AuthUnauthenticated();
+}
+
 final class AuthFailure extends AuthState {
   const AuthFailure(this.message);
 

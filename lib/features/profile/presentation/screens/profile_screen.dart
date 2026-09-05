@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../cubit/profile_cubit.dart';
 import '../cubit/profile_state.dart';
 import '../widgets/profile_avatar.dart';
@@ -13,9 +16,22 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<ProfileCubit>(
-      create: (_) => sl<ProfileCubit>()..load(),
-      child: const _ProfileView(),
+    return MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<ProfileCubit>(create: (_) => sl<ProfileCubit>()..load()),
+        BlocProvider<AuthCubit>(create: (_) => sl<AuthCubit>()),
+      ],
+      child: BlocListener<AuthCubit, AuthState>(
+        listener: (context, state) {
+          if (state is AuthUnauthenticated) context.go('/login');
+          if (state is AuthFailure) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(content: Text(state.message)));
+          }
+        },
+        child: const _ProfileView(),
+      ),
     );
   }
 }
@@ -111,6 +127,44 @@ class _ProfileContent extends StatelessWidget {
               ),
             ),
           ],
+          const SizedBox(height: 32),
+          BlocBuilder<AuthCubit, AuthState>(
+            builder: (context, state) {
+              final isLoading = state is AuthLoading;
+              return SizedBox(
+                width: 220,
+                height: 48,
+                child: OutlinedButton.icon(
+                  key: const Key('profile_logout_button'),
+                  onPressed: isLoading
+                      ? null
+                      : () => context.read<AuthCubit>().logout(),
+                  icon: isLoading
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFFD64545),
+                          ),
+                        )
+                      : const Icon(LucideIcons.logOut, size: 19),
+                  label: Text(isLoading ? 'Выходим…' : 'Выйти'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFD64545),
+                    disabledForegroundColor: const Color(0xFFD64545),
+                    side: const BorderSide(color: Color(0xFFF0CACA)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    textStyle: GoogleFonts.manrope(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

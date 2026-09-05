@@ -47,11 +47,30 @@ void main() {
       await subscription.cancel();
       await cubit.close();
     });
+
+    test('logs out and emits unauthenticated', () async {
+      final repository = _FakeAuthRepository();
+      final cubit = AuthCubit(repository);
+      final states = <AuthState>[];
+      final subscription = cubit.stream.listen(states.add);
+
+      await cubit.logout();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(states, <AuthState>[
+        const AuthLoading(),
+        const AuthUnauthenticated(),
+      ]);
+      expect(repository.logoutCalls, 1);
+      await subscription.cancel();
+      await cubit.close();
+    });
   });
 }
 
 class _FakeAuthRepository implements AuthRepository {
   int calls = 0;
+  int logoutCalls = 0;
   LoginRequest? lastRequest;
 
   @override
@@ -59,5 +78,10 @@ class _FakeAuthRepository implements AuthRepository {
     calls += 1;
     lastRequest = request;
     return 'jwt-token';
+  }
+
+  @override
+  Future<void> logout() async {
+    logoutCalls += 1;
   }
 }

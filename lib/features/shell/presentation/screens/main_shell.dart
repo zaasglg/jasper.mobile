@@ -11,7 +11,7 @@ import '../widgets/app_drawer.dart';
 
 /// Root shell that hosts the bottom navigation bar and the active tab's
 /// content (provided by [child], typically a go_router StatefulNavigationShell).
-class MainShell extends StatelessWidget {
+class MainShell extends StatefulWidget {
   const MainShell({
     super.key,
     required this.child,
@@ -32,48 +32,64 @@ class MainShell extends StatelessWidget {
   static const Color _active = Color(0xFF5B5FEF);
 
   @override
+  State<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<MainShell> {
+  late final WorkspaceCubit _workspaceCubit;
+  late final ProjectsCubit _projectsCubit;
+
+  @override
+  void initState() {
+    super.initState();
+    _workspaceCubit = sl<WorkspaceCubit>()..load();
+    _projectsCubit = sl<ProjectsCubit>();
+  }
+
+  @override
+  void dispose() {
+    _workspaceCubit.close();
+    _projectsCubit.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     const destinations = [
       NavigationDestination(
-        icon: Icon(LucideIcons.layoutDashboard, color: _inactive),
-        selectedIcon: Icon(LucideIcons.layoutDashboard, color: _active),
+        icon: Icon(LucideIcons.layoutDashboard, color: MainShell._inactive),
+        selectedIcon: Icon(
+          LucideIcons.layoutDashboard,
+          color: MainShell._active,
+        ),
         label: 'Дашборд',
       ),
       NavigationDestination(
-        icon: Icon(LucideIcons.columns3, color: _inactive),
-        selectedIcon: Icon(LucideIcons.columns3, color: _active),
+        icon: Icon(LucideIcons.columns3, color: MainShell._inactive),
+        selectedIcon: Icon(LucideIcons.columns3, color: MainShell._active),
         label: 'Проекты',
       ),
       NavigationDestination(
-        icon: Icon(LucideIcons.messageCircle, color: _inactive),
-        selectedIcon: Icon(LucideIcons.messageCircle, color: _active),
+        icon: Icon(LucideIcons.messageCircle, color: MainShell._inactive),
+        selectedIcon: Icon(LucideIcons.messageCircle, color: MainShell._active),
         label: 'Мессенджер',
       ),
       NavigationDestination(
-        icon: Icon(LucideIcons.inbox, color: _inactive),
-        selectedIcon: Icon(LucideIcons.inbox, color: _active),
+        icon: Icon(LucideIcons.inbox, color: MainShell._inactive),
+        selectedIcon: Icon(LucideIcons.inbox, color: MainShell._active),
         label: 'Инбокс',
       ),
       NavigationDestination(
-        icon: Icon(LucideIcons.calendarClock, color: _inactive),
-        selectedIcon: Icon(LucideIcons.calendarClock, color: _active),
+        icon: Icon(LucideIcons.calendarClock, color: MainShell._inactive),
+        selectedIcon: Icon(LucideIcons.calendarClock, color: MainShell._active),
         label: 'Ежедневник',
       ),
     ];
 
-    final workspaceCubit = sl<WorkspaceCubit>()..load();
-    final projectsCubit = sl<ProjectsCubit>();
-    final workspaceState = workspaceCubit.state;
-    if (workspaceState is WorkspaceLoaded &&
-        workspaceState.selected != null &&
-        projectsCubit.state.workspaceId != workspaceState.selected!.id) {
-      projectsCubit.loadForWorkspace(workspaceState.selected!.id);
-    }
-
     return MultiBlocProvider(
       providers: [
-        BlocProvider<WorkspaceCubit>.value(value: workspaceCubit),
-        BlocProvider<ProjectsCubit>.value(value: projectsCubit),
+        BlocProvider<WorkspaceCubit>.value(value: _workspaceCubit),
+        BlocProvider<ProjectsCubit>.value(value: _projectsCubit),
       ],
       child: BlocListener<WorkspaceCubit, WorkspaceState>(
         listenWhen: (previous, current) {
@@ -93,17 +109,20 @@ class MainShell extends StatelessWidget {
         },
         child: Builder(
           builder: (shellContext) => Scaffold(
-            key: scaffoldKey,
+            key: MainShell.scaffoldKey,
             drawer: AppDrawer(
               onCreateProject: () => showCreateProjectFlow(shellContext),
             ),
-            body: child,
+            body: widget.child,
             bottomNavigationBar: NavigationBar(
-              selectedIndex: currentIndex.clamp(0, destinations.length - 1),
-              onDestinationSelected: onTap,
+              selectedIndex: widget.currentIndex.clamp(
+                0,
+                destinations.length - 1,
+              ),
+              onDestinationSelected: widget.onTap,
               backgroundColor: Colors.white,
               surfaceTintColor: Colors.transparent,
-              indicatorColor: _active.withValues(alpha: 0.12),
+              indicatorColor: MainShell._active.withValues(alpha: 0.12),
               elevation: 0,
               height: 68,
               labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
