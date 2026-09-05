@@ -82,6 +82,7 @@ class _InboxScreenState extends State<InboxScreen> {
                 child: _QuickTaskComposer(
                   controller: _taskController,
                   focusNode: _taskFocusNode,
+                  isSubmitting: state.isCreating,
                   onChanged: (_) => setState(() {}),
                   onAdd: _addTask,
                 ),
@@ -93,10 +94,18 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 
-  void _addTask() {
+  Future<void> _addTask() async {
     final title = _taskController.text.trim();
     if (title.isEmpty) return;
-    context.read<InboxCubit>().addLocal(title);
+    final created = await context.read<InboxCubit>().create(title);
+    if (!mounted) return;
+    if (!created) {
+      final message = context.read<InboxCubit>().state.creationErrorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message ?? 'Не удалось создать задачу.')),
+      );
+      return;
+    }
     _taskController.clear();
     setState(() {});
     _taskFocusNode.requestFocus();
@@ -261,18 +270,20 @@ class _QuickTaskComposer extends StatelessWidget {
   const _QuickTaskComposer({
     required this.controller,
     required this.focusNode,
+    required this.isSubmitting,
     required this.onChanged,
     required this.onAdd,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
+  final bool isSubmitting;
   final ValueChanged<String> onChanged;
-  final VoidCallback onAdd;
+  final Future<void> Function() onAdd;
 
   @override
   Widget build(BuildContext context) {
-    final canAdd = controller.text.trim().isNotEmpty;
+    final canAdd = controller.text.trim().isNotEmpty && !isSubmitting;
     return Container(
       padding: const EdgeInsets.fromLTRB(13, 4, 5, 4),
       decoration: BoxDecoration(
@@ -291,6 +302,7 @@ class _QuickTaskComposer extends StatelessWidget {
               focusNode: focusNode,
               onChanged: onChanged,
               onSubmitted: (_) => canAdd ? onAdd() : null,
+              readOnly: isSubmitting,
               textCapitalization: TextCapitalization.sentences,
               textInputAction: TextInputAction.done,
               style: GoogleFonts.manrope(fontSize: 14, color: AppColors.ink),
@@ -319,7 +331,15 @@ class _QuickTaskComposer extends StatelessWidget {
                 foregroundColor: Colors.white,
                 disabledForegroundColor: AppColors.muted,
               ),
-              icon: const Icon(Icons.arrow_upward_rounded, size: 19),
+              icon: isSubmitting
+                  ? const SizedBox.square(
+                      dimension: 17,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.arrow_upward_rounded, size: 19),
             ),
           ),
         ],

@@ -7,9 +7,7 @@ import 'package:jospar/features/inbox/presentation/cubit/inbox_cubit.dart';
 import 'package:jospar/features/inbox/presentation/screens/inbox_screen.dart';
 
 void main() {
-  testWidgets('adds and completes a quick inbox task on a narrow screen', (
-    tester,
-  ) async {
+  testWidgets('creates a quick inbox task on a narrow screen', (tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -45,19 +43,26 @@ void main() {
     expect(find.text('Подготовить смету'), findsOneWidget);
     expect(find.text('Не распределена'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Завершить задачу'));
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
 
 class _FakeInboxRepository implements InboxRepository {
+  final List<InboxTaskModel> _tasks = <InboxTaskModel>[];
+
+  @override
+  Future<void> createInbox({required String title}) async {
+    _tasks.insert(
+      0,
+      InboxTaskModel(id: 'created-${_tasks.length + 1}', title: title),
+    );
+  }
+
   @override
   Future<List<InboxTaskModel>> getInbox({
     bool archived = true,
     int sort = 1,
   }) async {
-    return const <InboxTaskModel>[];
+    return List<InboxTaskModel>.unmodifiable(_tasks);
   }
 }

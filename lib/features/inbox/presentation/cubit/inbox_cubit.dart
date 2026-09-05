@@ -41,6 +41,41 @@ class InboxCubit extends Cubit<InboxState> {
     }
   }
 
+  Future<bool> create(String title) async {
+    final value = title.trim();
+    if (value.isEmpty || state.isCreating) return false;
+    emit(state.copyWith(isCreating: true, clearCreationError: true));
+    try {
+      await _repository.createInbox(title: value);
+      final tasks = await _repository.getInbox(archived: true, sort: 1);
+      if (isClosed) return false;
+      emit(
+        InboxState(
+          status: InboxStatus.success,
+          tasks: tasks,
+          isCreating: false,
+        ),
+      );
+      unawaited(InboxHomeWidgetService.sync(tasks));
+      return true;
+    } on InboxException catch (error) {
+      if (isClosed) return false;
+      emit(
+        state.copyWith(isCreating: false, creationErrorMessage: error.message),
+      );
+      return false;
+    } catch (_) {
+      if (isClosed) return false;
+      emit(
+        state.copyWith(
+          isCreating: false,
+          creationErrorMessage: 'Не удалось создать задачу Инбокса.',
+        ),
+      );
+      return false;
+    }
+  }
+
   void addLocal(String title) {
     final value = title.trim();
     if (value.isEmpty) return;

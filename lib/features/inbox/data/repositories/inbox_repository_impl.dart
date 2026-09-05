@@ -9,6 +9,20 @@ class InboxRepositoryImpl implements InboxRepository {
   final Dio _dio;
 
   @override
+  Future<void> createInbox({required String title}) async {
+    try {
+      await _dio.post<dynamic>(
+        'inbox',
+        data: <String, dynamic>{'title': title.trim()},
+      );
+    } on DioException catch (error) {
+      throw InboxException(_messageFor(error, creating: true));
+    } catch (_) {
+      throw const InboxException('Не удалось создать задачу Инбокса.');
+    }
+  }
+
+  @override
   Future<List<InboxTaskModel>> getInbox({
     bool archived = true,
     int sort = 1,
@@ -69,7 +83,10 @@ class InboxRepositoryImpl implements InboxRepository {
     throw const InboxException('Сервер вернул некорректный список Инбокса.');
   }
 
-  String _messageFor(DioException error) {
+  String _messageFor(DioException error, {bool creating = false}) {
+    final fallback = creating
+        ? 'Не удалось создать задачу Инбокса.'
+        : 'Не удалось загрузить задачи Инбокса.';
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
@@ -83,12 +100,12 @@ class InboxRepositoryImpl implements InboxRepository {
         if (code == 401 || code == 403) {
           return 'Сессия истекла. Войдите снова.';
         }
-        return 'Не удалось загрузить задачи Инбокса.';
+        return fallback;
       case DioExceptionType.cancel:
         return 'Запрос был отменён.';
       case DioExceptionType.badCertificate:
       case DioExceptionType.unknown:
-        return 'Не удалось подключиться к серверу.';
+        return creating ? fallback : 'Не удалось подключиться к серверу.';
     }
   }
 }

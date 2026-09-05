@@ -41,11 +41,23 @@ void main() {
     expect(task.order, 4);
     expect(task.toJson()['title'], 'Проверить договор');
   });
+
+  test('creates an inbox task with its title', () async {
+    final adapter = _InboxApiAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/'))
+      ..httpClientAdapter = adapter;
+    final repository = InboxRepositoryImpl(dio);
+
+    await repository.createInbox(title: '  Новая задача  ');
+
+    expect(adapter.createdTitle, 'Новая задача');
+  });
 }
 
 class _InboxApiAdapter implements HttpClientAdapter {
   int? archived;
   int? sort;
+  String? createdTitle;
 
   @override
   Future<ResponseBody> fetch(
@@ -60,6 +72,10 @@ class _InboxApiAdapter implements HttpClientAdapter {
         '{"data":{"items":[{"id":"inbox-1",'
         '"title":"Подготовить отчёт","completed":false}]}}',
       );
+    }
+    if (options.path == 'inbox' && options.method == 'POST') {
+      createdTitle = (options.data as Map<String, dynamic>)['title'] as String?;
+      return _jsonResponse('{}', statusCode: 201);
     }
     return _jsonResponse('{}', statusCode: 404);
   }
