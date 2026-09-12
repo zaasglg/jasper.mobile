@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_projects_card.dart';
 import 'package:jospar/features/projects/data/models/create_project_request.dart';
 import 'package:jospar/features/projects/data/models/project_model.dart';
@@ -62,6 +63,48 @@ void main() {
     expect(find.text('Проект 3'), findsOneWidget);
     expect(find.text('Проект 4'), findsNothing);
     expect(find.text('50%'), findsOneWidget);
+  });
+
+  testWidgets('opens the selected project from the dashboard', (tester) async {
+    const project = ProjectModel(
+      id: 'project-42',
+      code: 'P42',
+      name: 'Прогон',
+      workspaceId: 'workspace',
+      start: null,
+      end: null,
+    );
+    final cubit = ProjectsCubit(
+      const _ProjectRepository(<ProjectModel>[project]),
+    );
+    await cubit.loadForWorkspace('workspace');
+    addTearDown(cubit.close);
+
+    final router = GoRouter(
+      initialLocation: '/dashboard',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/dashboard',
+          builder: (_, _) => BlocProvider<ProjectsCubit>.value(
+            value: cubit,
+            child: const Scaffold(body: DashboardProjectsCard()),
+          ),
+        ),
+        GoRoute(
+          path: '/projects/:projectId',
+          builder: (_, state) => Scaffold(
+            body: Text('Открыт ${state.pathParameters['projectId']}'),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.tap(find.byKey(const Key('dashboard-project-project-42')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Открыт project-42'), findsOneWidget);
   });
 }
 

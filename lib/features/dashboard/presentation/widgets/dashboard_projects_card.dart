@@ -76,7 +76,10 @@ class DashboardProjectsCard extends StatelessWidget {
             colorIndex: index,
             onTap: () {
               context.read<ProjectsCubit>().selectProject(projects[index].id);
-              context.go('/projects');
+              context.push(
+                '/projects/${projects[index].id}',
+                extra: projects[index],
+              );
             },
           ),
           if (index != projects.length - 1)

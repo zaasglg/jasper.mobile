@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -52,7 +53,12 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
         IconButton(
           onPressed: () {},
           tooltip: 'AI',
-          icon: const Icon(LucideIcons.sparkles, size: 18, color: _iconColor),
+          icon: SvgPicture.asset(
+            'assets/images/JBee.svg',
+            key: const Key('dashboard-ai-icon'),
+            width: 24,
+            height: 24,
+          ),
         ),
         IconButton(
           onPressed: () {},

@@ -25,14 +25,10 @@ class KanbanBoard extends StatefulWidget {
 class _KanbanBoardState extends State<KanbanBoard> {
   static const double _columnViewportFraction = 0.98;
   static const double _columnHorizontalInset = 4;
-  static const double _autoScrollEdge = 52;
-  static const Duration _autoScrollCooldown = Duration(milliseconds: 420);
-  static const Duration _autoScrollDuration = Duration(milliseconds: 260);
 
   final PageController _horizontalController = PageController(
     viewportFraction: _columnViewportFraction,
   );
-  DateTime? _lastAutoScrollAt;
 
   @override
   void didUpdateWidget(covariant KanbanBoard oldWidget) {
@@ -49,42 +45,6 @@ class _KanbanBoardState extends State<KanbanBoard> {
   void dispose() {
     _horizontalController.dispose();
     super.dispose();
-  }
-
-  void _autoScroll(Offset globalPosition) {
-    if (!_horizontalController.hasClients) return;
-
-    final now = DateTime.now();
-    if (_lastAutoScrollAt != null &&
-        now.difference(_lastAutoScrollAt!) < _autoScrollCooldown) {
-      return;
-    }
-
-    final direction = _scrollDirectionFor(
-      pointerX: globalPosition.dx,
-      viewportWidth: MediaQuery.sizeOf(context).width,
-    );
-    if (direction == null) return;
-
-    final currentPage = (_horizontalController.page ?? 0).round();
-    final pageCount = context.read<KanbanCubit>().state.columns.length;
-    final targetPage = (currentPage + direction).clamp(0, pageCount - 1);
-    if (targetPage == currentPage) return;
-    _lastAutoScrollAt = now;
-    _horizontalController.animateToPage(
-      targetPage,
-      duration: _autoScrollDuration,
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  int? _scrollDirectionFor({
-    required double pointerX,
-    required double viewportWidth,
-  }) {
-    if (pointerX < _autoScrollEdge) return -1;
-    if (pointerX > viewportWidth - _autoScrollEdge) return 1;
-    return null;
   }
 
   @override
@@ -168,7 +128,6 @@ class _KanbanBoardState extends State<KanbanBoard> {
               column.statusMap,
               position,
             ),
-            onDragUpdate: _autoScroll,
             onMoveMenu: (task) => _showMoveTask(context, task, state),
             onManage: (action) => _manageColumn(context, column, action),
           ),
@@ -300,7 +259,6 @@ class _KanbanColumn extends StatefulWidget {
     required this.exceedsWip,
     required this.onAddTask,
     required this.onMove,
-    required this.onDragUpdate,
     required this.onMoveMenu,
     required this.onManage,
   });
@@ -310,7 +268,6 @@ class _KanbanColumn extends StatefulWidget {
   final bool exceedsWip;
   final Future<void> Function(String title) onAddTask;
   final void Function(ProjectTaskModel task, int position) onMove;
-  final ValueChanged<Offset> onDragUpdate;
   final ValueChanged<ProjectTaskModel> onMoveMenu;
   final ValueChanged<_ColumnAction> onManage;
 
@@ -527,8 +484,9 @@ class _KanbanColumnState extends State<_KanbanColumn> {
                         padding: const EdgeInsets.only(bottom: 9),
                         child: LongPressDraggable<_DragTask>(
                           data: _DragTask(task),
-                          onDragUpdate: (details) =>
-                              widget.onDragUpdate(details.globalPosition),
+                          axis: Axis.vertical,
+                          delay: const Duration(milliseconds: 220),
+                          hapticFeedbackOnStart: true,
                           feedback: Material(
                             color: Colors.transparent,
                             child: SizedBox(

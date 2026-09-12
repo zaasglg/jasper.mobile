@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../kanban/presentation/widgets/kanban_board.dart';
+import '../../../kanban/presentation/cubit/kanban_cubit.dart';
+import '../../../kanban/presentation/cubit/kanban_state.dart';
 import '../../data/models/project_model.dart';
 import '../cubit/projects_cubit.dart';
 import '../cubit/projects_state.dart';
@@ -62,9 +64,26 @@ class _ProjectDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: KanbanBoard(project: project),
+    return BlocBuilder<KanbanCubit, KanbanState>(
+      buildWhen: (previous, current) => previous.status != current.status,
+      builder: (context, state) => Stack(
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: KanbanBoard(project: project),
+          ),
+          if (state.status == KanbanStatus.loading)
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(
+                key: Key('project-board-loader'),
+                minHeight: 3,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

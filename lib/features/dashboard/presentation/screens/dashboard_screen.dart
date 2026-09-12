@@ -7,7 +7,9 @@ import '../../../profile/presentation/cubit/profile_state.dart';
 import '../../../projects/presentation/cubit/projects_cubit.dart';
 import '../../../projects/presentation/cubit/projects_state.dart';
 import '../../../tasks/presentation/cubit/my_tasks_cubit.dart';
+import '../../../inbox/presentation/cubit/inbox_cubit.dart';
 import '../widgets/dashboard_app_bar.dart';
+import '../widgets/dashboard_inbox_composer.dart';
 import '../widgets/dashboard_projects_card.dart';
 import '../widgets/dashboard_welcome_header.dart';
 import '../../../tasks/presentation/widgets/my_tasks_widget.dart';
@@ -23,6 +25,7 @@ class DashboardScreen extends StatelessWidget {
         BlocProvider<MyTasksCubit>(
           create: (_) => sl<MyTasksCubit>()..initializeFields(),
         ),
+        BlocProvider<InboxCubit>(create: (_) => sl<InboxCubit>()),
       ],
       child: const _DashboardCoordinator(),
     );
@@ -106,6 +109,8 @@ class _DashboardView extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
                 children: const <Widget>[
+                  DashboardInboxComposer(),
+                  SizedBox(height: 16),
                   DashboardProjectsCard(),
                   SizedBox(height: 16),
                   MyTasksWidget(),

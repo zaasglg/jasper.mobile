@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/widgets/app_logo.dart';
+
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/storage/auth_token_storage.dart';
 
@@ -116,24 +118,7 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Minimal wordmark with a single accent dot — no icons/boxes.
-              RichText(
-                text: TextSpan(
-                  style: GoogleFonts.manrope(
-                    fontSize: 44,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1A1A1A),
-                    letterSpacing: -0.5,
-                  ),
-                  children: const [
-                    TextSpan(text: 'jospar'),
-                    TextSpan(
-                      text: 'bee',
-                      style: TextStyle(color: Color(0xFF5B5FEF)),
-                    ),
-                  ],
-                ),
-              ),
+              const AppLogo(height: 48),
               const SizedBox(height: 12),
               Text(
                 'Work, organized.',

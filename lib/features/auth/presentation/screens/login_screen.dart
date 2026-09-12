@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../../core/widgets/app_logo.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
 
@@ -130,29 +131,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildWordmark() {
-    return Semantics(
-      header: true,
-      label: 'josparbee',
-      child: ExcludeSemantics(
-        child: RichText(
-          text: TextSpan(
-            style: GoogleFonts.manrope(
-              color: _ink,
-              fontSize: 20,
-              height: 1.2,
-              letterSpacing: -0.35,
-              fontWeight: FontWeight.w700,
-            ),
-            children: const <InlineSpan>[
-              TextSpan(text: 'jospar'),
-              TextSpan(
-                text: 'bee',
-                style: TextStyle(color: _accent),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return const Align(
+      alignment: Alignment.centerLeft,
+      child: AppLogo(height: 25),
     );
   }
 
