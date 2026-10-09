@@ -79,6 +79,46 @@ class KanbanCubit extends Cubit<KanbanState> {
     state.copyWith(priorityFilter: value, clearPriorityFilter: value == null),
   );
 
+  Future<void> archiveTask(ProjectTaskModel task) async {
+    if (state.movingTaskIds.isNotEmpty) return;
+    final projectId = state.projectId;
+    final oldTasks = state.tasks;
+    emit(
+      state.copyWith(
+        tasks: state.tasks.where((item) => item.id != task.id).toList(),
+        movingTaskIds: {task.id},
+        clearActionError: true,
+      ),
+    );
+    try {
+      await _repository.archiveTask(task.id);
+      if (isClosed || state.projectId != projectId) return;
+      _cache.write(
+        projectId,
+        KanbanBoardData(columns: state.columns, tasks: state.tasks),
+      );
+      emit(state.copyWith(movingTaskIds: {}));
+    } catch (error) {
+      if (isClosed || state.projectId != projectId) return;
+      // Restore only the archived card, preserving other edits made meanwhile.
+      emit(
+        state.copyWith(
+          tasks: [
+            for (final item in oldTasks)
+              if (item.id == task.id) item,
+            ...state.tasks,
+          ],
+          movingTaskIds: {},
+        ),
+      );
+      _actionError(
+        error is KanbanException
+            ? error.message
+            : 'Не удалось архивировать задачу.',
+      );
+    }
+  }
+
   Future<void> moveTask(
     ProjectTaskModel task,
     String targetStatus,

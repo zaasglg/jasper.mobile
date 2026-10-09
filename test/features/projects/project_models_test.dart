@@ -4,6 +4,186 @@ import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
 
 void main() {
+  test(
+    'personal labels are included alongside shared labels and preserved after moving',
+    () {
+      final task = ProjectTaskModel.fromJson({
+        'detail': {
+          'labels': [
+            {'id': 'shared', 'text': 'Общая', 'color': '#6366F1'},
+          ],
+          'personalLabels': [
+            {'id': 'private', 'text': 'Личная', 'color': '#d09835'},
+          ],
+        },
+      });
+      expect(task.labels.length, 2);
+      expect(task.labels.first.isPersonal, false);
+      expect(task.labels.last.isPersonal, true);
+      final restored = ProjectTaskModel.fromJson(
+        task.copyWith(status: 'DONE').toJson(),
+      );
+      expect(restored.labels.last.text, 'Личная');
+      expect(restored.labels.last.isPersonal, true);
+      expect(restored.labels.last.color, '#d09835');
+    },
+  );
+
+  test('checklist count includes items and sections across multiple lists', () {
+    final task = ProjectTaskModel.fromJson({
+      'detail': {
+        'checklists': [
+          {
+            'items': [
+              {'id': '1', 'done': true},
+              {'id': '2', 'done': false},
+            ],
+            'sections': [
+              {
+                'items': [
+                  {'id': '3', 'done': true},
+                ],
+              },
+            ],
+          },
+          {
+            'items': [
+              {'id': '4', 'done': false},
+            ],
+          },
+        ],
+      },
+    });
+    expect(task.checklistTotal, 4);
+    expect(task.checklistCompleted, 2);
+    final restored = ProjectTaskModel.fromJson(
+      task.copyWith(status: 'DONE').toJson(),
+    );
+    expect(restored.checklistTotal, 4);
+    expect(restored.checklistCompleted, 2);
+    final legacy = ProjectTaskModel.fromJson({
+      'detail': '{"checklist":[{"done":true},{"done":false}]}',
+    });
+    expect(legacy.checklistTotal, 2);
+    expect(legacy.checklistCompleted, 1);
+  });
+
+  test(
+    'discussion count reads active detail comments and legacy summaries',
+    () {
+      final task = ProjectTaskModel.fromJson({
+        'detail': {
+          'comments': [
+            {'id': '1', 'text': 'Обсуждение'},
+            {'id': '2', 'deletedAt': '2026-10-05T10:00:00Z'},
+            {'id': '3', 'deleted_at': '2026-10-05T10:00:00Z'},
+          ],
+        },
+      });
+      expect(task.commentCount, 1);
+      expect(
+        ProjectTaskModel.fromJson(
+          task.copyWith(status: 'DONE').toJson(),
+        ).commentCount,
+        1,
+      );
+      expect(ProjectTaskModel.fromJson({'comments': 4}).commentCount, 4);
+      expect(ProjectTaskModel.fromJson({'commentsCount': '3'}).commentCount, 3);
+      expect(
+        ProjectTaskModel.fromJson({
+          'detail': '{"comments":[{"id":"1"}]}',
+        }).commentCount,
+        1,
+      );
+      expect(
+        ProjectTaskModel.fromJson({'detail': 'Обычный текст'}).commentCount,
+        0,
+      );
+    },
+  );
+
+  test(
+    'attachment counts read detail files and survive moves and serialization',
+    () {
+      for (final detail in [
+        {
+          'files': [
+            {'id': '1'},
+            {'id': '2'},
+            null,
+          ],
+        },
+        '{"files":[{"id":"1"},{"id":"2"},null]}',
+      ]) {
+        final task = ProjectTaskModel.fromJson({'detail': detail});
+        expect(task.fileCount, 2);
+        expect(
+          ProjectTaskModel.fromJson(
+            task.copyWith(status: 'DONE').toJson(),
+          ).fileCount,
+          2,
+        );
+      }
+      expect(ProjectTaskModel.fromJson({'filesCount': '5'}).fileCount, 5);
+      expect(ProjectTaskModel.fromJson({'detail': 'text'}).fileCount, 0);
+      expect(
+        ProjectTaskModel.fromJson({
+          'detail': {'files': []},
+        }).fileCount,
+        0,
+      );
+    },
+  );
+
+  test(
+    'board task reads nested labels and colored epics without losing them on copy or JSON round trip',
+    () {
+      final task = ProjectTaskModel.fromJson({
+        'id': 'task',
+        'projectId': 'p',
+        'status': 'TODO',
+        'detail': {
+          'labels': [
+            {'id': 'label', 'text': 'Личная метка', 'color': '#e19b31'},
+            {'id': 'empty', 'text': '  '},
+          ],
+        },
+        'epics': [
+          {
+            'epicId': 'e1',
+            'epic': {'name': 'Архитектура', 'color': '#128867'},
+          },
+          {'id': 'e2', 'name': 'Релиз', 'color': '#6366F1'},
+        ],
+      });
+      expect(task.labels.single.text, 'Личная метка');
+      expect(task.labels.single.color, '#e19b31');
+      expect(task.epics.first.color, '#128867');
+      expect(task.epics.last.id, 'e2');
+      final moved = task.copyWith(status: 'DONE', order: 2);
+      final restored = ProjectTaskModel.fromJson(moved.toJson());
+      expect(restored.labels, task.labels);
+      expect(restored.epics, task.epics);
+    },
+  );
+
+  test('labels support JSON detail and ignore malformed legacy detail', () {
+    final task = ProjectTaskModel.fromJson({
+      'detail': '{"labels":[{"id":"l","text":"Метка"}]}',
+    });
+    expect(task.labels.single.text, 'Метка');
+    expect(
+      ProjectTaskModel.fromJson({'detail': 'Обычный текст'}).labels,
+      isEmpty,
+    );
+    expect(
+      ProjectTaskModel.fromJson({
+        'detail': {'labels': null},
+      }).labels,
+      isEmpty,
+    );
+  });
+
   test('ProjectModel parses flexible API values', () {
     final project = ProjectModel.fromJson(<String, dynamic>{
       'id': 'p1',

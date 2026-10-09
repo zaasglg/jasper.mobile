@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../data/models/kanban_column_model.dart';
 import '../../data/models/task_detail_model.dart';
@@ -994,14 +995,13 @@ class _CommentBubble extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.success.withValues(alpha: 0.14),
-            foregroundColor: AppColors.success,
-            child: Text(
-              _initial(comment.author),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-            ),
+          UserAvatar(
+            size: 36,
+            userId: comment.authorId,
+            name: comment.author,
+            avatarUrl:
+                (comment.raw['authorAvatarUrl'] ?? comment.raw['avatarUrl'])
+                    as String?,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1334,19 +1334,13 @@ class _Assignees extends StatelessWidget {
               for (var index = 0; index < visible.length; index++)
                 Positioned(
                   left: index * 20,
-                  child: CircleAvatar(
-                    radius: 14,
-                    backgroundColor: AppColors.accent.withValues(
-                      alpha: 0.1 + index * 0.04,
-                    ),
+                  child: UserAvatar(
+                    size: 28,
+                    userId: visible[index].userId,
+                    name: visible[index].name,
+                    avatarUrl: visible[index].avatarUrl,
+                    backgroundColor: AppColors.accent.withValues(alpha: 0.12),
                     foregroundColor: AppColors.accent,
-                    child: Text(
-                      _initial(visible[index].name),
-                      style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
                   ),
                 ),
             ],
@@ -1670,11 +1664,6 @@ String _timing(int? minutes) {
   if (hours == 0) return '$rest мин';
   if (rest == 0) return '$hours ч';
   return '$hours ч $rest мин';
-}
-
-String _initial(String value) {
-  final trimmed = value.trim();
-  return trimmed.isEmpty ? '•' : trimmed.characters.first.toUpperCase();
 }
 
 Color _parseColor(String value) {

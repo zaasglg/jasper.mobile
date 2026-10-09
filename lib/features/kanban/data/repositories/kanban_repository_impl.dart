@@ -109,6 +109,18 @@ class KanbanRepositoryImpl implements KanbanRepository {
   }
 
   @override
+  Future<void> archiveTask(String taskId) async {
+    try {
+      await _dio.patch<dynamic>(
+        'project-tasks/$taskId',
+        data: <String, dynamic>{'archived': true},
+      );
+    } on DioException catch (error) {
+      throw _exception(error, 'архивировать задачу');
+    }
+  }
+
+  @override
   Future<void> moveTask({
     required String taskId,
     required String projectId,

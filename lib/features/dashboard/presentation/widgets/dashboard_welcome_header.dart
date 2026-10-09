@@ -16,7 +16,7 @@ class DashboardWelcomeHeader extends StatelessWidget {
 
   static const Color _title = Color(0xFF16181D);
   static const Color _subtitle = Color(0xFF8A9099);
-  static const Color _accent = Color(0xFF5B5FEF);
+  static const Color _accent = Color(0xFF6D5FE0);
 
   @override
   Widget build(BuildContext context) {

@@ -3,12 +3,16 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 
 import '../network/dio_factory.dart';
+import '../network/user_avatar_repository.dart';
 import '../storage/auth_token_storage.dart';
 import '../storage/workspace_selection_storage.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/cubit/auth_cubit.dart';
 import '../../features/inbox/data/repositories/inbox_repository_impl.dart';
+import '../../features/chat/data/repositories/chat_repository_impl.dart';
+import '../../features/chat/domain/repositories/chat_repository.dart';
+import '../../features/chat/presentation/cubit/chat_cubit.dart';
 import '../../features/inbox/domain/repositories/inbox_repository.dart';
 import '../../features/inbox/presentation/cubit/inbox_cubit.dart';
 import '../../features/profile/data/repositories/profile_repository_impl.dart';
@@ -45,6 +49,9 @@ Future<void> initServiceLocator() async {
     () => WorkspaceSelectionStorage(sl()),
   );
   sl.registerLazySingleton<Dio>(() => createDio(sl()));
+  sl.registerLazySingleton<UserAvatarRepository>(
+    () => UserAvatarRepository(sl(), sl()),
+  );
 
   // Auth
   sl.registerLazySingleton<AuthRepository>(
@@ -59,6 +66,12 @@ Future<void> initServiceLocator() async {
   // Inbox
   sl.registerLazySingleton<InboxRepository>(() => InboxRepositoryImpl(sl()));
   sl.registerFactory<InboxCubit>(() => InboxCubit(sl()));
+
+  // Messenger
+  sl.registerLazySingleton<ChatRepository>(
+    () => ChatRepositoryImpl(sl(), sl()),
+  );
+  sl.registerFactory<ChatCubit>(() => ChatCubit(sl()));
 
   // Profile
   sl.registerLazySingleton<ProfileRepository>(

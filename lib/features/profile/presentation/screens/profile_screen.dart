@@ -69,7 +69,7 @@ class _ProfileView extends StatelessWidget {
           }
           return const Center(
             child: CircularProgressIndicator(
-              color: Color(0xFF5B5FEF),
+              color: Color(0xFF6D5FE0),
               strokeWidth: 2.5,
             ),
           );
@@ -100,7 +100,7 @@ class _ProfileContent extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: const Color(0xFF5B5FEF).withValues(alpha: 0.2),
+                color: const Color(0xFF6D5FE0).withValues(alpha: 0.2),
                 width: 3,
               ),
             ),

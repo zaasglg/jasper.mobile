@@ -26,7 +26,7 @@ class AppDrawer extends StatelessWidget {
   static const Color _text = Color(0xFF2F333A);
   static const Color _muted = Color(0xFF737A86);
   static const Color _border = Color(0xFFDDE1E7);
-  static const Color _purple = Color(0xFF7C70BC);
+  static const Color _purple = Color(0xFF6D5FE0);
   static const double width = 280;
 
   @override
@@ -441,7 +441,7 @@ class _WorkspaceDropdown extends StatelessWidget {
                         const Icon(
                           LucideIcons.check,
                           size: 18,
-                          color: Color(0xFF635BEB),
+                          color: Color(0xFF6D5FE0),
                         ),
                     ],
                   ),
@@ -634,7 +634,7 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
                     onPressed: isCreating ? null : () => _submit(context),
                     style: FilledButton.styleFrom(
                       elevation: 0,
-                      backgroundColor: const Color(0xFFAAA3ED),
+                      backgroundColor: const Color(0xFF6D5FE0),
                       disabledBackgroundColor: const Color(0xFFD1CEF1),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(

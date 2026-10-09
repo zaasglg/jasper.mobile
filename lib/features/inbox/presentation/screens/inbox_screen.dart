@@ -150,9 +150,10 @@ class _InboxContent extends StatelessWidget {
               return _QuickTaskTile(
                 key: ValueKey<String>(task.id),
                 task: task,
-                onToggle: task.isLocalOnly
-                    ? () => context.read<InboxCubit>().toggleLocal(task.id)
-                    : null,
+                isCompleting: state.completingTaskIds.contains(task.id),
+                onToggle: () => task.isLocalOnly
+                    ? context.read<InboxCubit>().toggleLocal(task.id)
+                    : _completeTask(context, task.id),
                 onDelete: task.isLocalOnly
                     ? () => context.read<InboxCubit>().removeLocal(task.id)
                     : null,
@@ -161,6 +162,19 @@ class _InboxContent extends StatelessWidget {
           ),
         ),
       },
+    );
+  }
+
+  Future<void> _completeTask(BuildContext context, String taskId) async {
+    final cubit = context.read<InboxCubit>();
+    final completed = await cubit.complete(taskId);
+    if (!context.mounted || completed) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          cubit.state.completionErrorMessage ?? 'Не удалось завершить задачу.',
+        ),
+      ),
     );
   }
 }
@@ -352,11 +366,13 @@ class _QuickTaskTile extends StatelessWidget {
   const _QuickTaskTile({
     super.key,
     required this.task,
+    required this.isCompleting,
     required this.onToggle,
     required this.onDelete,
   });
 
   final InboxTaskModel task;
+  final bool isCompleting;
   final VoidCallback? onToggle;
   final VoidCallback? onDelete;
 
@@ -445,7 +461,7 @@ class _QuickTaskTile extends StatelessWidget {
                     : 'Завершить задачу',
                 child: InkWell(
                   key: Key('inbox-task-checkbox-${task.id}'),
-                  onTap: onToggle,
+                  onTap: isCompleting ? null : onToggle,
                   customBorder: const CircleBorder(),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
@@ -464,7 +480,15 @@ class _QuickTaskTile extends StatelessWidget {
                         width: 1.6,
                       ),
                     ),
-                    child: task.completed
+                    child: isCompleting
+                        ? const SizedBox.square(
+                            dimension: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.8,
+                              color: AppColors.accent,
+                            ),
+                          )
+                        : task.completed
                         ? const Icon(
                             Icons.check_rounded,
                             size: 15,

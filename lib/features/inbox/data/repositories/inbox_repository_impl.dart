@@ -23,6 +23,17 @@ class InboxRepositoryImpl implements InboxRepository {
   }
 
   @override
+  Future<void> completeInboxTask({required String id}) async {
+    try {
+      await _dio.post<dynamic>('inbox/${Uri.encodeComponent(id)}/complete');
+    } on DioException catch (error) {
+      throw InboxException(_messageFor(error, completing: true));
+    } catch (_) {
+      throw const InboxException('Не удалось завершить задачу Инбокса.');
+    }
+  }
+
+  @override
   Future<List<InboxTaskModel>> getInbox({
     bool archived = true,
     int sort = 1,
@@ -83,8 +94,14 @@ class InboxRepositoryImpl implements InboxRepository {
     throw const InboxException('Сервер вернул некорректный список Инбокса.');
   }
 
-  String _messageFor(DioException error, {bool creating = false}) {
-    final fallback = creating
+  String _messageFor(
+    DioException error, {
+    bool creating = false,
+    bool completing = false,
+  }) {
+    final fallback = completing
+        ? 'Не удалось завершить задачу Инбокса.'
+        : creating
         ? 'Не удалось создать задачу Инбокса.'
         : 'Не удалось загрузить задачи Инбокса.';
     switch (error.type) {
@@ -105,7 +122,9 @@ class InboxRepositoryImpl implements InboxRepository {
         return 'Запрос был отменён.';
       case DioExceptionType.badCertificate:
       case DioExceptionType.unknown:
-        return creating ? fallback : 'Не удалось подключиться к серверу.';
+        return creating || completing
+            ? fallback
+            : 'Не удалось подключиться к серверу.';
     }
   }
 }

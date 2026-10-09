@@ -52,12 +52,24 @@ void main() {
 
     expect(adapter.createdTitle, 'Новая задача');
   });
+
+  test('completes an inbox task using documented endpoint', () async {
+    final adapter = _InboxApiAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/'))
+      ..httpClientAdapter = adapter;
+    final repository = InboxRepositoryImpl(dio);
+
+    await repository.completeInboxTask(id: 'inbox-1');
+
+    expect(adapter.completedTaskId, 'inbox-1');
+  });
 }
 
 class _InboxApiAdapter implements HttpClientAdapter {
   int? archived;
   int? sort;
   String? createdTitle;
+  String? completedTaskId;
 
   @override
   Future<ResponseBody> fetch(
@@ -75,6 +87,13 @@ class _InboxApiAdapter implements HttpClientAdapter {
     }
     if (options.path == 'inbox' && options.method == 'POST') {
       createdTitle = (options.data as Map<String, dynamic>)['title'] as String?;
+      return _jsonResponse('{}', statusCode: 201);
+    }
+    final completeMatch = RegExp(
+      r'^inbox/([^/]+)/complete$',
+    ).firstMatch(options.path);
+    if (completeMatch != null && options.method == 'POST') {
+      completedTaskId = completeMatch.group(1);
       return _jsonResponse('{}', statusCode: 201);
     }
     return _jsonResponse('{}', statusCode: 404);

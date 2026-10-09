@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -18,19 +18,9 @@ class ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = avatarUrl?.trim();
-    if (url == null || url.isEmpty) return _fallback();
-
-    return ClipOval(
-      child: CachedNetworkImage(
-        imageUrl: url,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        placeholder: (context, _) => _fallback(),
-        errorWidget: (context, _, _) => _fallback(),
-      ),
-    );
+    final url = resolveUserAvatarUrl(avatarUrl);
+    if (url == null) return _fallback();
+    return UserAvatar(size: size, avatarUrl: url);
   }
 
   Widget _fallback() {

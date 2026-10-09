@@ -4,4 +4,6 @@ abstract interface class InboxRepository {
   Future<List<InboxTaskModel>> getInbox({bool archived = true, int sort = 1});
 
   Future<void> createInbox({required String title});
+
+  Future<void> completeInboxTask({required String id});
 }

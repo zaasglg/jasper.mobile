@@ -13,7 +13,7 @@ class DashboardProjectsCard extends StatelessWidget {
 
   static const Color _ink = Color(0xFF252525);
   static const Color _muted = Color(0xFF787774);
-  static const Color _accent = Color(0xFF6257C7);
+  static const Color _accent = Color(0xFF6D5FE0);
   static const Color _border = Color(0xFFEAEAE8);
 
   @override

@@ -11,6 +11,8 @@ class InboxState extends Equatable {
     this.errorMessage,
     this.isCreating = false,
     this.creationErrorMessage,
+    this.completingTaskIds = const <String>{},
+    this.completionErrorMessage,
   });
 
   final InboxStatus status;
@@ -18,6 +20,8 @@ class InboxState extends Equatable {
   final String? errorMessage;
   final bool isCreating;
   final String? creationErrorMessage;
+  final Set<String> completingTaskIds;
+  final String? completionErrorMessage;
 
   InboxState copyWith({
     InboxStatus? status,
@@ -27,6 +31,9 @@ class InboxState extends Equatable {
     bool? isCreating,
     String? creationErrorMessage,
     bool clearCreationError = false,
+    Set<String>? completingTaskIds,
+    String? completionErrorMessage,
+    bool clearCompletionError = false,
   }) {
     return InboxState(
       status: status ?? this.status,
@@ -36,6 +43,10 @@ class InboxState extends Equatable {
       creationErrorMessage: clearCreationError
           ? null
           : creationErrorMessage ?? this.creationErrorMessage,
+      completingTaskIds: completingTaskIds ?? this.completingTaskIds,
+      completionErrorMessage: clearCompletionError
+          ? null
+          : completionErrorMessage ?? this.completionErrorMessage,
     );
   }
 
@@ -46,5 +57,7 @@ class InboxState extends Equatable {
     errorMessage,
     isCreating,
     creationErrorMessage,
+    completingTaskIds,
+    completionErrorMessage,
   ];
 }

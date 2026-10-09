@@ -45,10 +45,45 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('completes a server inbox task by tapping its circle', (
+    tester,
+  ) async {
+    final repository = _FakeInboxRepository(
+      initialTasks: const <InboxTaskModel>[
+        InboxTaskModel(id: 'server-1', title: 'Завершить меня'),
+      ],
+    );
+    final cubit = InboxCubit(repository)..load();
+    addTearDown(cubit.close);
+    await tester.pumpWidget(
+      BlocProvider<InboxCubit>.value(
+        value: cubit,
+        child: const MaterialApp(home: InboxScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('inbox-task-checkbox-server-1')));
+    await tester.pumpAndSettle();
+
+    expect(repository.completedTaskId, 'server-1');
+    expect(find.text('Завершить меня'), findsNothing);
+  });
 }
 
 class _FakeInboxRepository implements InboxRepository {
-  final List<InboxTaskModel> _tasks = <InboxTaskModel>[];
+  _FakeInboxRepository({List<InboxTaskModel> initialTasks = const []})
+    : _tasks = List<InboxTaskModel>.of(initialTasks);
+
+  final List<InboxTaskModel> _tasks;
+  String? completedTaskId;
+
+  @override
+  Future<void> completeInboxTask({required String id}) async {
+    completedTaskId = id;
+    _tasks.removeWhere((task) => task.id == id);
+  }
 
   @override
   Future<void> createInbox({required String title}) async {

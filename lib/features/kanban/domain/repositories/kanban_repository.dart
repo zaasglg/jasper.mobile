@@ -40,6 +40,7 @@ abstract interface class KanbanRepository {
   });
 
   Future<void> reorderColumns(String projectId, List<String> ids);
+  Future<void> archiveTask(String taskId);
   Future<void> archiveColumn(String columnId);
   Future<void> deleteColumn(String columnId);
 }

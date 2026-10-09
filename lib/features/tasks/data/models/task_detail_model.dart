@@ -1,5 +1,8 @@
 import 'package:equatable/equatable.dart';
 
+import 'task_label_model.dart';
+export 'task_label_model.dart';
+
 import '../../../projects/data/models/project_task_model.dart';
 
 class TaskDetailsPayload extends Equatable {
@@ -493,53 +496,6 @@ class TaskFileModel extends Equatable {
     uploadedAt,
     raw,
   ];
-}
-
-class TaskLabelModel extends Equatable {
-  const TaskLabelModel({
-    required this.id,
-    required this.text,
-    this.color = '#6366F1',
-    this.raw = const <String, Object?>{},
-  });
-
-  factory TaskLabelModel.fromJson(Map<String, dynamic> json) {
-    return TaskLabelModel(
-      id: json['id']?.toString() ?? '',
-      text: json['text']?.toString() ?? '',
-      color: json['color']?.toString() ?? '#6366F1',
-      raw: Map<String, Object?>.from(json),
-    );
-  }
-
-  final String id;
-  final String text;
-  final String color;
-  final Map<String, Object?> raw;
-
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    ...raw,
-    'id': id,
-    'text': text,
-    'color': color,
-  };
-
-  TaskLabelModel copyWith({
-    String? id,
-    String? text,
-    String? color,
-    Map<String, Object?>? raw,
-  }) {
-    return TaskLabelModel(
-      id: id ?? this.id,
-      text: text ?? this.text,
-      color: color ?? this.color,
-      raw: raw ?? this.raw,
-    );
-  }
-
-  @override
-  List<Object?> get props => <Object?>[id, text, color, raw];
 }
 
 class TaskResourceModel extends Equatable {

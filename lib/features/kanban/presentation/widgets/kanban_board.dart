@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -9,7 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../projects/data/models/project_model.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/data/models/kanban_column_model.dart';
-import '../../../tasks/domain/utils/my_tasks_utils.dart';
+import 'task_card.dart';
 import '../cubit/kanban_cubit.dart';
 import '../cubit/kanban_state.dart';
 
@@ -29,6 +28,62 @@ class _KanbanBoardState extends State<KanbanBoard> {
   final PageController _horizontalController = PageController(
     viewportFraction: _columnViewportFraction,
   );
+
+  final _archiveTarget = GlobalKey();
+  final _moveTarget = GlobalKey();
+  ProjectTaskModel? _draggedTask;
+  _TaskDropAction? _hoveredAction;
+  bool _dragCancelled = false;
+
+  void _updateDropTarget(PointerMoveEvent event) {
+    if (_draggedTask == null) return;
+    _TaskDropAction? action;
+    for (final entry in {
+      _TaskDropAction.archive: _archiveTarget,
+      _TaskDropAction.move: _moveTarget,
+    }.entries) {
+      final box = entry.value.currentContext?.findRenderObject() as RenderBox?;
+      if (box != null &&
+          box.hasSize &&
+          (box.localToGlobal(Offset.zero) & box.size).contains(
+            event.position,
+          )) {
+        action = entry.key;
+      }
+    }
+    if (_hoveredAction != action) setState(() => _hoveredAction = action);
+  }
+
+  void _startTaskDrag(ProjectTaskModel task) {
+    setState(() {
+      _draggedTask = task;
+      _hoveredAction = null;
+      _dragCancelled = false;
+    });
+  }
+
+  bool _endTaskDrag() {
+    final task = _draggedTask;
+    final action = _hoveredAction;
+    final cancelled = _dragCancelled;
+    setState(() {
+      _draggedTask = null;
+      _hoveredAction = null;
+    });
+    if (!cancelled && task != null && action != null) {
+      // Let the reorder proxy finish its drop animation before opening a sheet.
+      Future<void>.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted || widget.project.id != task.projectId) return;
+        final cubit = context.read<KanbanCubit>();
+        if (action == _TaskDropAction.move) {
+          _showMoveTask(context, task, cubit.state);
+        } else {
+          cubit.archiveTask(task);
+        }
+      });
+    }
+    return cancelled || action != null;
+  }
 
   @override
   void didUpdateWidget(covariant KanbanBoard oldWidget) {
@@ -65,13 +120,47 @@ class _KanbanBoardState extends State<KanbanBoard> {
           );
       },
       builder: (context, state) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            _BoardToolbar(onAddColumn: () => _showCreateColumn(context)),
-            const SizedBox(height: 14),
-            Expanded(child: _boardContent(context, state)),
-          ],
+        return Listener(
+          onPointerMove: _updateDropTarget,
+          onPointerCancel: (_) {
+            _dragCancelled = true;
+            if (_draggedTask != null) _endTaskDrag();
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              SizedBox(
+                height: 52,
+                child: _draggedTask == null
+                    ? _BoardToolbar(
+                        onAddColumn: () => _showCreateColumn(context),
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: _TaskDropZone(
+                              key: _archiveTarget,
+                              label: 'Архив',
+                              icon: LucideIcons.archive,
+                              active: _hoveredAction == _TaskDropAction.archive,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _TaskDropZone(
+                              key: _moveTarget,
+                              label: 'Переместить',
+                              icon: LucideIcons.arrowRightLeft,
+                              active: _hoveredAction == _TaskDropAction.move,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 14),
+              Expanded(child: _boardContent(context, state)),
+            ],
+          ),
         );
       },
     );
@@ -115,7 +204,12 @@ class _KanbanBoardState extends State<KanbanBoard> {
             2,
           ),
           child: _KanbanColumn(
+            key: ValueKey('${widget.project.id}-${column.id}'),
             column: column,
+            canReorder:
+                state.movingTaskIds.isEmpty &&
+                state.search.trim().isEmpty &&
+                state.priorityFilter == null,
             tasks: state.tasksFor(column),
             exceedsWip: state.exceedsWip(column),
             onAddTask: (title) => context.read<KanbanCubit>().createTask(
@@ -128,7 +222,8 @@ class _KanbanBoardState extends State<KanbanBoard> {
               column.statusMap,
               position,
             ),
-            onMoveMenu: (task) => _showMoveTask(context, task, state),
+            onDragStart: _startTaskDrag,
+            onDragEnd: _endTaskDrag,
             onManage: (action) => _manageColumn(context, column, action),
           ),
         );
@@ -211,6 +306,55 @@ class _KanbanBoardState extends State<KanbanBoard> {
   }
 }
 
+enum _TaskDropAction { archive, move }
+
+class _TaskDropZone extends StatelessWidget {
+  const _TaskDropZone({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.active,
+  });
+  final String label;
+  final IconData icon;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: const Duration(milliseconds: 160),
+    curve: Curves.easeOutCubic,
+    decoration: BoxDecoration(
+      color: active
+          ? AppColors.accent
+          : AppColors.accent.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: active
+            ? AppColors.accent
+            : AppColors.accent.withValues(alpha: 0.25),
+      ),
+    ),
+    alignment: Alignment.center,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 18, color: active ? Colors.white : AppColors.accent),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            label,
+            style: GoogleFonts.manrope(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: active ? Colors.white : AppColors.accent,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _BoardToolbar extends StatelessWidget {
   const _BoardToolbar({required this.onAddColumn});
 
@@ -254,21 +398,26 @@ class _BoardToolbar extends StatelessWidget {
 
 class _KanbanColumn extends StatefulWidget {
   const _KanbanColumn({
+    super.key,
     required this.column,
+    required this.canReorder,
     required this.tasks,
     required this.exceedsWip,
     required this.onAddTask,
     required this.onMove,
-    required this.onMoveMenu,
+    required this.onDragStart,
+    required this.onDragEnd,
     required this.onManage,
   });
 
   final KanbanColumnModel column;
+  final bool canReorder;
   final List<ProjectTaskModel> tasks;
   final bool exceedsWip;
   final Future<void> Function(String title) onAddTask;
   final void Function(ProjectTaskModel task, int position) onMove;
-  final ValueChanged<ProjectTaskModel> onMoveMenu;
+  final ValueChanged<ProjectTaskModel> onDragStart;
+  final bool Function() onDragEnd;
   final ValueChanged<_ColumnAction> onManage;
 
   @override
@@ -284,12 +433,33 @@ class _KanbanColumnState extends State<_KanbanColumn> {
   final TextEditingController _taskTitleController = TextEditingController();
   final FocusNode _taskTitleFocusNode = FocusNode();
 
-  bool _highlighted = false;
+  final _columnBounds = GlobalKey();
+  final _dragVisual = ValueNotifier<(double, bool)>((0, false));
+  double _pointerStartX = 0;
+  bool _isDragging = false;
+
+  void _trackDrag(PointerMoveEvent event) {
+    if (!_isDragging) return;
+    final box = _columnBounds.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final outside = !(box.localToGlobal(Offset.zero) & box.size).contains(
+      event.position,
+    );
+    // Flutter handles vertical movement; add the pointer's horizontal movement
+    // only outside the column, keeping normal list reordering aligned.
+    _dragVisual.value = (
+      outside ? event.position.dx - _pointerStartX : 0,
+      outside,
+    );
+  }
+
+  bool _skipReorder = false;
   bool _isAddingTask = false;
   bool _isSubmittingTask = false;
 
   @override
   void dispose() {
+    _dragVisual.dispose();
     _taskTitleController.dispose();
     _taskTitleFocusNode.dispose();
     super.dispose();
@@ -391,187 +561,204 @@ class _KanbanColumnState extends State<_KanbanColumn> {
       columnColor.withValues(alpha: isDark ? 0.22 : 0.15),
       colors.surface,
     );
-    final highlightedBackground = Color.alphaBlend(
-      columnColor.withValues(alpha: isDark ? 0.34 : 0.24),
-      colors.surface,
-    );
     final headerColor = Color.lerp(columnColor, colors.onSurface, 0.58)!;
     final wip = widget.column.wip;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      decoration: BoxDecoration(
-        color: _highlighted ? highlightedBackground : columnBackground,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 15, 8, 13),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    widget.column.name.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.manrope(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.25,
+    return Listener(
+      onPointerDown: (event) => _pointerStartX = event.position.dx,
+      onPointerMove: _trackDrag,
+      onPointerCancel: (_) {
+        _isDragging = false;
+        _dragVisual.value = (0, false);
+      },
+      child: AnimatedContainer(
+        key: _columnBounds,
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          color: columnBackground,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 15, 8, 13),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      widget.column.name.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.25,
+                        color: headerColor,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: widget.exceedsWip
+                          ? AppColors.error
+                          : columnColor.withValues(alpha: 0.88),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      wip == null
+                          ? '${widget.tasks.length}'
+                          : '${widget.tasks.length} / $wip',
+                      style: GoogleFonts.manrope(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Действия колонки',
+                    onPressed: _showColumnMenu,
+                    icon: Icon(
+                      LucideIcons.ellipsis,
+                      size: 17,
                       color: headerColor,
                     ),
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: widget.exceedsWip
-                        ? AppColors.error
-                        : columnColor.withValues(alpha: 0.88),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Text(
-                    wip == null
-                        ? '${widget.tasks.length}'
-                        : '${widget.tasks.length} / $wip',
-                    style: GoogleFonts.manrope(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Действия колонки',
-                  onPressed: _showColumnMenu,
-                  icon: Icon(
-                    LucideIcons.ellipsis,
-                    size: 17,
-                    color: headerColor,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: DragTarget<_DragTask>(
-              onWillAcceptWithDetails: (_) {
-                setState(() => _highlighted = true);
-                return true;
-              },
-              onLeave: (_) => setState(() => _highlighted = false),
-              onAcceptWithDetails: (details) {
-                setState(() => _highlighted = false);
-                widget.onMove(details.data.task, widget.tasks.length);
-              },
-              builder: (context, _, _) {
-                if (widget.tasks.isEmpty) {
-                  return const _EmptyColumn();
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  itemCount: widget.tasks.length,
-                  itemBuilder: (context, index) {
-                    final task = widget.tasks[index];
-                    return DragTarget<_DragTask>(
-                      onWillAcceptWithDetails: (_) => true,
-                      onAcceptWithDetails: (details) =>
-                          widget.onMove(details.data.task, index),
-                      builder: (context, _, _) => Padding(
-                        padding: const EdgeInsets.only(bottom: 9),
-                        child: LongPressDraggable<_DragTask>(
-                          data: _DragTask(task),
-                          axis: Axis.vertical,
-                          delay: const Duration(milliseconds: 220),
-                          hapticFeedbackOnStart: true,
-                          feedback: Material(
-                            color: Colors.transparent,
-                            child: SizedBox(
-                              width: MediaQuery.sizeOf(context).width * 0.72,
-                              child: _TaskCard(
-                                task: task,
-                                dragging: true,
-                                onMove: null,
+            Expanded(
+              child: widget.tasks.isEmpty
+                  ? const _EmptyColumn()
+                  : ReorderableListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      buildDefaultDragHandles: false,
+                      autoScrollerVelocityScalar: 45,
+                      itemCount: widget.tasks.length,
+                      proxyDecorator: (child, index, animation) =>
+                          AnimatedBuilder(
+                            animation: Listenable.merge([
+                              animation,
+                              _dragVisual,
+                            ]),
+                            child: child,
+                            builder: (context, child) => Transform.translate(
+                              offset: Offset(
+                                _dragVisual.value.$1 *
+                                    (_isDragging ? 1 : animation.value),
+                                0,
+                              ),
+                              child: Opacity(
+                                opacity: _dragVisual.value.$2 ? 0.65 : 1,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  elevation:
+                                      6 *
+                                      Curves.easeOutCubic.transform(
+                                        animation.value,
+                                      ),
+                                  shadowColor: AppColors.ink.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: child,
+                                ),
                               ),
                             ),
                           ),
-                          childWhenDragging: Opacity(
-                            opacity: 0.35,
-                            child: _TaskCard(task: task, onMove: null),
+                      dragBoundaryProvider: (_) => null,
+                      onReorderStart: (index) {
+                        _skipReorder = false;
+                        _isDragging = true;
+                        _dragVisual.value = (0, false);
+                        widget.onDragStart(widget.tasks[index]);
+                      },
+                      onReorderEnd: (_) {
+                        _isDragging = false;
+                        _skipReorder = widget.onDragEnd();
+                      },
+                      onReorder: (oldIndex, newIndex) {
+                        if (_skipReorder) return;
+                        if (newIndex > oldIndex) newIndex--;
+                        if (newIndex == oldIndex) return;
+                        widget.onMove(widget.tasks[oldIndex], newIndex);
+                      },
+                      itemBuilder: (context, index) {
+                        final task = widget.tasks[index];
+                        return Padding(
+                          key: ValueKey(task.id),
+                          padding: const EdgeInsets.only(bottom: 9),
+                          child: ReorderableDelayedDragStartListener(
+                            index: index,
+                            enabled: widget.canReorder,
+                            child: TaskCard(task: task),
                           ),
-                          child: _TaskCard(
-                            task: task,
-                            onMove: () => widget.onMoveMenu(task),
-                          ),
-                        ),
+                        );
+                      },
+                    ),
+            ),
+            ClipRect(
+              child: AnimatedSize(
+                duration: _composerAnimationDuration,
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.bottomCenter,
+                child: AnimatedSwitcher(
+                  duration: _composerAnimationDuration,
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  layoutBuilder: (currentChild, previousChildren) => Stack(
+                    alignment: Alignment.bottomCenter,
+                    children: <Widget>[...previousChildren, ?currentChild],
+                  ),
+                  transitionBuilder: (child, animation) {
+                    final curvedAnimation = CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    );
+                    return FadeTransition(
+                      opacity: curvedAnimation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.08),
+                          end: Offset.zero,
+                        ).animate(curvedAnimation),
+                        child: child,
                       ),
                     );
                   },
-                );
-              },
-            ),
-          ),
-          ClipRect(
-            child: AnimatedSize(
-              duration: _composerAnimationDuration,
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.bottomCenter,
-              child: AnimatedSwitcher(
-                duration: _composerAnimationDuration,
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                layoutBuilder: (currentChild, previousChildren) => Stack(
-                  alignment: Alignment.bottomCenter,
-                  children: <Widget>[...previousChildren, ?currentChild],
-                ),
-                transitionBuilder: (child, animation) {
-                  final curvedAnimation = CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                  );
-                  return FadeTransition(
-                    opacity: curvedAnimation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 0.08),
-                        end: Offset.zero,
-                      ).animate(curvedAnimation),
-                      child: child,
-                    ),
-                  );
-                },
-                child: _isAddingTask
-                    ? _InlineTaskComposer(
-                        key: const ValueKey<String>('task-composer'),
-                        controller: _taskTitleController,
-                        focusNode: _taskTitleFocusNode,
-                        isSubmitting: _isSubmittingTask,
-                        accentColor: headerColor,
-                        onSubmit: _submitTask,
-                        onCancel: _closeTaskComposer,
-                      )
-                    : Padding(
-                        key: const ValueKey<String>('add-task-button'),
-                        padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: TextButton.icon(
-                            onPressed: _openTaskComposer,
-                            icon: const Icon(LucideIcons.plus, size: 17),
-                            label: const Text('Добавить задачу'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: headerColor,
+                  child: _isAddingTask
+                      ? _InlineTaskComposer(
+                          key: const ValueKey<String>('task-composer'),
+                          controller: _taskTitleController,
+                          focusNode: _taskTitleFocusNode,
+                          isSubmitting: _isSubmittingTask,
+                          accentColor: headerColor,
+                          onSubmit: _submitTask,
+                          onCancel: _closeTaskComposer,
+                        )
+                      : Padding(
+                          key: const ValueKey<String>('add-task-button'),
+                          padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: TextButton.icon(
+                              onPressed: _openTaskComposer,
+                              icon: const Icon(LucideIcons.plus, size: 17),
+                              label: const Text('Добавить задачу'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: headerColor,
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -671,11 +858,6 @@ class _InlineTaskComposer extends StatelessWidget {
   }
 }
 
-class _DragTask {
-  const _DragTask(this.task);
-  final ProjectTaskModel task;
-}
-
 Color _parseColumnColor(String? value) {
   final source = value?.trim();
   if (source == null || source.isEmpty) return AppColors.accent;
@@ -693,238 +875,6 @@ Color _parseColumnColor(String? value) {
 
 enum _ColumnAction { moveLeft, moveRight, rename, archive, delete }
 
-class _TaskCard extends StatelessWidget {
-  const _TaskCard({
-    required this.task,
-    required this.onMove,
-    this.dragging = false,
-  });
-
-  final ProjectTaskModel task;
-  final VoidCallback? onMove;
-  final bool dragging;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final overdue = isTaskOverdue(task, DateTime.now());
-    return InkWell(
-      onTap: dragging
-          ? null
-          : () => context.push('/tasks/${task.id}', extra: task),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? colors.surfaceContainerHigh
-              : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: AppColors.ink.withValues(alpha: dragging ? 0.14 : 0.045),
-              blurRadius: dragging ? 18 : 8,
-              offset: Offset(0, dragging ? 8 : 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    task.displayId.isEmpty ? task.id : task.displayId,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
-                      color: colors.onSurfaceVariant.withValues(alpha: 0.78),
-                    ),
-                  ),
-                ),
-                if (onMove != null)
-                  SizedBox(
-                    width: 32,
-                    height: 28,
-                    child: IconButton(
-                      tooltip: 'Действия задачи',
-                      padding: EdgeInsets.zero,
-                      onPressed: onMove,
-                      icon: const Icon(LucideIcons.ellipsis, size: 17),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              task.title.isEmpty ? 'Без названия' : task.title,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.manrope(
-                fontSize: 13,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-                color: colors.onSurface,
-              ),
-            ),
-            if (task.epicNames.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 9),
-              Wrap(
-                spacing: 5,
-                runSpacing: 5,
-                children: <Widget>[
-                  for (final epic in task.epicNames.take(2))
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        epic,
-                        style: GoogleFonts.manrope(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 11),
-            Row(
-              children: <Widget>[
-                if (task.end != null) ...<Widget>[
-                  Icon(
-                    LucideIcons.calendarDays,
-                    size: 13,
-                    color: overdue ? AppColors.error : AppColors.muted,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    formatRussianTaskDate(task.end!),
-                    style: GoogleFonts.manrope(
-                      fontSize: 10,
-                      fontWeight: overdue ? FontWeight.w700 : FontWeight.w500,
-                      color: overdue ? AppColors.error : AppColors.muted,
-                    ),
-                  ),
-                ],
-                if (task.assignees.isNotEmpty) ...<Widget>[
-                  const SizedBox(width: 8),
-                  _TaskAvatars(assignees: task.assignees),
-                ],
-                const Spacer(),
-                if (task.commentCount > 0) ...<Widget>[
-                  const Icon(
-                    LucideIcons.messageCircle,
-                    size: 13,
-                    color: AppColors.muted,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    '${task.commentCount}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                if (task.checklistTotal > 0) ...<Widget>[
-                  const Icon(
-                    LucideIcons.listChecks,
-                    size: 13,
-                    color: AppColors.muted,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    '${task.checklistCompleted}/${task.checklistTotal}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            if ((task.progress ?? 0) > 0 &&
-                (task.progress ?? 0) < 100) ...<Widget>[
-              const SizedBox(height: 9),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(99),
-                child: LinearProgressIndicator(
-                  value: (task.progress ?? 0) / 100,
-                  minHeight: 4,
-                  backgroundColor: AppColors.skeletonTrack,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppColors.accent,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TaskAvatars extends StatelessWidget {
-  const _TaskAvatars({required this.assignees});
-
-  final List<TaskAssigneeModel> assignees;
-
-  @override
-  Widget build(BuildContext context) {
-    final visible = assignees.take(3).toList(growable: false);
-    return SizedBox(
-      width: 18 + (visible.length - 1) * 12,
-      height: 18,
-      child: Stack(
-        children: <Widget>[
-          for (var index = 0; index < visible.length; index++)
-            Positioned(
-              left: index * 12,
-              child: Container(
-                width: 18,
-                height: 18,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.1 + index * 0.04),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.2),
-                ),
-                child: Text(
-                  _initial(visible[index]),
-                  style: GoogleFonts.manrope(
-                    fontSize: 7,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.accent,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  String _initial(TaskAssigneeModel assignee) {
-    final value = assignee.name.trim();
-    return value.isEmpty ? '•' : value.characters.first.toUpperCase();
-  }
-}
-
 class _EmptyColumn extends StatelessWidget {
   const _EmptyColumn();
 
@@ -932,7 +882,7 @@ class _EmptyColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Text(
-        'Перетащите задачу сюда',
+        'В этой колонке пока нет задач',
         style: GoogleFonts.manrope(fontSize: 12, color: AppColors.muted),
       ),
     );
@@ -1149,7 +1099,16 @@ class _MoveTaskSheetState extends State<_MoveTaskSheet> {
     final column = widget.state.columns
         .where((item) => item.statusMap == _status)
         .firstOrNull;
-    final count = column == null ? 0 : widget.state.tasksFor(column).length;
+    final count = column == null
+        ? 0
+        : widget.state.tasks
+              .where(
+                (task) =>
+                    task.status.toUpperCase() ==
+                        column.statusMap.toUpperCase() &&
+                    task.id != widget.task.id,
+              )
+              .length;
     _position = _position.clamp(0, count);
     return SafeArea(
       child: Padding(

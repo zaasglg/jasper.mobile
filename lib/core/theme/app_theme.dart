@@ -7,7 +7,7 @@ abstract final class AppColors {
   static const Color border = Color(0xFFE6E6E3);
   static const Color error = Color(0xFFC72C21);
   static const Color success = Color(0xFF4B9460);
-  static const Color accent = Color(0xFF5B5FEF);
+  static const Color accent = Color(0xFF6D5FE0);
   static const Color subtleSurface = Color(0xFFF8F8F7);
   static const Color quietSurface = Color(0xFFFBFBFA);
   static const Color badgeSurface = Color(0xFFF5F5F3);

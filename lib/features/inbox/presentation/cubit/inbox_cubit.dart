@@ -76,6 +76,58 @@ class InboxCubit extends Cubit<InboxState> {
     }
   }
 
+  Future<bool> complete(String taskId) async {
+    if (taskId.isEmpty || state.completingTaskIds.contains(taskId)) {
+      return false;
+    }
+    emit(
+      state.copyWith(
+        completingTaskIds: <String>{...state.completingTaskIds, taskId},
+        clearCompletionError: true,
+      ),
+    );
+    try {
+      await _repository.completeInboxTask(id: taskId);
+      if (isClosed) return false;
+      final tasks = state.tasks
+          .where((task) => task.id != taskId)
+          .toList(growable: false);
+      final completingIds = <String>{...state.completingTaskIds}
+        ..remove(taskId);
+      emit(
+        state.copyWith(
+          tasks: tasks,
+          completingTaskIds: completingIds,
+          clearCompletionError: true,
+        ),
+      );
+      unawaited(InboxHomeWidgetService.sync(tasks));
+      return true;
+    } on InboxException catch (error) {
+      if (isClosed) return false;
+      final completingIds = <String>{...state.completingTaskIds}
+        ..remove(taskId);
+      emit(
+        state.copyWith(
+          completingTaskIds: completingIds,
+          completionErrorMessage: error.message,
+        ),
+      );
+      return false;
+    } catch (_) {
+      if (isClosed) return false;
+      final completingIds = <String>{...state.completingTaskIds}
+        ..remove(taskId);
+      emit(
+        state.copyWith(
+          completingTaskIds: completingIds,
+          completionErrorMessage: 'Не удалось завершить задачу Инбокса.',
+        ),
+      );
+      return false;
+    }
+  }
+
   void addLocal(String title) {
     final value = title.trim();
     if (value.isEmpty) return;

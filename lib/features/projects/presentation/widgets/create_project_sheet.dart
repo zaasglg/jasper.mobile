@@ -15,7 +15,7 @@ const _secondary = Color(0xFF666B80);
 const _muted = Color(0xFF989DA9);
 const _border = Color(0xFFDADCE2);
 const _surface = Color(0xFFFAFAF9);
-const _accent = Color(0xFF6C5CE7);
+const _accent = Color(0xFF6D5FE0);
 const _danger = Color(0xFFB42318);
 
 Future<void> showCreateProjectFlow(BuildContext context) async {

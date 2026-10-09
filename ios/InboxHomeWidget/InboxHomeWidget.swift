@@ -1,7 +1,7 @@
 import SwiftUI
 import WidgetKit
 
-private let appGroupId = "group.com.example.jospar"
+private let appGroupId = "group.com.jospar.app"
 private let widgetKind = "InboxHomeWidget"
 
 private struct InboxEntry: TimelineEntry {

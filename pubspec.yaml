@@ -46,6 +46,14 @@ dependencies:
   google_fonts: ^8.2.1
   lucide_icons_flutter: ^3.1.15
   home_widget: ^0.9.4
+  open_filex: ^4.7.0
+  path_provider: ^2.1.6
+  record: ^6.2.1
+  just_audio: ^0.10.6
+  camera: ^0.12.0+2
+  video_player: ^2.11.1
+  file_picker: ^13.1.0
+  mime: ^2.1.0
 
 dev_dependencies:
   flutter_test:
@@ -57,6 +65,12 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+# path_provider_foundation 2.6.0 crashes on iOS Simulator while loading the
+# objective_c native asset. Keep the last stable platform-channel release
+# until the upstream FFI loader regression is fixed.
+dependency_overrides:
+  path_provider_foundation: 2.5.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

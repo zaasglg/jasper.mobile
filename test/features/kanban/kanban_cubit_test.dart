@@ -49,6 +49,35 @@ void main() {
     await cubit.close();
   });
 
+  test(
+    'archives optimistically and restores the task after a failure',
+    () async {
+      final completer = Completer<void>();
+      final cubit = KanbanCubit(_Repository(moveCompleter: completer));
+      await cubit.load('project');
+      final pending = cubit.archiveTask(task);
+      expect(cubit.state.tasks, isEmpty);
+      completer.completeError(const KanbanException('Архив недоступен'));
+      await pending;
+      expect(cubit.state.tasks.single.id, task.id);
+      expect(cubit.state.actionErrorMessage, 'Архив недоступен');
+      expect(cubit.state.movingTaskIds, isEmpty);
+      await cubit.close();
+    },
+  );
+
+  test(
+    'successful archive removes task and clears the pending state',
+    () async {
+      final cubit = KanbanCubit(_Repository());
+      await cubit.load('project');
+      await cubit.archiveTask(task);
+      expect(cubit.state.tasks, isEmpty);
+      expect(cubit.state.movingTaskIds, isEmpty);
+      await cubit.close();
+    },
+  );
+
   test('explains a 403 response when moving to DONE', () async {
     final repository = _Repository(
       moveError: const KanbanException('Forbidden', statusCode: 403),
@@ -110,6 +139,11 @@ class _Repository implements KanbanRepository {
 
   @override
   Future<void> archiveColumn(String columnId) async {}
+
+  @override
+  Future<void> archiveTask(String taskId) async {
+    if (moveCompleter != null) await moveCompleter!.future;
+  }
 
   @override
   Future<ProjectTaskModel> createTask({

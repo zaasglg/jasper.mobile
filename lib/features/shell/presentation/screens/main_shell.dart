@@ -29,7 +29,7 @@ class MainShell extends StatefulWidget {
   static void openDrawer() => scaffoldKey.currentState?.openDrawer();
 
   static const Color _inactive = Color(0xFF9AA0A6);
-  static const Color _active = Color(0xFF5B5FEF);
+  static const Color _active = Color(0xFF6D5FE0);
 
   @override
   State<MainShell> createState() => _MainShellState();

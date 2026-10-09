@@ -10,6 +10,11 @@ import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/projects/presentation/screens/projects_screen.dart';
 import '../../features/projects/presentation/screens/project_details_screen.dart';
 import '../../features/chat/presentation/screens/chat_screen.dart';
+import '../../features/chat/presentation/screens/conversation_screen.dart';
+import '../../features/chat/data/models/chat_conversation_model.dart';
+import '../../features/chat/domain/repositories/chat_repository.dart';
+import '../../features/chat/presentation/cubit/chat_cubit.dart';
+import '../../features/chat/presentation/cubit/conversation_cubit.dart';
 import '../../features/inbox/presentation/screens/inbox_screen.dart';
 import '../../features/inbox/presentation/cubit/inbox_cubit.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
@@ -114,7 +119,33 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/messenger',
-              builder: (context, state) => const ChatScreen(),
+              builder: (context, state) => BlocProvider<ChatCubit>(
+                create: (_) => sl<ChatCubit>()..load(),
+                child: const ChatScreen(),
+              ),
+              routes: <RouteBase>[
+                GoRoute(
+                  path: ':conversationId',
+                  builder: (context, state) {
+                    final fallbackId =
+                        state.pathParameters['conversationId'] ?? '';
+                    final conversation = state.extra is ChatConversationModel
+                        ? state.extra! as ChatConversationModel
+                        : ChatConversationModel(
+                            id: fallbackId,
+                            threadId: fallbackId,
+                            title: 'Переписка',
+                            isChannel: false,
+                          );
+                    return BlocProvider<ConversationCubit>(
+                      create: (_) =>
+                          ConversationCubit(sl<ChatRepository>(), conversation)
+                            ..load(),
+                      child: ConversationScreen(conversation: conversation),
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),
