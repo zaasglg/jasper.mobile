@@ -45,6 +45,9 @@ class _FakeInboxRepository implements InboxRepository {
   final List<String> createdTitles = <String>[];
 
   @override
+  Future<void> completeInboxTask({required String id}) async {}
+
+  @override
   Future<void> createInbox({required String title}) async {
     createdTitles.add(title);
   }

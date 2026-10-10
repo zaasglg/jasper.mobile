@@ -1,3 +1,5 @@
+import '../../features/assistant/presentation/cubit/assistant_cubit.dart';
+import '../../features/assistant/presentation/screens/assistant_screen.dart';
 import '../../features/planner/presentation/cubit/planner_cubit.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -42,6 +44,16 @@ final appRouter = GoRouter(
       builder: (context, state) => BlocProvider<AuthCubit>(
         create: (_) => sl<AuthCubit>(),
         child: const LoginScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/assistant',
+      builder: (context, state) => BlocProvider(
+        create: (_) => sl<AssistantCubit>()..initialize(),
+        child: AssistantScreen(
+          startVoice: state.uri.queryParameters['voice'] == 'true',
+          initialCommand: state.extra is String ? state.extra as String : null,
+        ),
       ),
     ),
     GoRoute(

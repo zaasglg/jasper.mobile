@@ -25,7 +25,14 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Камера нужна для записи видеозаметок в чатах.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Микрофон нужен для записи голосовых сообщений в чатах.</string>
+	<string>Микрофон нужен для голосовых сообщений и вопросов ИИ-помощнику Jospar.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Распознавание речи нужно для вызова «Ok, Jospar» и голосовых вопросов помощнику.</string>
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict><key>INAlternativeAppName</key><string>Jospar</string></dict>
+		<dict><key>INAlternativeAppName</key><string>Жоспар</string></dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

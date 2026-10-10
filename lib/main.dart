@@ -1,3 +1,4 @@
+import 'core/voice/assistant_launch_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -11,9 +12,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initServiceLocator();
   await InboxHomeWidgetService.initialize();
+  sl.registerSingleton<AssistantLaunchService>(
+    AssistantLaunchService(appRouter),
+  );
   runApp(const MyApp());
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(_listenForInboxWidgetLaunches());
+    unawaited(sl<AssistantLaunchService>().initialize());
   });
 }
 

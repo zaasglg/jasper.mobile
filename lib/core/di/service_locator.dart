@@ -1,3 +1,8 @@
+import '../../features/assistant/data/repositories/assistant_repository_impl.dart';
+import '../../features/assistant/data/services/device_assistant_voice.dart';
+import '../../features/assistant/domain/repositories/assistant_repository.dart';
+import '../../features/assistant/domain/services/assistant_voice.dart';
+import '../../features/assistant/presentation/cubit/assistant_cubit.dart';
 import '../../features/planner/data/repositories/planner_repository_impl.dart';
 import '../../features/planner/domain/repositories/planner_repository.dart';
 import '../../features/planner/presentation/cubit/planner_cubit.dart';
@@ -112,6 +117,13 @@ Future<void> initServiceLocator() async {
     () => TaskDetailsRepositoryImpl(sl()),
   );
   sl.registerFactory<TaskDetailsCubit>(() => TaskDetailsCubit(sl(), sl()));
+
+  // Voice assistant
+  sl.registerLazySingleton<AssistantRepository>(
+    () => AssistantRepositoryImpl(sl()),
+  );
+  sl.registerLazySingleton<AssistantVoice>(DeviceAssistantVoice.new);
+  sl.registerFactory<AssistantCubit>(() => AssistantCubit(sl(), sl(), sl()));
 
   // Planner
   sl.registerLazySingleton<PlannerRepository>(

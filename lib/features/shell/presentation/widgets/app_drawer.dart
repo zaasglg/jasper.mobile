@@ -1,3 +1,4 @@
+import '../../../assistant/presentation/screens/assistant_screen.dart';
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -18,9 +19,18 @@ import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
 import '../../../workspaces/presentation/cubit/workspace_state.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key, required this.onCreateProject});
+  const AppDrawer({
+    super.key,
+    required this.onCreateProject,
+    this.onOpenAssistant,
+    this.onVoiceWake,
+    this.isVoiceWakeListening = false,
+  });
 
   final Future<void> Function() onCreateProject;
+  final VoidCallback? onOpenAssistant;
+  final VoidCallback? onVoiceWake;
+  final bool isVoiceWakeListening;
 
   static const Color _bg = Color(0xFFF7F8FA);
   static const Color _text = Color(0xFF2F333A);
@@ -43,6 +53,48 @@ class AppDrawer extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _WorkspaceHeader(),
+              ListTile(
+                key: const Key('drawer-assistant'),
+                leading: const Icon(
+                  LucideIcons.sparkles,
+                  color: AppDrawer._purple,
+                ),
+                title: const Text('ИИ-помощник'),
+                onTap:
+                    onOpenAssistant ??
+                    () {
+                      final router = GoRouter.of(context);
+                      Navigator.pop(context);
+                      router.push('/assistant');
+                    },
+              ),
+              if (onVoiceWake != null)
+                ListTile(
+                  key: const Key('drawer-voice-wake'),
+                  leading: Icon(
+                    isVoiceWakeListening ? LucideIcons.micOff : LucideIcons.mic,
+                    color: AppDrawer._purple,
+                  ),
+                  title: Text(
+                    isVoiceWakeListening
+                        ? 'Остановить голосовой вызов'
+                        : 'Слушать Ok, Jospar',
+                  ),
+                  subtitle: const Text(
+                    'До 45 секунд, пока приложение открыто',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  onTap: onVoiceWake,
+                ),
+              ListTile(
+                leading: const Icon(
+                  LucideIcons.circleHelp,
+                  color: AppDrawer._muted,
+                ),
+                title: const Text('Вызов через Siri'),
+                onTap: () => showVoiceLaunchHelp(context),
+              ),
+              const Divider(height: 1),
               _DrawerProjects(onCreateProject: onCreateProject),
             ],
           ),
