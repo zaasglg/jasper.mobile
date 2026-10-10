@@ -1,3 +1,6 @@
+import '../../features/planner/data/repositories/planner_repository_impl.dart';
+import '../../features/planner/domain/repositories/planner_repository.dart';
+import '../../features/planner/presentation/cubit/planner_cubit.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
@@ -109,6 +112,12 @@ Future<void> initServiceLocator() async {
     () => TaskDetailsRepositoryImpl(sl()),
   );
   sl.registerFactory<TaskDetailsCubit>(() => TaskDetailsCubit(sl(), sl()));
+
+  // Planner
+  sl.registerLazySingleton<PlannerRepository>(
+    () => PlannerRepositoryImpl(sl()),
+  );
+  sl.registerFactory<PlannerCubit>(() => PlannerCubit(sl()));
 
   // Workspaces
   sl.registerLazySingleton<WorkspaceRepository>(

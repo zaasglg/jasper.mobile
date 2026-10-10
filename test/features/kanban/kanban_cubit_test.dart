@@ -22,6 +22,34 @@ void main() {
     status: 'TODO',
   );
 
+  test('completion toggles immediately and rolls back after failure', () async {
+    final completer = Completer<void>();
+    final cubit = KanbanCubit(_Repository(moveCompleter: completer));
+    await cubit.load('project');
+    final pending = cubit.toggleCompleted(task);
+    expect(cubit.state.tasks.single.isDone, isTrue);
+    expect(cubit.state.tasks.single.status, 'TODO');
+    expect(cubit.state.movingTaskIds, {'task'});
+    completer.completeError(const KanbanException('Ошибка сети'));
+    await pending;
+    expect(cubit.state.tasks.single.isDone, isFalse);
+    expect(cubit.state.actionErrorMessage, 'Ошибка сети');
+    expect(cubit.state.movingTaskIds, isEmpty);
+    await cubit.close();
+  });
+
+  test('saves completion and allows reopening', () async {
+    final cubit = KanbanCubit(_Repository());
+    await cubit.load('project');
+    await cubit.toggleCompleted(task);
+    expect(cubit.state.tasks.single.progress, 100);
+    expect(cubit.state.movingTaskIds, isEmpty);
+    await cubit.toggleCompleted(cubit.state.tasks.single);
+    expect(cubit.state.tasks.single.isDone, isFalse);
+    expect(cubit.state.tasks.single.progress, 0);
+    await cubit.close();
+  });
+
   test('shows WIP warning when column exceeds its limit', () {
     const state = KanbanState(
       columns: [todo],
@@ -131,6 +159,15 @@ class _Repository implements KanbanRepository {
     required int position,
   }) async {
     if (moveError != null) throw moveError!;
+    if (moveCompleter != null) await moveCompleter!.future;
+  }
+
+  @override
+  Future<void> updateCompletion(
+    String taskId, {
+    required int progress,
+    String? status,
+  }) async {
     if (moveCompleter != null) await moveCompleter!.future;
   }
 

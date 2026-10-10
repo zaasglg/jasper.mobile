@@ -19,6 +19,12 @@ abstract interface class KanbanRepository {
     required String priority,
   });
 
+  Future<void> updateCompletion(
+    String taskId, {
+    required int progress,
+    String? status,
+  });
+
   Future<void> moveTask({
     required String taskId,
     required String projectId,

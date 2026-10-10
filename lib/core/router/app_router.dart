@@ -1,3 +1,4 @@
+import '../../features/planner/presentation/cubit/planner_cubit.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../auth/auth_session.dart';
@@ -164,7 +165,10 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/planner',
-              builder: (context, state) => const PlannerScreen(),
+              builder: (context, state) => BlocProvider(
+                create: (_) => sl<PlannerCubit>(),
+                child: const PlannerScreen(),
+              ),
             ),
           ],
         ),

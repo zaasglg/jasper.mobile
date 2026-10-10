@@ -40,9 +40,16 @@ enum _TaskMenuAction {
 }
 
 class TaskCard extends StatelessWidget {
-  const TaskCard({super.key, required this.task});
+  const TaskCard({
+    super.key,
+    required this.task,
+    this.onToggleCompleted,
+    this.isUpdating = false,
+  });
 
   final ProjectTaskModel task;
+  final VoidCallback? onToggleCompleted;
+  final bool isUpdating;
 
   @override
   Widget build(BuildContext context) {
@@ -161,16 +168,84 @@ class TaskCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              task.title.isEmpty ? 'Без названия' : task.title,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.manrope(
-                fontSize: 13,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-                color: colors.onSurface,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Semantics(
+                  checked: task.isDone,
+                  label: task.isDone
+                      ? 'Вернуть задачу в работу'
+                      : 'Завершить задачу',
+                  child: IconButton(
+                    key: ValueKey('task-completion-${task.id}'),
+                    tooltip: task.isDone
+                        ? 'Вернуть в работу'
+                        : 'Завершить задачу',
+                    onPressed: isUpdating ? null : onToggleCompleted,
+                    padding: EdgeInsets.zero,
+                    alignment: Alignment.centerLeft,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(18, 28),
+                      maximumSize: const Size(18, 28),
+                      padding: EdgeInsets.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 28,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    icon: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: task.isDone
+                            ? AppColors.accent
+                            : Colors.transparent,
+                        border: Border.all(
+                          color: task.isDone
+                              ? AppColors.accent
+                              : colors.outline,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: isUpdating
+                          ? Padding(
+                              padding: const EdgeInsets.all(3),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: task.isDone
+                                    ? Colors.white
+                                    : AppColors.accent,
+                              ),
+                            )
+                          : task.isDone
+                          ? const Icon(
+                              LucideIcons.check,
+                              size: 12,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    task.title.isEmpty ? 'Без названия' : task.title,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.manrope(
+                      fontSize: 13,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                ),
+              ],
             ),
             if (task.epicNames.isNotEmpty ||
                 task.labels.isNotEmpty) ...<Widget>[

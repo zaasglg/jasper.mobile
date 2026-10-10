@@ -121,6 +121,22 @@ class KanbanRepositoryImpl implements KanbanRepository {
   }
 
   @override
+  Future<void> updateCompletion(
+    String taskId, {
+    required int progress,
+    String? status,
+  }) async {
+    try {
+      await _dio.patch<dynamic>(
+        'project-tasks/$taskId',
+        data: <String, dynamic>{'progress': progress, 'status': ?status},
+      );
+    } on DioException catch (error) {
+      throw _exception(error, 'обновить завершение задачи');
+    }
+  }
+
+  @override
   Future<void> moveTask({
     required String taskId,
     required String projectId,

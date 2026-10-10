@@ -79,6 +79,60 @@ class KanbanCubit extends Cubit<KanbanState> {
     state.copyWith(priorityFilter: value, clearPriorityFilter: value == null),
   );
 
+  Future<void> toggleCompleted(ProjectTaskModel task) async {
+    if (state.movingTaskIds.isNotEmpty) return;
+    final projectId = state.projectId;
+    final progress = task.isDone ? 0 : 100;
+    final reopenedStatus = task.isDone && task.status.toUpperCase() == 'DONE'
+        ? (state.columns
+                  .where((column) => column.statusMap.toUpperCase() != 'DONE')
+                  .firstOrNull
+                  ?.statusMap ??
+              'TODO')
+        : null;
+    final updated = task.copyWith(
+      progress: progress.toDouble(),
+      status: reopenedStatus,
+    );
+    emit(
+      state.copyWith(
+        tasks: state.tasks
+            .map((item) => item.id == task.id ? updated : item)
+            .toList(),
+        movingTaskIds: {task.id},
+        clearActionError: true,
+      ),
+    );
+    try {
+      await _repository.updateCompletion(
+        task.id,
+        progress: progress,
+        status: reopenedStatus,
+      );
+      if (isClosed || state.projectId != projectId) return;
+      _cache.write(
+        projectId,
+        KanbanBoardData(columns: state.columns, tasks: state.tasks),
+      );
+      emit(state.copyWith(movingTaskIds: {}));
+    } catch (error) {
+      if (isClosed || state.projectId != projectId) return;
+      emit(
+        state.copyWith(
+          tasks: state.tasks
+              .map((item) => item.id == task.id ? task : item)
+              .toList(),
+          movingTaskIds: {},
+        ),
+      );
+      _actionError(
+        error is KanbanException
+            ? error.message
+            : 'Не удалось обновить завершение задачи.',
+      );
+    }
+  }
+
   Future<void> archiveTask(ProjectTaskModel task) async {
     if (state.movingTaskIds.isNotEmpty) return;
     final projectId = state.projectId;

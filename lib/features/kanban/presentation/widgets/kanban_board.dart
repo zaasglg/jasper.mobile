@@ -694,7 +694,24 @@ class _KanbanColumnState extends State<_KanbanColumn> {
                           child: ReorderableDelayedDragStartListener(
                             index: index,
                             enabled: widget.canReorder,
-                            child: TaskCard(task: task),
+                            child: TaskCard(
+                              task: task,
+                              isUpdating: context
+                                  .watch<KanbanCubit>()
+                                  .state
+                                  .movingTaskIds
+                                  .contains(task.id),
+                              onToggleCompleted:
+                                  context
+                                      .watch<KanbanCubit>()
+                                      .state
+                                      .movingTaskIds
+                                      .isEmpty
+                                  ? () => context
+                                        .read<KanbanCubit>()
+                                        .toggleCompleted(task)
+                                  : null,
+                            ),
                           ),
                         );
                       },

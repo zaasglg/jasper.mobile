@@ -265,32 +265,32 @@ class _TaskHeader extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
             InkWell(
               onTap: onToggleCompleted,
               customBorder: const CircleBorder(),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                width: 28,
-                height: 28,
+                width: 18,
+                height: 18,
                 decoration: BoxDecoration(
-                  color: task.isDone ? AppColors.success : Colors.transparent,
+                  color: task.isDone ? AppColors.accent : Colors.transparent,
                   shape: BoxShape.circle,
                   border: task.isDone
                       ? null
-                      : Border.all(color: colors.outlineVariant, width: 2),
+                      : Border.all(color: colors.outlineVariant, width: 1.5),
                 ),
                 child: task.isDone
                     ? const Icon(
                         LucideIcons.check,
-                        size: 17,
+                        size: 12,
                         color: Colors.white,
                       )
                     : null,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 task.title.trim().isEmpty ? 'Без названия' : task.title,

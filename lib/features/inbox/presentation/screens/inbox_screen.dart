@@ -382,7 +382,12 @@ class _QuickTaskTile extends StatelessWidget {
       duration: const Duration(milliseconds: 180),
       padding: const EdgeInsets.fromLTRB(13, 11, 8, 12),
       decoration: BoxDecoration(
-        color: task.completed ? const Color(0xFFF4F8F4) : Colors.white,
+        color: task.completed
+            ? Color.alphaBlend(
+                AppColors.accent.withValues(alpha: 0.05),
+                Colors.white,
+              )
+            : Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: <BoxShadow>[
           BoxShadow(
@@ -441,19 +446,8 @@ class _QuickTaskTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            task.title,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.manrope(
-              fontSize: 14,
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-              color: task.completed ? AppColors.muted : AppColors.ink,
-            ),
-          ),
-          const SizedBox(height: 13),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
               Tooltip(
                 message: task.completed
@@ -465,17 +459,17 @@ class _QuickTaskTile extends StatelessWidget {
                   customBorder: const CircleBorder(),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    width: 22,
-                    height: 22,
+                    width: 18,
+                    height: 18,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: task.completed
-                          ? AppColors.success
+                          ? AppColors.accent
                           : Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: task.completed
-                            ? AppColors.success
+                            ? AppColors.accent
                             : AppColors.muted,
                         width: 1.6,
                       ),
@@ -491,14 +485,32 @@ class _QuickTaskTile extends StatelessWidget {
                         : task.completed
                         ? const Icon(
                             Icons.check_rounded,
-                            size: 15,
+                            size: 12,
                             color: Colors.white,
                           )
                         : null,
                   ),
                 ),
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  task.title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                    color: task.completed ? AppColors.muted : AppColors.ink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          Row(
+            children: <Widget>[
               const Icon(
                 Icons.folder_open_rounded,
                 size: 15,
