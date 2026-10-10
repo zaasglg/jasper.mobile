@@ -22,13 +22,11 @@ class AppDrawer extends StatelessWidget {
   const AppDrawer({
     super.key,
     required this.onCreateProject,
-    this.onOpenAssistant,
     this.onVoiceWake,
     this.isVoiceWakeListening = false,
   });
 
   final Future<void> Function() onCreateProject;
-  final VoidCallback? onOpenAssistant;
   final VoidCallback? onVoiceWake;
   final bool isVoiceWakeListening;
 
@@ -53,21 +51,6 @@ class AppDrawer extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _WorkspaceHeader(),
-              ListTile(
-                key: const Key('drawer-assistant'),
-                leading: const Icon(
-                  LucideIcons.sparkles,
-                  color: AppDrawer._purple,
-                ),
-                title: const Text('ИИ-помощник'),
-                onTap:
-                    onOpenAssistant ??
-                    () {
-                      final router = GoRouter.of(context);
-                      Navigator.pop(context);
-                      router.push('/assistant');
-                    },
-              ),
               if (onVoiceWake != null)
                 ListTile(
                   key: const Key('drawer-voice-wake'),

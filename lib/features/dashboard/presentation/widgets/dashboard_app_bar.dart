@@ -51,8 +51,8 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
         IconButton(
-          onPressed: () {},
-          tooltip: 'AI',
+          onPressed: () => MainShell.openAssistant(context),
+          tooltip: 'ИИ-помощник',
           icon: SvgPicture.asset(
             'assets/images/JBee.svg',
             key: const Key('dashboard-ai-icon'),

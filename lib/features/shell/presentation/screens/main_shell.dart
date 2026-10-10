@@ -32,6 +32,15 @@ class MainShell extends StatefulWidget {
 
   static void openDrawer() => scaffoldKey.currentState?.openDrawer();
 
+  static void openAssistant(BuildContext context) {
+    final shell = context.findAncestorStateOfType<_MainShellState>();
+    if (shell != null) {
+      unawaited(shell._openAssistant());
+    } else {
+      context.push('/assistant');
+    }
+  }
+
   static const Color _inactive = Color(0xFF9AA0A6);
   static const Color _active = Color(0xFF6D5FE0);
 
@@ -204,7 +213,6 @@ class _MainShellState extends State<MainShell> {
             key: MainShell.scaffoldKey,
             drawer: AppDrawer(
               onCreateProject: () => showCreateProjectFlow(shellContext),
-              onOpenAssistant: () => _openAssistant(),
               onVoiceWake: _voice == null ? null : _toggleVoiceWake,
               isVoiceWakeListening: _wakeListening,
             ),
