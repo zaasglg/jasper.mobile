@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -42,12 +43,14 @@ class _ProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF7F7FB),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        centerTitle: true,
         leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
+          onPressed: () => context.pop(),
           icon: const Icon(LucideIcons.arrowLeft, color: Color(0xFF1A1A1A)),
         ),
         title: Text(
@@ -89,51 +92,98 @@ class _ProfileContent extends StatelessWidget {
     final user = profile.profile;
     final displayName = user.name.isNotEmpty ? user.name : 'Пользователь';
 
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return RefreshIndicator(
+      color: const Color(0xFF6D5FE0),
+      onRefresh: context.read<ProfileCubit>().load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
         children: [
-          Container(
-            width: 102,
-            height: 102,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFF6D5FE0).withValues(alpha: 0.2),
-                width: 3,
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFECE9FC),
               ),
+              child: ProfileAvatar(size: 88, avatarUrl: user.avatarUrl),
             ),
-            child: ProfileAvatar(size: 90, avatarUrl: user.avatarUrl),
           ),
           const SizedBox(height: 16),
           Text(
             displayName,
             textAlign: TextAlign.center,
             style: GoogleFonts.manrope(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1A1A1A),
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF292735),
             ),
           ),
           if (user.email.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               user.email,
+              textAlign: TextAlign.center,
               style: GoogleFonts.manrope(
                 fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: const Color(0xFF9AA0A6),
+                color: const Color(0xFF858297),
               ),
             ),
           ],
           const SizedBox(height: 32),
+          Text(
+            'Данные аккаунта',
+            style: GoogleFonts.manrope(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF858297),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                _ProfileDataRow(
+                  icon: LucideIcons.userRound,
+                  label: 'Имя',
+                  value: user.name.isNotEmpty ? user.name : 'Не указано',
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Divider(height: 1, color: Color(0xFFF0EEF5)),
+                ),
+                _ProfileDataRow(
+                  icon: LucideIcons.mail,
+                  label: 'Электронная почта',
+                  value: user.email.isNotEmpty ? user.email : 'Не указана',
+                  onCopy: user.email.isEmpty
+                      ? null
+                      : () async {
+                          await Clipboard.setData(
+                            ClipboardData(text: user.email),
+                          );
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              const SnackBar(
+                                content: Text('Почта скопирована'),
+                              ),
+                            );
+                        },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
           BlocBuilder<AuthCubit, AuthState>(
             builder: (context, state) {
               final isLoading = state is AuthLoading;
               return SizedBox(
-                width: 220,
-                height: 48,
+                height: 54,
                 child: OutlinedButton.icon(
                   key: const Key('profile_logout_button'),
                   onPressed: isLoading
@@ -148,13 +198,14 @@ class _ProfileContent extends StatelessWidget {
                           ),
                         )
                       : const Icon(LucideIcons.logOut, size: 19),
-                  label: Text(isLoading ? 'Выходим…' : 'Выйти'),
+                  label: Text(isLoading ? 'Выходим…' : 'Выйти из аккаунта'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFD64545),
-                    disabledForegroundColor: const Color(0xFFD64545),
-                    side: const BorderSide(color: Color(0xFFF0CACA)),
+                    foregroundColor: const Color(0xFFC44E58),
+                    disabledForegroundColor: const Color(0xFFC44E58),
+                    backgroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFFEEDDE0)),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     textStyle: GoogleFonts.manrope(
                       fontSize: 15,
@@ -165,6 +216,74 @@ class _ProfileContent extends StatelessWidget {
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileDataRow extends StatelessWidget {
+  const _ProfileDataRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.onCopy,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback? onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 12, 18),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1EEFD),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: const Color(0xFF6D5FE0)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    color: const Color(0xFF858297),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  value,
+                  style: GoogleFonts.manrope(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF292735),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (onCopy != null)
+            IconButton(
+              tooltip: 'Скопировать почту',
+              onPressed: onCopy,
+              icon: const Icon(
+                LucideIcons.copy,
+                size: 18,
+                color: Color(0xFF858297),
+              ),
+            ),
         ],
       ),
     );
