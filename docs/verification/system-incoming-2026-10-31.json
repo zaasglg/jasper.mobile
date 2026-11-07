@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-31",
+  "scope": "Native presentation and action delivery on isolated Android API 36 emulator; no actual calls/invitees. Server/media state transitions tested with fakes separately.",
+  "android": {
+    "notificationAnswerAndDecline": true,
+    "fullScreenIntentDeniedFallbackCallStyle": true,
+    "fullScreenLockScreenWhenPermissionAllowed": true,
+    "events": [
+      {
+        "action": "answer",
+        "id": "native-check",
+        "muted": false
+      },
+      {
+        "action": "decline",
+        "id": "native-check",
+        "muted": false
+      }
+    ],
+    "fullScreenAnswerAfterTaskFix": [
+      {
+        "action": "answer",
+        "id": "native-check",
+        "muted": false
+      }
+    ],
+    "noFlutterEngineOwnershipCrashAfterFix": true
+  },
+  "checks": {
+    "flutterAnalyze": "No issues found",
+    "callsChatAndAppTests": 79,
+    "iosSignedSimulatorBuild": "passed",
+    "androidArm64Build": "passed"
+  },
+  "ios": "CallKit and RTCAudioSession delegate compiled; physical iPhone unavailable, CallKit audio not device-tested."
+}

@@ -12,21 +12,84 @@ class InboxCubit extends Cubit<InboxState> {
   InboxCubit(this._repository) : super(const InboxState());
 
   final InboxRepository _repository;
-  int _loadRevision = 0;
+  final Set<String> _actionIds = {};
 
-  Future<void> load() async {
-    final revision = ++_loadRevision;
-    emit(state.copyWith(status: InboxStatus.loading, clearError: true));
+  Future<String?> runAction(
+    String id,
+    Future<void> Function(InboxActionsRepository repository) action,
+  ) async {
+    if (!_actionIds.add(id)) return 'Изменения задачи уже сохраняются.';
+    _loadRevision++;
+    _reloadPending = true;
     try {
-      final tasks = await _repository.getInbox(archived: true, sort: 1);
+      final repository = _repository;
+      if (repository is! InboxActionsRepository) return 'Действие недоступно.';
+      await action(repository as InboxActionsRepository);
+      _loadRevision++;
+      if (!isClosed) await load();
+      return null;
+    } on InboxException catch (error) {
+      return error.message;
+    } catch (_) {
+      return 'Не удалось изменить задачу. Попробуйте ещё раз.';
+    } finally {
+      _actionIds.remove(id);
+      await _flushReload();
+    }
+  }
+
+  int _loadRevision = 0;
+  bool _reloadPending = false;
+
+  Future<void> _flushReload() async {
+    if (!isClosed &&
+        _reloadPending &&
+        !state.isCreating &&
+        state.completingTaskIds.isEmpty &&
+        _actionIds.isEmpty) {
+      await _load();
+    }
+  }
+
+  Future<void> load() => _load();
+
+  Future<void> _load({bool duringCreate = false}) async {
+    if (isClosed) return;
+    if ((!duringCreate && state.isCreating) ||
+        state.completingTaskIds.isNotEmpty ||
+        _actionIds.isNotEmpty) {
+      _reloadPending = true;
+      return;
+    }
+    _reloadPending = false;
+    final revision = ++_loadRevision;
+    emit(
+      state.copyWith(
+        status: state.tasks.isEmpty ? InboxStatus.loading : InboxStatus.success,
+        clearError: true,
+      ),
+    );
+    try {
+      final tasks = (await _repository.getInbox(
+        archived: false,
+        sort: 1,
+      )).where((task) => !task.archived).toList(growable: false);
       if (revision != _loadRevision || isClosed) return;
-      emit(InboxState(status: InboxStatus.success, tasks: tasks));
+      emit(
+        state.copyWith(
+          status: InboxStatus.success,
+          tasks: tasks,
+          clearError: true,
+        ),
+      );
       unawaited(InboxHomeWidgetService.sync(tasks));
     } on InboxException catch (error) {
       if (revision != _loadRevision || isClosed) return;
       emit(
         state.copyWith(
-          status: InboxStatus.failure,
+          status: state.tasks.isEmpty
+              ? InboxStatus.failure
+              : InboxStatus.success,
           errorMessage: error.message,
         ),
       );
@@ -34,7 +97,9 @@ class InboxCubit extends Cubit<InboxState> {
       if (revision != _loadRevision || isClosed) return;
       emit(
         state.copyWith(
-          status: InboxStatus.failure,
+          status: state.tasks.isEmpty
+              ? InboxStatus.failure
+              : InboxStatus.success,
           errorMessage: 'Не удалось загрузить задачи Инбокса.',
         ),
       );
@@ -44,19 +109,16 @@ class InboxCubit extends Cubit<InboxState> {
   Future<bool> create(String title) async {
     final value = title.trim();
     if (value.isEmpty || state.isCreating) return false;
+    _loadRevision++;
+    _reloadPending = true;
     emit(state.copyWith(isCreating: true, clearCreationError: true));
     try {
       await _repository.createInbox(title: value);
-      final tasks = await _repository.getInbox(archived: true, sort: 1);
       if (isClosed) return false;
-      emit(
-        InboxState(
-          status: InboxStatus.success,
-          tasks: tasks,
-          isCreating: false,
-        ),
-      );
-      unawaited(InboxHomeWidgetService.sync(tasks));
+      // A failed refresh must not turn an acknowledged POST into a failed create.
+      await _load(duringCreate: true);
+      if (isClosed) return true;
+      emit(state.copyWith(isCreating: false, clearCreationError: true));
       return true;
     } on InboxException catch (error) {
       if (isClosed) return false;
@@ -73,6 +135,8 @@ class InboxCubit extends Cubit<InboxState> {
         ),
       );
       return false;
+    } finally {
+      await _flushReload();
     }
   }
 
@@ -80,6 +144,8 @@ class InboxCubit extends Cubit<InboxState> {
     if (taskId.isEmpty || state.completingTaskIds.contains(taskId)) {
       return false;
     }
+    _loadRevision++;
+    _reloadPending = true;
     emit(
       state.copyWith(
         completingTaskIds: <String>{...state.completingTaskIds, taskId},
@@ -88,6 +154,7 @@ class InboxCubit extends Cubit<InboxState> {
     );
     try {
       await _repository.completeInboxTask(id: taskId);
+      _loadRevision++;
       if (isClosed) return false;
       final tasks = state.tasks
           .where((task) => task.id != taskId)
@@ -125,6 +192,8 @@ class InboxCubit extends Cubit<InboxState> {
         ),
       );
       return false;
+    } finally {
+      await _flushReload();
     }
   }
 

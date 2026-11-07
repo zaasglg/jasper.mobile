@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -306,7 +307,11 @@ class _SheetHeader extends StatelessWidget {
               color: const Color(0xFFF0EDFF),
               borderRadius: BorderRadius.circular(11),
             ),
-            child: const Icon(LucideIcons.folder, size: 21, color: _accent),
+            child: const Icon(
+              LucideIcons.folder,
+              size: AppIconSizes.standard,
+              color: _accent,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -331,7 +336,7 @@ class _SheetHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(11),
               ),
             ),
-            icon: const Icon(LucideIcons.x, size: 20),
+            icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
           ),
         ],
       ),
@@ -442,7 +447,10 @@ class _WorkspaceField extends StatelessWidget {
           key: const Key('project_workspace_dropdown'),
           initialValue: selected,
           isExpanded: true,
-          icon: const Icon(LucideIcons.chevronDown, size: 18),
+          icon: const Icon(
+            LucideIcons.chevronDown,
+            size: AppIconSizes.standard,
+          ),
           borderRadius: BorderRadius.circular(12),
           dropdownColor: Colors.white,
           style: GoogleFonts.manrope(fontSize: 15, color: _ink),
@@ -564,7 +572,7 @@ class _DateField extends StatelessWidget {
                 ),
                 const Icon(
                   LucideIcons.calendarDays,
-                  size: 16,
+                  size: AppIconSizes.standard,
                   color: _secondary,
                 ),
               ],
@@ -704,12 +712,12 @@ InputDecoration _inputDecoration({String? hint}) {
     fillColor: _surface,
     isDense: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-    border: border(_border),
-    enabledBorder: border(_border),
-    disabledBorder: border(_border),
-    focusedBorder: border(_accent, 1.5),
+    border: border(Colors.transparent),
+    enabledBorder: border(Colors.transparent),
+    disabledBorder: border(Colors.transparent),
+    focusedBorder: border(_accent),
     errorBorder: border(_danger),
-    focusedErrorBorder: border(_danger, 1.5),
+    focusedErrorBorder: border(_danger),
     errorStyle: GoogleFonts.manrope(fontSize: 11, color: _danger),
   );
 }

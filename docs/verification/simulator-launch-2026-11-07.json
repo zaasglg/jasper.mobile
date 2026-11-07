@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-07",
+  "device": "iPhone 17 Pro Max simulator, iOS 26.2",
+  "bundle_id": "com.jospar.app",
+  "checks": {
+    "install_debug_build": "passed",
+    "launch": "passed",
+    "existing_session_restored": "passed",
+    "dashboard_skeleton_replaced_by_content": "passed",
+    "dashboard_server_data_visible": "passed",
+    "session_restored_after_terminate_and_relaunch": "passed"
+  },
+  "log_review": {
+    "scope": "Runner error-level unified logs covering the first launch",
+    "observed": "UIKit focus caching and app-launch measurement diagnostics",
+    "crash_or_native_plugin_error_observed": false
+  },
+  "limitations": [
+    "This is a startup smoke check, not an end-to-end verification of every screen.",
+    "No messages were sent and no user content was edited during this check.",
+    "No physical device was reachable; Flutter reported wireless connection error -27.",
+    "Voice recording/playback, Google OAuth and push delivery remain unverified on physical devices."
+  ]
+}

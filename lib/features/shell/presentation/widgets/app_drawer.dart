@@ -1,4 +1,4 @@
-import '../../../assistant/presentation/screens/assistant_screen.dart';
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -22,13 +22,11 @@ class AppDrawer extends StatelessWidget {
   const AppDrawer({
     super.key,
     required this.onCreateProject,
-    this.onVoiceWake,
-    this.isVoiceWakeListening = false,
+    required this.onOpenSettings,
   });
 
   final Future<void> Function() onCreateProject;
-  final VoidCallback? onVoiceWake;
-  final bool isVoiceWakeListening;
+  final VoidCallback onOpenSettings;
 
   static const Color _bg = Color(0xFFF7F8FA);
   static const Color _text = Color(0xFF2F333A);
@@ -44,43 +42,29 @@ class AppDrawer extends StatelessWidget {
       backgroundColor: _bg,
       shape: const RoundedRectangleBorder(),
       child: SafeArea(
-        child: SingleChildScrollView(
-          key: const Key('drawer-scroll-view'),
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _WorkspaceHeader(),
-              if (onVoiceWake != null)
-                ListTile(
-                  key: const Key('drawer-voice-wake'),
-                  leading: Icon(
-                    isVoiceWakeListening ? LucideIcons.micOff : LucideIcons.mic,
-                    color: AppDrawer._purple,
-                  ),
-                  title: Text(
-                    isVoiceWakeListening
-                        ? 'Остановить голосовой вызов'
-                        : 'Слушать Ok, Jospar',
-                  ),
-                  subtitle: const Text(
-                    'До 45 секунд, пока приложение открыто',
-                    style: TextStyle(fontSize: 11),
-                  ),
-                  onTap: onVoiceWake,
-                ),
-              ListTile(
-                leading: const Icon(
-                  LucideIcons.circleHelp,
-                  color: AppDrawer._muted,
-                ),
-                title: const Text('Вызов через Siri'),
-                onTap: () => showVoiceLaunchHelp(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _WorkspaceHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                key: const Key('drawer-scroll-view'),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                child: _DrawerProjects(onCreateProject: onCreateProject),
               ),
-              const Divider(height: 1),
-              _DrawerProjects(onCreateProject: onCreateProject),
-            ],
-          ),
+            ),
+            const Divider(height: 1, color: _border),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+              child: _SidebarItem(
+                icon: LucideIcons.settings,
+                iconColor: _muted,
+                label: 'Настройки',
+                onTap: onOpenSettings,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -148,7 +132,7 @@ class _DrawerProjects extends StatelessWidget {
                       padding: EdgeInsets.all(4),
                       child: Icon(
                         LucideIcons.plus,
-                        size: 16,
+                        size: AppIconSizes.standard,
                         color: AppDrawer._muted,
                       ),
                     ),
@@ -340,7 +324,7 @@ class _WorkspaceHeaderState extends State<_WorkspaceHeader> {
                         duration: const Duration(milliseconds: 180),
                         child: const Icon(
                           LucideIcons.chevronDown,
-                          size: 18,
+                          size: AppIconSizes.standard,
                           color: AppDrawer._muted,
                         ),
                       ),
@@ -421,80 +405,113 @@ class _WorkspaceDropdown extends StatelessWidget {
 
     if (state is! WorkspaceLoaded) return const SizedBox.shrink();
     final loaded = state as WorkspaceLoaded;
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppDrawer._border)),
-      ),
-      child: Column(
-        children: [
-          if (loaded.workspaces.isEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Доступных workspace пока нет',
-                  style: GoogleFonts.manrope(
-                    fontSize: 13,
-                    color: AppDrawer._muted,
-                  ),
-                ),
+    return Material(
+      color: Colors.white,
+      child: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: AppDrawer._border)),
+        ),
+        child: Column(
+          children: [
+            if (loaded.isRefreshing)
+              const LinearProgressIndicator(
+                minHeight: 2,
+                color: AppDrawer._purple,
               ),
-            )
-          else
-            ...loaded.workspaces.map((workspace) {
-              final isSelected = workspace.id == loaded.selected?.id;
-              return InkWell(
-                onTap: loaded.isCreating
-                    ? null
-                    : () => context.read<WorkspaceCubit>().select(workspace),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 9, 12, 9),
-                  child: Row(
-                    children: [
-                      _WorkspaceBadge(workspace: workspace, size: 32),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          workspace.name.isEmpty
-                              ? 'Без названия'
-                              : workspace.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.manrope(
-                            fontSize: 14,
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: AppDrawer._text,
-                          ),
+            if (loaded.refreshError != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 8, 8, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        loaded.refreshError!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppDrawer._muted,
                         ),
                       ),
-                      if (isSelected)
-                        const Icon(
-                          LucideIcons.check,
-                          size: 18,
-                          color: Color(0xFF6D5FE0),
-                        ),
-                    ],
+                    ),
+                    IconButton(
+                      tooltip: 'Обновить workspace',
+                      onPressed: () =>
+                          context.read<WorkspaceCubit>().load(force: true),
+                      icon: const Icon(
+                        LucideIcons.refreshCw,
+                        size: AppIconSizes.standard,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (loaded.workspaces.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Доступных workspace пока нет',
+                    style: GoogleFonts.manrope(
+                      fontSize: 13,
+                      color: AppDrawer._muted,
+                    ),
                   ),
                 ),
-              );
-            }),
-          const Divider(height: 1, color: AppDrawer._border),
-          if (showCreateForm)
-            _CreateWorkspacePanel(
-              loaded: loaded,
-              onCancel: onCancel,
-              onCreated: onCreated,
-            )
-          else
-            _AddWorkspaceRow(onTap: onAdd),
-          const Divider(height: 1, color: AppDrawer._border),
-          const _ArchivedWorkspacesRow(),
-        ],
+              )
+            else
+              ...loaded.workspaces.map((workspace) {
+                final isSelected = workspace.id == loaded.selected?.id;
+                return InkWell(
+                  onTap: loaded.isCreating
+                      ? null
+                      : () => context.read<WorkspaceCubit>().select(workspace),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 9, 12, 9),
+                    child: Row(
+                      children: [
+                        _WorkspaceBadge(workspace: workspace, size: 32),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            workspace.name.isEmpty
+                                ? 'Без названия'
+                                : workspace.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.manrope(
+                              fontSize: 14,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: AppDrawer._text,
+                            ),
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(
+                            LucideIcons.check,
+                            size: AppIconSizes.standard,
+                            color: Color(0xFF6D5FE0),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            const Divider(height: 1, color: AppDrawer._border),
+            if (showCreateForm)
+              _CreateWorkspacePanel(
+                loaded: loaded,
+                onCancel: onCancel,
+                onCreated: onCreated,
+              )
+            else
+              _AddWorkspaceRow(onTap: onAdd),
+            const Divider(height: 1, color: AppDrawer._border),
+            const _ArchivedWorkspacesRow(),
+          ],
+        ),
       ),
     );
   }
@@ -514,14 +531,20 @@ class _AddWorkspaceRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         child: Row(
           children: [
-            const Icon(LucideIcons.plus, size: 18, color: Color(0xFF6D5FE0)),
+            const Icon(
+              LucideIcons.plus,
+              size: AppIconSizes.standard,
+              color: Color(0xFF6D5FE0),
+            ),
             const SizedBox(width: 10),
-            Text(
-              'Добавить workspace',
-              style: GoogleFonts.manrope(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF5F6475),
+            Expanded(
+              child: Text(
+                'Добавить workspace',
+                style: GoogleFonts.manrope(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF5F6475),
+                ),
               ),
             ),
           ],
@@ -599,10 +622,10 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                 filled: true,
                 fillColor: const Color(0xFFFCFCFB),
-                border: _fieldBorder(const Color(0xFFD6D8D6)),
-                enabledBorder: _fieldBorder(const Color(0xFFD6D8D6)),
-                focusedBorder: _fieldBorder(const Color(0xFF6D5FE0), 1.5),
-                disabledBorder: _fieldBorder(const Color(0xFFE3E4E6)),
+                border: _fieldBorder(Colors.transparent),
+                enabledBorder: _fieldBorder(Colors.transparent),
+                focusedBorder: _fieldBorder(const Color(0xFF6D5FE0)),
+                disabledBorder: _fieldBorder(Colors.transparent),
               ),
             ),
           ),
@@ -750,47 +773,115 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
   }
 }
 
-class _ArchivedWorkspacesRow extends StatelessWidget {
+class _ArchivedWorkspacesRow extends StatefulWidget {
   const _ArchivedWorkspacesRow();
-
   @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      hint: 'Раздел появится позже',
-      child: InkWell(
-        onTap: () {},
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          child: Row(
+  State<_ArchivedWorkspacesRow> createState() => _ArchivedWorkspacesRowState();
+}
+
+class _ArchivedWorkspacesRowState extends State<_ArchivedWorkspacesRow> {
+  bool _expanded = false;
+  @override
+  Widget build(BuildContext context) =>
+      BlocBuilder<WorkspaceCubit, WorkspaceState>(
+        builder: (context, state) {
+          final loaded = state is WorkspaceLoaded ? state : null;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                LucideIcons.archive,
-                size: 17,
-                color: Color(0xFF858AA1),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
+              ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                leading: const Icon(
+                  LucideIcons.archive,
+                  size: AppIconSizes.standard,
+                  color: AppDrawer._muted,
+                ),
+                title: Text(
                   'Архивированные',
                   style: GoogleFonts.manrope(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFF777C91),
+                    color: AppDrawer._muted,
                   ),
                 ),
+                trailing: Icon(
+                  _expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+                  size: AppIconSizes.standard,
+                  color: AppDrawer._muted,
+                ),
+                onTap: () {
+                  setState(() => _expanded = !_expanded);
+                  if (_expanded) context.read<WorkspaceCubit>().loadArchived();
+                },
               ),
-              const Icon(
-                LucideIcons.chevronDown,
-                size: 15,
-                color: Color(0xFF858AA1),
-              ),
+              if (_expanded && loaded != null) ...[
+                if (loaded.isLoadingArchived)
+                  const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                if (loaded.archivedError != null)
+                  ListTile(
+                    dense: true,
+                    title: Text(
+                      loaded.archivedError!,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: IconButton(
+                      tooltip: 'Повторить',
+                      onPressed: () =>
+                          context.read<WorkspaceCubit>().loadArchived(),
+                      icon: const Icon(
+                        LucideIcons.refreshCw,
+                        size: AppIconSizes.standard,
+                      ),
+                    ),
+                  ),
+                if (!loaded.isLoadingArchived &&
+                    loaded.archivedError == null &&
+                    loaded.archivedWorkspaces.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: Text(
+                      'Нет архивированных workspace',
+                      style: TextStyle(fontSize: 12, color: AppDrawer._muted),
+                    ),
+                  ),
+                if (loaded.archivedWorkspaces.isNotEmpty)
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 144),
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final workspace in loaded.archivedWorkspaces)
+                          ListTile(
+                            dense: true,
+                            leading: _WorkspaceBadge(
+                              workspace: workspace,
+                              size: 28,
+                            ),
+                            title: Text(
+                              workspace.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.manrope(
+                                fontSize: 13,
+                                color: AppDrawer._muted,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
             ],
-          ),
-        ),
-      ),
-    );
-  }
+          );
+        },
+      );
 }
 
 class _WorkspaceBadge extends StatelessWidget {
@@ -811,7 +902,10 @@ class _WorkspaceBadge extends StatelessWidget {
         );
       }
 
-      final token = sl<AuthTokenStorage>().cachedToken;
+      final sameOrigin = Uri.tryParse(logoUrl)?.host == 'jospar.me';
+      final token = sameOrigin && sl.isRegistered<AuthTokenStorage>()
+          ? sl<AuthTokenStorage>().cachedToken
+          : null;
       final headers = token == null || token.isEmpty
           ? null
           : <String, String>{'Authorization': 'Bearer $token'};
@@ -976,7 +1070,7 @@ class _SidebarItem extends StatelessWidget {
               children: [
                 Icon(
                   icon,
-                  size: 18,
+                  size: AppIconSizes.standard,
                   color: isActive ? AppDrawer._purple : iconColor,
                 ),
                 const SizedBox(width: 10),
@@ -996,7 +1090,7 @@ class _SidebarItem extends StatelessWidget {
                   const SizedBox(width: 6),
                   const Icon(
                     LucideIcons.check,
-                    size: 16,
+                    size: AppIconSizes.standard,
                     color: AppDrawer._purple,
                   ),
                 ],

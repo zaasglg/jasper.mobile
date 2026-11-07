@@ -1,4 +1,6 @@
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
@@ -8,23 +10,101 @@ import 'package:path_provider/path_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/chat_message_model.dart';
 
+abstract interface class VoicePlayback {
+  bool get playing;
+  ProcessingState get processingState;
+  Duration? get duration;
+  Stream<PlayerState> get playerStateStream;
+  Stream<Duration> get positionStream;
+  Future<void> setUrl(String url);
+  Future<void> setFilePath(String path);
+  Future<void> play();
+  Future<void> pause();
+  Future<void> seek(Duration position);
+  Future<void> dispose();
+}
+
+class DeviceVoicePlayback implements VoicePlayback {
+  final AudioPlayer _player = AudioPlayer();
+  @override
+  bool get playing => _player.playing;
+  @override
+  ProcessingState get processingState => _player.processingState;
+  @override
+  Duration? get duration => _player.duration;
+  @override
+  Stream<PlayerState> get playerStateStream => _player.playerStateStream;
+  @override
+  Stream<Duration> get positionStream => _player.positionStream;
+  @override
+  Future<void> setUrl(String url) async {
+    await _player.setUrl(url);
+  }
+
+  @override
+  Future<void> setFilePath(String path) async {
+    await _player.setFilePath(path);
+  }
+
+  @override
+  Future<void> play() => _player.play();
+  @override
+  Future<void> pause() => _player.pause();
+  @override
+  Future<void> seek(Duration position) => _player.seek(position);
+  @override
+  Future<void> dispose() => _player.dispose();
+}
+
 class VoiceMessage extends StatefulWidget {
-  const VoiceMessage({super.key, required this.message});
+  const VoiceMessage({super.key, required this.message, this.playerFactory});
   final ChatMessageModel message;
+  final VoicePlayback Function()? playerFactory;
   @override
   State<VoiceMessage> createState() => _VoiceMessageState();
 }
 
 class _VoiceMessageState extends State<VoiceMessage> {
-  AudioPlayer? _player;
+  VoicePlayback? _player;
+  int _generation = 0;
   bool _loading = false;
   File? _file;
   @override
   void dispose() {
-    _player?.dispose();
-    final file = _file;
-    if (file != null) _delete(file);
+    unawaited(_reset());
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant VoiceMessage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.id != widget.message.id ||
+        oldWidget.message.transcript != widget.message.transcript) {
+      unawaited(_reset());
+    }
+  }
+
+  Future<void> _reset() async {
+    _generation++;
+    final player = _player;
+    final file = _file;
+    _player = null;
+    _file = null;
+    _loading = false;
+    try {
+      await player?.dispose();
+    } catch (_) {
+      /* Allow retry after platform failures. */
+    }
+    if (file != null) await _delete(file);
+  }
+
+  Future<void> _fail(int generation) async {
+    if (!mounted || generation != _generation) return;
+    final reset = _reset();
+    setState(() {});
+    _error();
+    await reset;
   }
 
   Future<void> _delete(File file) async {
@@ -35,32 +115,43 @@ class _VoiceMessageState extends State<VoiceMessage> {
 
   Future<void> _toggle() async {
     if (_loading) return;
+    final generation = _generation;
     try {
       if (_player == null) {
         setState(() => _loading = true);
-        final data = UriData.parse(widget.message.transcript!);
-        final extension = data.mimeType.contains('webm')
-            ? 'webm'
-            : data.mimeType.contains('ogg')
-            ? 'ogg'
-            : data.mimeType.contains('wav')
-            ? 'wav'
-            : 'm4a';
-        final directory = await getTemporaryDirectory();
-        final file = File(
-          '${directory.path}/play-voice-${DateTime.now().microsecondsSinceEpoch}.$extension',
-        );
-        await file.writeAsBytes(data.contentAsBytes());
-        if (!mounted) {
-          await _delete(file);
-          return;
+        final source = widget.message.transcript!;
+        final remote = Uri.tryParse(source);
+        if (remote?.scheme == 'https' && remote!.host.isNotEmpty) {
+          final player = widget.playerFactory?.call() ?? DeviceVoicePlayback();
+          _player = player;
+          await player.setUrl(remote.removeFragment().toString());
+          if (!mounted || generation != _generation) return;
+          setState(() => _loading = false);
+        } else {
+          final data = UriData.parse(widget.message.transcript!);
+          final extension = data.mimeType.contains('webm')
+              ? 'webm'
+              : data.mimeType.contains('ogg')
+              ? 'ogg'
+              : data.mimeType.contains('wav')
+              ? 'wav'
+              : 'm4a';
+          final directory = await getTemporaryDirectory();
+          final file = File(
+            '${directory.path}/play-voice-${DateTime.now().microsecondsSinceEpoch}.$extension',
+          );
+          await file.writeAsBytes(data.contentAsBytes());
+          if (!mounted || generation != _generation) {
+            await _delete(file);
+            return;
+          }
+          _file = file;
+          final player = widget.playerFactory?.call() ?? DeviceVoicePlayback();
+          _player = player;
+          await player.setFilePath(file.path);
+          if (!mounted || generation != _generation) return;
+          setState(() => _loading = false);
         }
-        _file = file;
-        final player = AudioPlayer();
-        _player = player;
-        await player.setFilePath(file.path);
-        if (!mounted) return;
-        setState(() => _loading = false);
       }
       final player = _player!;
       if (player.playing &&
@@ -70,17 +161,13 @@ class _VoiceMessageState extends State<VoiceMessage> {
         if (player.processingState == ProcessingState.completed) {
           await player.seek(Duration.zero);
         }
+        if (!mounted || generation != _generation) return;
         player.play().catchError((Object error) {
-          if (mounted) _error();
+          unawaited(_fail(generation));
         });
       }
     } catch (_) {
-      await _player?.dispose();
-      _player = null;
-      if (mounted) {
-        setState(() => _loading = false);
-        _error();
-      }
+      await _fail(generation);
     }
   }
 
@@ -94,7 +181,8 @@ class _VoiceMessageState extends State<VoiceMessage> {
   @override
   Widget build(BuildContext context) {
     final playable =
-        widget.message.transcript?.startsWith('data:audio/') == true;
+        widget.message.transcript?.startsWith('data:audio/') == true ||
+        (Uri.tryParse(widget.message.transcript ?? '')?.scheme == 'https');
     return SizedBox(
       width: 250,
       child: StreamBuilder<PlayerState>(
@@ -121,7 +209,7 @@ class _VoiceMessageState extends State<VoiceMessage> {
                       )
                     : Icon(
                         playing ? LucideIcons.pause : LucideIcons.play,
-                        size: 19,
+                        size: AppIconSizes.standard,
                       ),
               ),
               const SizedBox(width: 4),

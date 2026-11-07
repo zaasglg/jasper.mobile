@@ -1,8 +1,11 @@
 import Flutter
 import UIKit
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private var pushNotifications: IOSPushNotifications?
+  private var systemIncomingCall: SystemIncomingCall?
   private var assistantChannel: FlutterMethodChannel?
   private var assistantObserver: NSObjectProtocol?
 
@@ -12,6 +15,9 @@ import UIKit
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
     if let controller = window?.rootViewController as? FlutterViewController {
+      pushNotifications = IOSPushNotifications(messenger: controller.binaryMessenger)
+      UNUserNotificationCenter.current().delegate = self
+      systemIncomingCall = SystemIncomingCall(messenger: controller.binaryMessenger)
       let channel = FlutterMethodChannel(name: "jospar/assistant_launch", binaryMessenger: controller.binaryMessenger)
       assistantChannel = channel
       channel.setMethodCallHandler { call, result in
@@ -31,4 +37,28 @@ import UIKit
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
+  override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+    pushNotifications?.registered(deviceToken)
+    super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+  }
+
+  override func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+    let info = notification.request.content.userInfo
+    guard let push = pushNotifications, push.isFirebase(info) else {
+      super.userNotificationCenter(center, willPresent: notification, withCompletionHandler: completionHandler)
+      return
+    }
+    completionHandler(push.receive(info, opened: false) ? [.banner, .sound] : [])
+  }
+
+  override func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+    let info = response.notification.request.content.userInfo
+    guard let push = pushNotifications, push.isFirebase(info) else {
+      super.userNotificationCenter(center, didReceive: response, withCompletionHandler: completionHandler)
+      return
+    }
+    _ = push.receive(info, opened: true)
+    completionHandler()
+  }
+
 }

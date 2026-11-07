@@ -10,6 +10,7 @@ class ProjectTaskModel extends Equatable {
     required this.projectId,
     required this.status,
     this.displayId = '',
+    this.deps = const [],
     this.title = '',
     this.progress,
     this.priority = 'MED',
@@ -18,9 +19,13 @@ class ProjectTaskModel extends Equatable {
     this.end,
     this.order = 0,
     this.estimate = 0,
+    this.timerStartedAt,
+    this.timerElapsedMs = 0,
+    this.isTimingEnabled = true,
     this.archived = false,
     this.commentCount = 0,
     this.fileCount = 0,
+    this.resourceCount = 0,
     this.checklistCompleted = 0,
     this.checklistTotal = 0,
     this.assignees = const <TaskAssigneeModel>[],
@@ -39,14 +44,29 @@ class ProjectTaskModel extends Equatable {
       status: json['status']?.toString() ?? '',
       progress: _parseProgress(json['progress']),
       priority: json['priority']?.toString() ?? 'MED',
-      detail: _optionalString(json['detail']),
+      detail: json['detail'] is Map
+          ? jsonEncode(json['detail'])
+          : _optionalString(json['detail']),
+      deps: (json['deps'] is List)
+          ? (json['deps'] as List).map((e) => e.toString()).toList()
+          : const [],
       start: _parseDate(json['start']),
       end: _parseDate(json['end']),
       order: _parseInt(json['order']) ?? 0,
-      estimate: _parseInt(json['est'] ?? json['estimate']) ?? 0,
+      estimate:
+          double.tryParse(
+            (json['est'] ?? json['estimate'])?.toString() ?? '',
+          ) ??
+          0,
+      timerStartedAt: _parseDate(json['timerStartedAt']),
+      timerElapsedMs: _parseInt(json['timerElapsedMs']) ?? 0,
+      isTimingEnabled: json['isTimingEnabled'] != false,
       archived: _parseBool(json['archived']),
       commentCount: _commentCount(json),
       fileCount: _fileCount(json),
+      resourceCount:
+          _parseInt(json['resourcesCount'] ?? json['resourceCount']) ??
+          (json['resources'] is List ? (json['resources'] as List).length : 0),
       checklistCompleted: _checklistCompleted(json),
       checklistTotal: _checklistTotal(json),
       assignees: _parseAssignees(json['assignees']),
@@ -63,13 +83,51 @@ class ProjectTaskModel extends Equatable {
   final double? progress;
   final String priority;
   final String? detail;
+  final List<String> deps;
   final DateTime? start;
   final DateTime? end;
   final int order;
-  final int estimate;
+  final double estimate;
+  final DateTime? timerStartedAt;
+  final int timerElapsedMs;
+  final bool isTimingEnabled;
   final bool archived;
   final int commentCount;
   final int fileCount;
+  final int resourceCount;
+
+  Map<dynamic, dynamic> get cover {
+    final object = _detailObject(detail);
+    final value = object['cover'];
+    if (value is! Map) return const {};
+    if (value['type'] == 'image' && value['fileId'] != null) {
+      final files = object['files'];
+      if (files is List) {
+        for (final file in files.whereType<Map>()) {
+          if (file['id'] == value['fileId'] && file['dataUrl'] is String) {
+            return {...value, 'url': file['dataUrl']};
+          }
+        }
+      }
+      final comments = object['comments'];
+      if (comments is List) {
+        for (final comment in comments.whereType<Map>()) {
+          final attachments = comment['files'];
+          if (attachments is! List) continue;
+          for (var index = 0; index < attachments.length; index++) {
+            final file = attachments[index];
+            if (file is Map &&
+                value['fileId'] == 'cfile__${comment['id']}__$index' &&
+                file['dataUrl'] is String) {
+              return {...value, 'url': file['dataUrl']};
+            }
+          }
+        }
+      }
+    }
+    return value;
+  }
+
   final int checklistCompleted;
   final int checklistTotal;
   final List<TaskAssigneeModel> assignees;
@@ -99,6 +157,21 @@ class ProjectTaskModel extends Equatable {
     if (explicit != null) return explicit < 0 ? 0 : explicit;
     final files = json['files'] ?? _detailObject(json['detail'])['files'];
     return files is List ? files.whereType<Map>().length : 0;
+  }
+
+  List<TaskLabelModel> labelsForUser(String? userId) {
+    if (userId == null) return labels;
+    final personal = _detailObject(detail)['personalLabels'];
+    final values = personal is Map ? personal[userId] : null;
+    if (values is! List) return labels;
+    return [
+      ...labels.where((label) => !label.isPersonal),
+      ...values.whereType<Map>().map(
+        (value) => TaskLabelModel.fromJson(
+          Map<String, dynamic>.from(value),
+        ).copyWith(isPersonal: true),
+      ),
+    ];
   }
 
   static List<TaskLabelModel> _parseLabels(Map<String, dynamic> json) {
@@ -243,6 +316,7 @@ class ProjectTaskModel extends Equatable {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
+    'deps': deps,
     'id': id,
     'displayId': displayId,
     'title': title,
@@ -255,9 +329,13 @@ class ProjectTaskModel extends Equatable {
     if (end != null) 'end': end!.toUtc().toIso8601String(),
     'order': order,
     'est': estimate,
+    'timerStartedAt': timerStartedAt?.toUtc().toIso8601String(),
+    'timerElapsedMs': timerElapsedMs,
+    'isTimingEnabled': isTimingEnabled,
     'archived': archived,
     'commentsCount': commentCount,
     'filesCount': fileCount,
+    'resourcesCount': resourceCount,
     'checklistCompleted': checklistCompleted,
     'checklistTotal': checklistTotal,
     'assignees': assignees.map((item) => item.toJson()).toList(growable: false),
@@ -274,13 +352,18 @@ class ProjectTaskModel extends Equatable {
     double? progress,
     String? priority,
     String? detail,
+    List<String>? deps,
     DateTime? start,
     DateTime? end,
     int? order,
-    int? estimate,
+    double? estimate,
+    DateTime? timerStartedAt,
+    int? timerElapsedMs,
+    bool? isTimingEnabled,
     bool? archived,
     int? commentCount,
     int? fileCount,
+    int? resourceCount,
     int? checklistCompleted,
     int? checklistTotal,
     List<TaskAssigneeModel>? assignees,
@@ -296,13 +379,18 @@ class ProjectTaskModel extends Equatable {
       progress: progress ?? this.progress,
       priority: priority ?? this.priority,
       detail: detail ?? this.detail,
+      deps: deps ?? this.deps,
       start: start ?? this.start,
       end: end ?? this.end,
       order: order ?? this.order,
       estimate: estimate ?? this.estimate,
+      timerStartedAt: timerStartedAt ?? this.timerStartedAt,
+      timerElapsedMs: timerElapsedMs ?? this.timerElapsedMs,
+      isTimingEnabled: isTimingEnabled ?? this.isTimingEnabled,
       archived: archived ?? this.archived,
       commentCount: commentCount ?? this.commentCount,
       fileCount: fileCount ?? this.fileCount,
+      resourceCount: resourceCount ?? this.resourceCount,
       checklistCompleted: checklistCompleted ?? this.checklistCompleted,
       checklistTotal: checklistTotal ?? this.checklistTotal,
       assignees: assignees ?? this.assignees,
@@ -321,13 +409,18 @@ class ProjectTaskModel extends Equatable {
     progress,
     priority,
     detail,
+    deps,
     start,
     end,
     order,
     estimate,
+    timerStartedAt,
+    timerElapsedMs,
+    isTimingEnabled,
     archived,
     commentCount,
     fileCount,
+    resourceCount,
     checklistCompleted,
     checklistTotal,
     assignees,

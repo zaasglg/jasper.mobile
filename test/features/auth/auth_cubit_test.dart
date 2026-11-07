@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jospar/core/auth/auth_session.dart';
+import 'package:jospar/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:jospar/features/auth/data/models/login_request.dart';
 import 'package:jospar/features/auth/domain/repositories/auth_repository.dart';
 import 'package:jospar/features/auth/presentation/cubit/auth_cubit.dart';
@@ -19,6 +23,64 @@ void main() {
   });
 
   group('AuthCubit', () {
+    for (final fails in [false, true]) {
+      test(
+        'closed login ignores a delayed response (failure: $fails)',
+        () async {
+          final pending = Completer<String>();
+          final repository = _FakeAuthRepository()
+            ..pendingLogin = pending.future;
+          final cubit = AuthCubit(repository);
+          final generation = authSession.generation;
+          final operation = cubit.login(
+            email: 'user@jospar.me',
+            password: 'secret',
+          );
+          final completed = expectLater(operation, completes);
+          await cubit.close();
+          if (fails) {
+            pending.completeError(const AuthException('Login failed'));
+          } else {
+            pending.complete('late-token');
+          }
+          await completed;
+          expect(authSession.generation, generation);
+        },
+      );
+
+      test(
+        'closed logout handles a delayed response (failure: $fails)',
+        () async {
+          final pending = Completer<void>();
+          final repository = _FakeAuthRepository()
+            ..pendingLogout = pending.future;
+          final cubit = AuthCubit(repository);
+          final operation = cubit.logout();
+          final completed = expectLater(operation, completes);
+          await cubit.close();
+          if (fails) {
+            pending.completeError(const AuthException('Logout failed'));
+          } else {
+            pending.complete();
+          }
+          await completed;
+          if (!fails) expect(authSession.requiresLogin, isTrue);
+        },
+      );
+    }
+    test(
+      'Google login authenticates and cancellation resets loading',
+      () async {
+        final repository = _FakeAuthRepository();
+        final cubit = AuthCubit(repository);
+        await cubit.loginWithGoogle();
+        expect(cubit.state, const AuthAuthenticated('google-token'));
+        repository.googleToken = null;
+        await cubit.loginWithGoogle();
+        expect(cubit.state, const AuthInitial());
+        await cubit.close();
+      },
+    );
     test('rejects an invalid email without calling repository', () async {
       final repository = _FakeAuthRepository();
       final cubit = AuthCubit(repository);
@@ -68,20 +130,26 @@ void main() {
   });
 }
 
-class _FakeAuthRepository implements AuthRepository {
+class _FakeAuthRepository implements AuthRepository, GoogleLoginRepository {
+  String? googleToken = 'google-token';
+  @override
+  Future<String?> loginWithGoogle() async => googleToken;
   int calls = 0;
   int logoutCalls = 0;
   LoginRequest? lastRequest;
+  Future<String>? pendingLogin;
+  Future<void>? pendingLogout;
 
   @override
   Future<String> login(LoginRequest request) async {
     calls += 1;
     lastRequest = request;
-    return 'jwt-token';
+    return pendingLogin ?? 'jwt-token';
   }
 
   @override
   Future<void> logout() async {
     logoutCalls += 1;
+    await pendingLogout;
   }
 }

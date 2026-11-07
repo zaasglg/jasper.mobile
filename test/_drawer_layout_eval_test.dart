@@ -56,7 +56,10 @@ void main() {
           child: MaterialApp(
             home: Scaffold(
               key: scaffoldKey,
-              drawer: AppDrawer(onCreateProject: () async {}),
+              drawer: AppDrawer(
+                onCreateProject: () async {},
+                onOpenSettings: () {},
+              ),
               body: const SizedBox.expand(),
             ),
           ),
@@ -105,6 +108,9 @@ void main() {
 }
 
 class _WorkspaceRepo implements WorkspaceRepository {
+  @override
+  Future<List<WorkspaceModel>> getArchivedWorkspaces() async => [];
+
   @override
   Future<List<WorkspaceModel>> getWorkspaces() async => const <WorkspaceModel>[
     WorkspaceModel(id: 'ws-digital', name: 'Цифровизация', color: '#6D5FE0'),

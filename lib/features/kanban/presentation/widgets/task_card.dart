@@ -1,3 +1,9 @@
+import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/widgets/app_action_menu.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../data/models/card_view_settings.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +13,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/domain/utils/my_tasks_utils.dart';
+import '../../../planner/presentation/screens/planner_screen.dart';
 
 Color _parseTagColor(String? value) {
   final source = value?.trim();
@@ -23,18 +30,19 @@ Color _parseTagColor(String? value) {
   return parsed == null ? AppColors.accent : Color(parsed);
 }
 
-enum _TaskMenuAction {
+enum TaskCardAction {
   cover('Обложка', LucideIcons.image),
   edit('Редактировать', LucideIcons.pencil),
   duplicate('Дублировать', LucideIcons.copy),
   move('Переместить', LucideIcons.arrowRight),
+  schedule('В ежедневник', LucideIcons.calendarPlus),
   share('Поделиться', LucideIcons.share2),
   copyLink('Копировать ссылку', LucideIcons.link),
   translate('Перевести задачу', LucideIcons.languages),
   archive('Архивировать', LucideIcons.archive),
   delete('Удалить задачу', LucideIcons.trash2);
 
-  const _TaskMenuAction(this.label, this.icon);
+  const TaskCardAction(this.label, this.icon);
   final String label;
   final IconData icon;
 }
@@ -44,16 +52,149 @@ class TaskCard extends StatelessWidget {
     super.key,
     required this.task,
     this.onToggleCompleted,
+    this.onMove,
+    this.onAction,
+    this.cardView = const CardViewSettings(),
     this.isUpdating = false,
+    this.currentUserId,
   });
 
+  final String? currentUserId;
   final ProjectTaskModel task;
   final VoidCallback? onToggleCompleted;
+  final VoidCallback? onMove;
+  final ValueChanged<TaskCardAction>? onAction;
   final bool isUpdating;
+  final CardViewSettings cardView;
+
+  Future<void> _showActions(BuildContext context) async {
+    final action = await showAppActionMenu<TaskCardAction>(
+      context,
+      title: task.title.isEmpty ? 'Без названия' : task.title,
+      eyebrow: task.displayId.isEmpty ? 'Действия с задачей' : task.displayId,
+      groups: [
+        for (final group in const [
+          [
+            TaskCardAction.edit,
+            TaskCardAction.move,
+            TaskCardAction.duplicate,
+            TaskCardAction.schedule,
+          ],
+          [TaskCardAction.cover, TaskCardAction.translate],
+          [TaskCardAction.share, TaskCardAction.copyLink],
+          [TaskCardAction.archive, TaskCardAction.delete],
+        ])
+          [
+            for (final action in group)
+              if (onAction != null ||
+                  const {
+                    TaskCardAction.edit,
+                    TaskCardAction.schedule,
+                    TaskCardAction.share,
+                    TaskCardAction.copyLink,
+                  }.contains(action))
+                AppMenuAction(
+                  value: action,
+                  label: action.label,
+                  icon: action.icon,
+                  enabled: action != TaskCardAction.move || onMove != null,
+                  destructive: action == TaskCardAction.delete,
+                  muted: action == TaskCardAction.archive,
+                  opensSubmenu: const {
+                    TaskCardAction.cover,
+                    TaskCardAction.move,
+                    TaskCardAction.translate,
+                  }.contains(action),
+                ),
+          ],
+      ],
+    );
+    if (!context.mounted || action == null || isUpdating) return;
+    switch (action) {
+      case TaskCardAction.edit:
+        context.push('/tasks/${task.id}', extra: task);
+      case TaskCardAction.move:
+        onMove?.call();
+      case TaskCardAction.schedule:
+        showScheduleProjectTask(context, task);
+      case TaskCardAction.copyLink:
+        await _shareTask(context, copy: true);
+      case TaskCardAction.share:
+        await _shareTask(context);
+      default:
+        onAction?.call(action);
+    }
+  }
+
+  Future<void> _shareTask(BuildContext context, {bool copy = false}) async {
+    final link = Uri.https('jospar.me', '/tasks', {
+      'project': task.projectId,
+      'taskId': task.id,
+    }).toString();
+    try {
+      if (copy) {
+        await Clipboard.setData(ClipboardData(text: link));
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Ссылка скопирована')));
+        }
+      } else {
+        final box = context.findRenderObject() as RenderBox?;
+        await SharePlus.instance.share(
+          ShareParams(
+            text:
+                '${task.displayId.isEmpty ? '' : '${task.displayId}: '}${task.title}\n$link',
+            subject: task.title,
+            sharePositionOrigin: box == null
+                ? null
+                : box.localToGlobal(Offset.zero) & box.size,
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              copy
+                  ? 'Не удалось скопировать ссылку.'
+                  : 'Не удалось открыть меню отправки.',
+            ),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final visibleEpics = cardView.shows(CardField.epics)
+        ? task.epics.where((epic) => epic.name.trim().isNotEmpty).toList()
+        : <TaskEpicModel>[];
+    final visibleLabels = task
+        .labelsForUser(currentUserId)
+        .where(
+          (label) =>
+              label.text.trim().isNotEmpty &&
+              cardView.shows(
+                label.isPersonal ? CardField.personalLabels : CardField.labels,
+              ),
+        )
+        .toList();
+    final hasMetadata =
+        (cardView.shows(CardField.dates) && task.end != null) ||
+        (cardView.shows(CardField.checklists) && task.checklistTotal > 0) ||
+        (cardView.shows(CardField.files) && task.fileCount > 0) ||
+        (cardView.shows(CardField.comments) && task.commentCount > 0) ||
+        (cardView.shows(CardField.timing) &&
+            task.isTimingEnabled &&
+            (task.estimate > 0 ||
+                task.timerElapsedMs > 0 ||
+                task.timerStartedAt != null)) ||
+        (cardView.shows(CardField.resources) && task.resourceCount > 0) ||
+        (cardView.shows(CardField.assignees) && task.assignees.isNotEmpty);
     final overdue = isTaskOverdue(task, DateTime.now());
     return InkWell(
       onTap: () => context.push('/tasks/${task.id}', extra: task),
@@ -76,94 +217,37 @@ class TaskCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            if (cardView.shows(CardField.cover) && task.cover.isNotEmpty)
+              TaskCover(cover: task.cover),
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Text(
-                    task.displayId.isEmpty ? task.id : task.displayId,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
-                      color: colors.onSurfaceVariant.withValues(alpha: 0.78),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 32,
-                  height: 28,
-                  child: PopupMenuButton<_TaskMenuAction>(
-                    key: ValueKey('task-actions-${task.id}'),
-                    tooltip: 'Действия задачи',
-                    onSelected: (action) {
-                      if (action == _TaskMenuAction.edit) {
-                        context.push('/tasks/${task.id}', extra: task);
-                      }
-                    },
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(LucideIcons.ellipsis, size: 17),
-                    position: PopupMenuPosition.under,
-                    color: colors.surface,
-                    surfaceTintColor: Colors.transparent,
-                    elevation: 8,
-                    shadowColor: AppColors.ink.withValues(alpha: 0.16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: colors.outlineVariant.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 248,
-                      maxWidth: 300,
-                    ),
-                    itemBuilder: (context) => [
-                      for (final action in _TaskMenuAction.values) ...[
-                        if (action == _TaskMenuAction.archive ||
-                            action == _TaskMenuAction.delete)
-                          const PopupMenuDivider(height: 9),
-                        PopupMenuItem<_TaskMenuAction>(
-                          value: action,
-                          height: 45,
-                          child: Row(
-                            children: [
-                              Icon(
-                                action.icon,
-                                size: 19,
-                                color: action == _TaskMenuAction.delete
-                                    ? AppColors.error
-                                    : action == _TaskMenuAction.archive
-                                    ? AppColors.muted
-                                    : AppColors.accent,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  action.label,
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: action == _TaskMenuAction.delete
-                                        ? AppColors.error
-                                        : colors.onSurface,
-                                  ),
-                                ),
-                              ),
-                              if (action == _TaskMenuAction.translate)
-                                Icon(
-                                  LucideIcons.chevronRight,
-                                  size: 17,
-                                  color: colors.onSurfaceVariant,
-                                ),
-                            ],
+                  child: !cardView.shows(CardField.id)
+                      ? const SizedBox.shrink()
+                      : Text(
+                          task.displayId.isEmpty ? task.id : task.displayId,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                            color: colors.onSurfaceVariant.withValues(
+                              alpha: 0.78,
+                            ),
                           ),
                         ),
-                      ],
-                    ],
+                ),
+                IconButton(
+                  key: ValueKey('task-actions-${task.id}'),
+                  tooltip: 'Действия задачи',
+                  onPressed: isUpdating ? null : () => _showActions(context),
+                  icon: const Icon(
+                    LucideIcons.ellipsis,
+                    size: AppIconSizes.standard,
                   ),
+                  visualDensity: VisualDensity.compact,
                 ),
               ],
             ),
@@ -247,24 +331,20 @@ class TaskCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (task.epicNames.isNotEmpty ||
-                task.labels.isNotEmpty) ...<Widget>[
+            if (visibleEpics.isNotEmpty ||
+                visibleLabels.isNotEmpty) ...<Widget>[
               const SizedBox(height: 9),
               Wrap(
                 spacing: 5,
                 runSpacing: 5,
                 children: [
-                  for (final epic in task.epics.where(
-                    (epic) => epic.name.trim().isNotEmpty,
-                  ))
+                  for (final epic in visibleEpics)
                     _TaskTag(
                       text: epic.name,
                       color: _parseTagColor(epic.color),
                       kind: 'Эпик',
                     ),
-                  for (final label in task.labels.where(
-                    (label) => label.text.trim().isNotEmpty,
-                  ))
+                  for (final label in visibleLabels)
                     _TaskTag(
                       text: label.text,
                       color: _parseTagColor(label.color),
@@ -275,72 +355,98 @@ class TaskCard extends StatelessWidget {
                 ],
               ),
             ],
-            const SizedBox(height: 11),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 7,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      if (task.end != null)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              LucideIcons.calendarDays,
-                              size: 16,
-                              color: overdue
-                                  ? AppColors.error
-                                  : AppColors.muted,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              formatRussianTaskDate(task.end!),
-                              style: GoogleFonts.manrope(
-                                fontSize: 11.5,
-                                fontWeight: overdue
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
+            if (hasMetadata) ...[
+              const SizedBox(height: 11),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 7,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (cardView.shows(CardField.dates) && task.end != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                LucideIcons.calendarDays,
+                                size: AppIconSizes.standard,
                                 color: overdue
                                     ? AppColors.error
                                     : AppColors.muted,
                               ),
-                            ),
-                          ],
-                        ),
-                      if (task.checklistTotal > 0)
-                        _TaskCardCount(
-                          icon: LucideIcons.listChecks,
-                          count:
-                              '${task.checklistCompleted}/${task.checklistTotal}',
-                          label:
-                              'Чек-лист: ${task.checklistCompleted} из ${task.checklistTotal}',
-                        ),
-                      if (task.fileCount > 0)
-                        _TaskCardCount(
-                          icon: LucideIcons.paperclip,
-                          count: '${task.fileCount}',
-                          label: 'Вложения: ${task.fileCount}',
-                        ),
-                      if (task.commentCount > 0)
-                        _TaskCardCount(
-                          icon: LucideIcons.messageCircle,
-                          count: '${task.commentCount}',
-                          label: 'Обсуждения: ${task.commentCount}',
-                        ),
-                    ],
+                              const SizedBox(width: 4),
+                              Text(
+                                formatRussianTaskDate(task.end!),
+                                style: GoogleFonts.manrope(
+                                  fontSize: 11.5,
+                                  fontWeight: overdue
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: overdue
+                                      ? AppColors.error
+                                      : AppColors.muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (cardView.shows(CardField.timing) &&
+                            task.isTimingEnabled &&
+                            (task.estimate > 0 ||
+                                task.timerElapsedMs > 0 ||
+                                task.timerStartedAt != null))
+                          _TaskCardCount(
+                            icon: LucideIcons.clock,
+                            count: task.estimate > 0
+                                ? '${task.estimate.toStringAsFixed(0)} мин'
+                                : '${task.timerElapsedMs ~/ 60000} мин',
+                            label: 'Тайминг задачи',
+                          ),
+                        if (cardView.shows(CardField.resources) &&
+                            task.resourceCount > 0)
+                          _TaskCardCount(
+                            icon: LucideIcons.chartNoAxesCombined,
+                            count: '${task.resourceCount}',
+                            label: 'Ресурсы: ${task.resourceCount}',
+                          ),
+                        if (cardView.shows(CardField.checklists) &&
+                            task.checklistTotal > 0)
+                          _TaskCardCount(
+                            icon: LucideIcons.listChecks,
+                            count:
+                                '${task.checklistCompleted}/${task.checklistTotal}',
+                            label:
+                                'Чек-лист: ${task.checklistCompleted} из ${task.checklistTotal}',
+                          ),
+                        if (cardView.shows(CardField.files) &&
+                            task.fileCount > 0)
+                          _TaskCardCount(
+                            icon: LucideIcons.paperclip,
+                            count: '${task.fileCount}',
+                            label: 'Вложения: ${task.fileCount}',
+                          ),
+                        if (cardView.shows(CardField.comments) &&
+                            task.commentCount > 0)
+                          _TaskCardCount(
+                            icon: LucideIcons.messageCircle,
+                            count: '${task.commentCount}',
+                            label: 'Обсуждения: ${task.commentCount}',
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                if (task.assignees.isNotEmpty) ...[
-                  const SizedBox(width: 10),
-                  _TaskAvatars(assignees: task.assignees),
+                  if (cardView.shows(CardField.assignees) &&
+                      task.assignees.isNotEmpty) ...[
+                    const SizedBox(width: 10),
+                    _TaskAvatars(assignees: task.assignees),
+                  ],
                 ],
-              ],
-            ),
-            if ((task.progress ?? 0) > 0 &&
+              ),
+            ],
+            if (cardView.shows(CardField.checklists) &&
+                (task.progress ?? 0) > 0 &&
                 (task.progress ?? 0) < 100) ...<Widget>[
               const SizedBox(height: 9),
               ClipRRect(
@@ -379,7 +485,7 @@ class _TaskCardCount extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: AppColors.muted),
+        Icon(icon, size: AppIconSizes.standard, color: AppColors.muted),
         const SizedBox(width: 4),
         Text(
           count,
@@ -432,7 +538,11 @@ class _TaskTag extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (personal) ...[
-                Icon(LucideIcons.lockKeyhole, size: 10, color: foreground),
+                Icon(
+                  LucideIcons.lockKeyhole,
+                  size: AppIconSizes.standard,
+                  color: foreground,
+                ),
                 const SizedBox(width: 4),
               ],
               Flexible(
@@ -491,6 +601,57 @@ class _TaskAvatars extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class TaskCover extends StatelessWidget {
+  const TaskCover({super.key, required this.cover});
+  final Map<dynamic, dynamic> cover;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = cover['color'];
+    final url = resolveUserAvatarUrl(
+      (cover['url'] ?? cover['imageUrl'])?.toString(),
+    );
+    if (cover['type'] == 'color' && color is String) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: _parseTagColor(color),
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
+    }
+    if (url == null) return const SizedBox.shrink();
+    final Widget image;
+    if (url.startsWith('data:image/')) {
+      try {
+        image = Image.memory(
+          UriData.parse(url).contentAsBytes(),
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        );
+      } on FormatException {
+        return const SizedBox.shrink();
+      }
+    } else {
+      image = CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        errorWidget: (_, _, _) => const SizedBox.shrink(),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(height: 120, width: double.infinity, child: image),
       ),
     );
   }

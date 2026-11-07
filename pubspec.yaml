@@ -38,6 +38,8 @@ dependencies:
   equatable: ^2.0.7
   freezed: ^3.2.5
   dio: ^5.11.0
+  flutter_web_auth_2: ^5.1.0
+  crypto: ^3.0.6
   go_router: ^17.5.0
   get_it: ^9.2.1
   flutter_secure_storage: ^11.0.0
@@ -56,6 +58,16 @@ dependencies:
   mime: ^2.1.0
   speech_to_text: ^7.4.0
   flutter_tts: ^4.2.5
+  video_player_media_kit: ^2.0.0
+  media_kit_libs_ios_video: ^1.1.4
+  share_plus: ^13.3.1
+  html: ^0.15.7
+  url_launcher: ^6.3.2
+  pdfx: ^2.9.2
+  webview_flutter: ^4.14.1
+  flutter_markdown: ^0.7.7+1
+  livekit_client: 2.13.2
+  flutter_webrtc: ^1.6.3
 
 dev_dependencies:
   flutter_test:
@@ -86,6 +98,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/audio/incoming_call.wav
     - assets/images/JBee.svg
     - assets/images/logo.svg
 

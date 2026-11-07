@@ -1,3 +1,26 @@
+import '../../features/notifications/data/native_push_gateway.dart';
+import '../../features/notifications/domain/push_gateway.dart';
+import '../../features/notifications/presentation/push_cubit.dart';
+import '../../features/planner/data/repositories/google_calendar_repository_impl.dart';
+import '../../features/planner/domain/repositories/google_calendar_repository.dart';
+import '../../features/calls/domain/call_repository.dart';
+import '../../features/calls/data/call_repository_impl.dart';
+import '../../features/calls/data/livekit_call_media.dart';
+import '../../features/calls/presentation/call_cubit.dart';
+import '../../features/assistant/data/services/assistant_actions.dart';
+import '../../features/dashboard/data/mentions_read_storage.dart';
+import '../../features/tasks/data/repositories/task_creation_repository_impl.dart';
+import '../../features/tasks/domain/repositories/task_creation_repository.dart';
+import '../../features/tasks/presentation/cubit/task_creation_cubit.dart';
+import '../../features/dashboard/data/dashboard_repository_impl.dart';
+import '../../features/dashboard/domain/dashboard_repository.dart';
+import '../../features/dashboard/presentation/cubit/dashboard_layout_cubit.dart';
+import '../../features/storage/data/storage_repository_impl.dart';
+import '../../features/storage/domain/storage_repository.dart';
+import '../../features/activity/data/activity_repository.dart';
+import '../../features/collaboration/data/collaboration_repository_impl.dart';
+import '../../features/collaboration/domain/collaboration_repository.dart';
+import '../../features/kanban/data/storage/card_view_storage.dart';
 import '../../features/assistant/data/repositories/assistant_repository_impl.dart';
 import '../../features/assistant/data/services/device_assistant_voice.dart';
 import '../../features/assistant/domain/repositories/assistant_repository.dart';
@@ -7,6 +30,7 @@ import '../../features/planner/data/repositories/planner_repository_impl.dart';
 import '../../features/planner/domain/repositories/planner_repository.dart';
 import '../../features/planner/presentation/cubit/planner_cubit.dart';
 import 'package:dio/dio.dart';
+import '../../features/search/data/search_repository.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 
@@ -52,13 +76,41 @@ final sl = GetIt.instance;
 Future<void> initServiceLocator() async {
   // Core
   sl.registerLazySingleton<FlutterSecureStorage>(FlutterSecureStorage.new);
+  sl.registerLazySingleton<MentionsReadStorage>(
+    () => MentionsReadStorage(sl()),
+  );
   sl.registerLazySingleton<AuthTokenStorage>(() => AuthTokenStorage(sl()));
   sl.registerLazySingleton<WorkspaceSelectionStorage>(
     () => WorkspaceSelectionStorage(sl()),
   );
-  sl.registerLazySingleton<Dio>(() => createDio(sl()));
+  sl.registerLazySingleton<Dio>(() => createDio(sl(), workspaceStorage: sl()));
+  sl.registerLazySingleton<SearchRepository>(() => SearchRepositoryImpl(sl()));
   sl.registerLazySingleton<UserAvatarRepository>(
     () => UserAvatarRepository(sl(), sl()),
+  );
+
+  sl.registerLazySingleton<CollaborationRepository>(
+    () => CollaborationRepositoryImpl(sl()),
+  );
+
+  sl.registerLazySingleton<ActivityRepository>(
+    () => ActivityRepository(sl(), sl()),
+  );
+
+  sl.registerLazySingleton<StorageRepository>(
+    () => StorageRepositoryImpl(sl(), sl()),
+  );
+
+  sl.registerLazySingleton<DashboardRepository>(
+    () => DashboardRepositoryImpl(sl()),
+  );
+  sl.registerFactory<DashboardLayoutCubit>(() => DashboardLayoutCubit(sl()));
+
+  sl.registerLazySingleton<TaskCreationRepository>(
+    () => TaskCreationRepositoryImpl(sl()),
+  );
+  sl.registerFactory<TaskCreationCubit>(
+    () => TaskCreationCubit(sl(), workspaceStorage: sl()),
   );
 
   // Auth
@@ -98,6 +150,10 @@ Future<void> initServiceLocator() async {
     () => ProjectsCubit(sl(), taskRepository: sl()),
   );
 
+  sl.registerLazySingleton<CardViewStorage>(
+    () => CardViewStorage(sl(), dio: sl(), tokenStorage: sl()),
+  );
+
   // Project Kanban
   sl.registerFactory<KanbanRepository>(() => KanbanRepositoryImpl(sl()));
   sl.registerLazySingleton<KanbanBoardCache>(KanbanBoardCache.new);
@@ -118,12 +174,36 @@ Future<void> initServiceLocator() async {
   );
   sl.registerFactory<TaskDetailsCubit>(() => TaskDetailsCubit(sl(), sl()));
 
+  sl.registerLazySingleton<CallRepository>(() => CallRepositoryImpl(sl()));
+  sl.registerLazySingleton<CallCubit>(
+    () => CallCubit(
+      sl(),
+      LiveKitCallMedia(
+        beforeCapture: () async {
+          await sl<AssistantVoice>().stop();
+          await sl<AssistantVoice>().stopSpeaking();
+        },
+      ),
+    ),
+    dispose: (cubit) => cubit.close(),
+  );
+
   // Voice assistant
   sl.registerLazySingleton<AssistantRepository>(
     () => AssistantRepositoryImpl(sl()),
   );
   sl.registerLazySingleton<AssistantVoice>(DeviceAssistantVoice.new);
-  sl.registerFactory<AssistantCubit>(() => AssistantCubit(sl(), sl(), sl()));
+  sl.registerFactory<AssistantCubit>(
+    () =>
+        AssistantCubit(sl(), sl(), sl(), actions: AssistantActions(sl(), sl())),
+  );
+
+  sl.registerLazySingleton<GoogleCalendarRepository>(
+    () => GoogleCalendarRepositoryImpl(sl()),
+  );
+
+  sl.registerLazySingleton<PushGateway>(NativePushGateway.new);
+  sl.registerLazySingleton<PushCubit>(() => PushCubit(sl()));
 
   // Planner
   sl.registerLazySingleton<PlannerRepository>(

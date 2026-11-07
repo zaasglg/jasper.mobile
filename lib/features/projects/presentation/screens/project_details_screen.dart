@@ -1,3 +1,6 @@
+import '../../../storage/data/storage_models.dart';
+import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/widgets/app_action_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -28,13 +31,63 @@ class ProjectDetailsScreen extends StatelessWidget {
         final project =
             _findProject(state.projects, projectId) ?? initialProject;
         return Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.surface
+              : const Color(0xFFFBF8FF),
           appBar: AppBar(
+            centerTitle: true,
+            backgroundColor: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.surface
+                : Colors.white,
+            surfaceTintColor: Colors.transparent,
             leading: IconButton(
               tooltip: 'Назад',
               onPressed: context.pop,
-              icon: const Icon(LucideIcons.arrowLeft),
+              icon: const Icon(
+                LucideIcons.arrowLeft,
+                size: AppIconSizes.standard,
+              ),
             ),
+            actions: [
+              if (project != null)
+                IconButton(
+                  tooltip: 'Кладовка',
+                  icon: const Icon(
+                    Icons.inventory_2_outlined,
+                    size: AppIconSizes.standard,
+                  ),
+                  onPressed: () => context.push(
+                    '/storage',
+                    extra: StorageScope(
+                      source: StorageSource.project,
+                      id: project.id,
+                      workspaceId: project.workspaceId,
+                      title: project.name,
+                    ),
+                  ),
+                ),
+              if (project != null)
+                IconButton(
+                  tooltip: 'Настройки проекта',
+                  icon: const Icon(
+                    LucideIcons.settings2,
+                    size: AppIconSizes.standard,
+                  ),
+                  onPressed: () async {
+                    final cubit = context.read<ProjectsCubit>();
+                    final result = await context.push<String>(
+                      '/manage/projects/${project.id}',
+                    );
+                    await cubit.loadForWorkspace(
+                      project.workspaceId,
+                      refresh: true,
+                    );
+                    if (context.mounted && result == 'removed') {
+                      context.go('/projects');
+                    }
+                  },
+                ),
+            ],
             title: project == null
                 ? const Text('Проект')
                 : _ProjectSwitcher(project: project, projects: state.projects),
@@ -96,23 +149,21 @@ class _ProjectSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<ProjectModel>(
+    return AppActionMenuButton<ProjectModel>(
+      title: 'Выбрать проект',
       tooltip: 'Выбрать проект',
       onSelected: (selected) =>
           context.go('/projects/${selected.id}', extra: selected),
-      itemBuilder: (_) => <PopupMenuEntry<ProjectModel>>[
-        for (final item in projects)
-          PopupMenuItem<ProjectModel>(
-            value: item,
-            child: Row(
-              children: <Widget>[
-                if (item.id == project.id)
-                  const Icon(LucideIcons.check, size: 16),
-                if (item.id == project.id) const SizedBox(width: 8),
-                Expanded(child: Text(item.name)),
-              ],
+      groups: [
+        [
+          for (final item in projects)
+            AppMenuAction(
+              value: item,
+              label: item.name,
+              icon: LucideIcons.folder,
+              selected: item.id == project.id,
             ),
-          ),
+        ],
       ],
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -125,7 +176,7 @@ class _ProjectSwitcher extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 5),
-          const Icon(LucideIcons.chevronDown, size: 16),
+          const Icon(LucideIcons.chevronDown, size: AppIconSizes.standard),
         ],
       ),
     );

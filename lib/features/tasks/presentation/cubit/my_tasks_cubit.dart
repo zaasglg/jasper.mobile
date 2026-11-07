@@ -1,3 +1,4 @@
+import '../../../assistant/data/services/assistant_task_changes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../projects/data/models/project_model.dart';
@@ -15,7 +16,20 @@ class MyTasksCubit extends Cubit<MyTasksState> {
     required MyTaskFieldsStorage fieldsStorage,
   }) : _repository = repository,
        _fieldsStorage = fieldsStorage,
-       super(const MyTasksState());
+       super(const MyTasksState()) {
+    assistantTaskChanges.addListener(_onAiTasksChanged);
+  }
+
+  void _onAiTasksChanged() {
+    if (!isClosed && _userId.isNotEmpty) refresh();
+  }
+
+  @override
+  Future<void> close() {
+    assistantTaskChanges.removeListener(_onAiTasksChanged);
+    _loadRevision++;
+    return super.close();
+  }
 
   final MyTasksRepository _repository;
   final MyTaskFieldsStorage _fieldsStorage;
@@ -74,6 +88,17 @@ class MyTasksCubit extends Cubit<MyTasksState> {
   Future<void> refresh({bool showLoading = false}) async {
     if (_userId.isEmpty) return;
     final revision = ++_loadRevision;
+    if (state.selectedScopeProjectIds.isEmpty) {
+      emit(
+        state.copyWith(
+          status: MyTasksStatus.success,
+          tasks: const [],
+          columnsByProjectId: const {},
+          clearError: true,
+        ),
+      );
+      return;
+    }
     if (showLoading || state.tasks.isEmpty) {
       emit(
         state.copyWith(
@@ -90,14 +115,11 @@ class MyTasksCubit extends Cubit<MyTasksState> {
         projectIds: state.selectedScopeProjectIds.toList(growable: false),
       );
       if (revision != _loadRevision || isClosed) return;
-      final filteredTasks = state.selectedScopeProjectIds.isEmpty
-          ? tasks
-          : tasks
-                .where(
-                  (task) =>
-                      state.selectedScopeProjectIds.contains(task.projectId),
-                )
-                .toList(growable: false);
+      final filteredTasks = tasks
+          .where(
+            (task) => state.selectedScopeProjectIds.contains(task.projectId),
+          )
+          .toList(growable: false);
       final projectIds = filteredTasks
           .map((task) => task.projectId)
           .where((id) => id.isNotEmpty)
@@ -210,7 +232,7 @@ class MyTasksCubit extends Cubit<MyTasksState> {
   }
 
   Set<String> _scopeIds(List<ProjectModel> projects, Set<String> selectedIds) {
-    if (selectedIds.isEmpty) return const <String>{};
+    if (selectedIds.isEmpty) return _allProjectIds(projects).toSet();
     final result = <String>{};
 
     void visit(ProjectModel project) {

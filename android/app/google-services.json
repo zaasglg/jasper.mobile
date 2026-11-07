@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1077699465053",
+    "project_id": "josparbee-c8e89",
+    "storage_bucket": "josparbee-c8e89.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1077699465053:android:5733c081ca8333fdf6e2b4",
+        "android_client_info": {
+          "package_name": "com.jospar.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAQ096DZOChc1cCisslg9rSwgJYk1cXTY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

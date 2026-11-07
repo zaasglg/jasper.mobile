@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-31",
+  "bundleId": "com.jospar.app",
+  "firebaseProject": "josparbee-c8e89",
+  "clientPlistValidated": true,
+  "clientPlistIncludedInRunner": true,
+  "nativeMessagingBridgeImplemented": true,
+  "apnsDeviceTokenForwardingImplemented": true,
+  "pushEntitlementAdded": true,
+  "backgroundModeAdded": true,
+  "iosSimulatorBuild": "passed",
+  "iosSimulatorLaunch": "passed",
+  "flutterAnalyze": "passed",
+  "affectedFlutterTestsPassed": 13,
+  "backendTypecheck": "passed",
+  "backendPushTestsPassed": 27,
+  "apnsKeyUploadVerified": false,
+  "realApnsDeliveryTested": false,
+  "backendReleased": false,
+  "pushKitWakeupImplemented": false
+}

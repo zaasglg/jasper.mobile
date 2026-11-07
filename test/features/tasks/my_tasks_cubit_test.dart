@@ -63,6 +63,40 @@ void main() {
     await cubit.close();
   });
 
+  test(
+    'all projects stays within current workspace including children',
+    () async {
+      final repository = _TasksRepository([
+        _task('root-task', 'root'),
+        _task('child-task', 'child'),
+        _task('foreign-task', 'another-workspace-project'),
+      ])..ignoreScope = true;
+      final cubit = MyTasksCubit(
+        repository: repository,
+        fieldsStorage: _FieldsStorage(),
+      );
+      addTearDown(cubit.close);
+      await cubit.configure(userId: 'user', projects: const [root]);
+      expect(repository.projectIds, unorderedEquals(['root', 'child']));
+      expect(cubit.state.tasks.map((task) => task.id), [
+        'root-task',
+        'child-task',
+      ]);
+    },
+  );
+
+  test('workspace without projects never loads unscoped tasks', () async {
+    final repository = _TasksRepository([_task('foreign-task', 'foreign')]);
+    final cubit = MyTasksCubit(
+      repository: repository,
+      fieldsStorage: _FieldsStorage(),
+    );
+    addTearDown(cubit.close);
+    await cubit.configure(userId: 'user', projects: const []);
+    expect(repository.assigneeId, isNull);
+    expect(cubit.state.tasks, isEmpty);
+  });
+
   test('optimistically updates progress and rolls back on failure', () async {
     final repository = _TasksRepository(<ProjectTaskModel>[
       _task('task', 'root', progress: 20),
@@ -124,6 +158,7 @@ class _TasksRepository implements MyTasksRepository {
   _TasksRepository(this.tasks);
 
   final List<ProjectTaskModel> tasks;
+  bool ignoreScope = false;
   String? assigneeId;
   List<String> projectIds = const <String>[];
   Completer<void>? updateCompleter;
@@ -136,7 +171,7 @@ class _TasksRepository implements MyTasksRepository {
   }) async {
     this.assigneeId = assigneeId;
     this.projectIds = projectIds;
-    if (projectIds.isEmpty) return tasks;
+    if (projectIds.isEmpty || ignoreScope) return tasks;
     return tasks
         .where((task) => projectIds.contains(task.projectId))
         .toList(growable: false);

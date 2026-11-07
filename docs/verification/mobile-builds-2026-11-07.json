@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-07",
+  "scope": "Local debug native builds after staged bug fixes",
+  "android": {
+    "command": "flutter build apk --debug --target-platform android-arm64",
+    "result": "passed",
+    "artifact": "build/app/outputs/flutter-apk/app-debug.apk",
+    "limitations": "ARM64 only; release signing and installation on a device were not checked."
+  },
+  "ios": {
+    "command": "flutter build ios --simulator --debug",
+    "result": "passed",
+    "artifact": "build/ios/iphonesimulator/Runner.app",
+    "limitations": "Simulator build only; physical-device signing and runtime behavior were not checked."
+  },
+  "environment": {
+    "initial_failure": "Both native builds failed because the local disk ran out of space.",
+    "resolution": "Removed generated project build output, ran flutter clean, and rebuilt platforms sequentially.",
+    "gradle_migration": "Flutter added android.builtInKotlin=false and android.newDsl=false to android/gradle.properties."
+  },
+  "remaining_warnings": [
+    "Flutter warns about future support for Gradle 8.14.0, Android Gradle Plugin 8.12.1 and Kotlin 2.2.20.",
+    "Some Android plugins compile with obsolete Java source/target 8 settings.",
+    "iOS UIScene lifecycle migration is still pending.",
+    "flutter_tts, media_kit_libs_ios_video, media_kit_video and open_filex do not support Swift Package Manager; CocoaPods fallback currently builds."
+  ],
+  "not_verified": [
+    "Production backend deployment for mobile Google OAuth",
+    "Google OAuth return flow on physical iOS and Android devices",
+    "Physical-device voice recording, playback and push notifications",
+    "Release builds and store distribution"
+  ]
+}

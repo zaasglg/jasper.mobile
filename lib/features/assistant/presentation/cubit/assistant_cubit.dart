@@ -1,3 +1,5 @@
+import '../../data/services/assistant_actions.dart';
+import '../../data/services/assistant_task_changes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/storage/workspace_selection_storage.dart';
 import '../../../workspaces/domain/repositories/workspace_repository.dart';
@@ -6,12 +8,28 @@ import '../../domain/repositories/assistant_repository.dart';
 import 'assistant_state.dart';
 
 class AssistantCubit extends Cubit<AssistantState> {
-  AssistantCubit(this._repository, this._workspaces, this._selection)
-    : super(const AssistantState());
+  AssistantCubit(
+    this._repository,
+    this._workspaces,
+    this._selection, {
+    this.actions,
+  }) : super(const AssistantState());
   final AssistantRepository _repository;
   final WorkspaceRepository _workspaces;
   final WorkspaceSelectionStorage _selection;
+  final AssistantActions? actions;
+  String? currentProjectId;
+  String? currentProjectName;
   int _revision = 0;
+  void resolve(int index, String status, {String actionKey = "create"}) {
+    if (isClosed || index >= state.messages.length) return;
+    final messages = [...state.messages];
+    messages[index] = messages[index].copyWith(
+      actionStates: {...messages[index].actionStates, actionKey: status},
+    );
+    emit(state.copyWith(messages: messages));
+  }
+
   Future<void> initialize() async {
     final revision = ++_revision;
     emit(const AssistantState());
@@ -31,6 +49,15 @@ class AssistantCubit extends Cubit<AssistantState> {
         );
         return;
       }
+      if (currentProjectId != null && actions != null) {
+        final projects = await actions!.projects(selected.id);
+        final project = projects
+            .where((e) => e['id'] == currentProjectId)
+            .firstOrNull;
+        currentProjectId = project?['id'] as String?;
+        currentProjectName = project?['name'] as String?;
+      }
+      if (isClosed || revision != _revision) return;
       emit(
         AssistantState(
           workspaceId: selected.id,
@@ -50,9 +77,9 @@ class AssistantCubit extends Cubit<AssistantState> {
     }
   }
 
-  Future<void> ask(String text) async {
+  Future<void> ask(String text, {List<String> images = const []}) async {
     final content = text.trim();
-    if (content.isEmpty ||
+    if ((content.isEmpty && images.isEmpty) ||
         state.workspaceId.isEmpty ||
         state.status == AssistantStatus.sending) {
       return;
@@ -60,7 +87,7 @@ class AssistantCubit extends Cubit<AssistantState> {
     final revision = ++_revision;
     final messages = [
       ...state.messages,
-      AssistantMessageModel(role: 'user', content: content),
+      AssistantMessageModel(role: 'user', content: content, images: images),
     ];
     emit(
       state.copyWith(
@@ -70,11 +97,52 @@ class AssistantCubit extends Cubit<AssistantState> {
       ),
     );
     try {
-      final reply = await _repository.chat(
-        workspaceId: state.workspaceId,
-        messages: messages,
+      await actions?.checkWorkspace(state.workspaceId);
+      final draft = await actions?.extract(
+        state.workspaceId,
+        content,
+        images,
+        currentProjectId,
       );
       if (isClosed || revision != _revision) return;
+      if (draft != null) {
+        emit(
+          state.copyWith(
+            status: AssistantStatus.ready,
+            messages: [
+              ...messages,
+              AssistantMessageModel(
+                role: 'assistant',
+                content: '',
+                draft: draft,
+              ),
+            ],
+            clearError: true,
+          ),
+        );
+        return;
+      }
+      await actions?.checkWorkspace(state.workspaceId);
+      final reply = await _repository.chat(
+        workspaceId: state.workspaceId,
+        messages: messages.where((e) => e.draft == null).toList(),
+        images: images,
+        currentProjectId: currentProjectId,
+      );
+      if (isClosed || revision != _revision) return;
+      await actions?.checkWorkspace(state.workspaceId);
+      if (isClosed || revision != _revision) return;
+      if (reply.tools.any((tool) {
+        final result = tool['result'];
+        final updated = result is Map ? result['updated'] : null;
+        return tool['name'] == 'update_task' &&
+            result is Map &&
+            !result.containsKey('error') &&
+            updated is Map &&
+            updated['workspaceId'] == state.workspaceId;
+      })) {
+        notifyAssistantTaskChanges();
+      }
       emit(
         state.copyWith(
           status: AssistantStatus.ready,
@@ -106,6 +174,7 @@ class AssistantCubit extends Cubit<AssistantState> {
       return;
     }
     final text = state.messages.last.content;
+    final images = state.messages.last.images;
     emit(
       state.copyWith(
         status: AssistantStatus.ready,
@@ -113,6 +182,6 @@ class AssistantCubit extends Cubit<AssistantState> {
         clearError: true,
       ),
     );
-    await ask(text);
+    await ask(text, images: images);
   }
 }

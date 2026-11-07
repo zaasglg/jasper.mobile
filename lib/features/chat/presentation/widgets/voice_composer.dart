@@ -1,3 +1,5 @@
+import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/widgets/app_action_menu.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -73,11 +75,14 @@ class _VoiceComposerState extends State<VoiceComposer>
   Timer? _timer;
   final _watch = Stopwatch();
   bool _recording = false;
+  bool _starting = false;
+  bool _pauseRequested = false;
   bool _busy = false;
   bool _held = false;
   bool _released = false;
   bool _cancelled = false;
   String? _draft;
+  String? _uploadingDraft;
   int _seconds = 0;
 
   @override
@@ -89,8 +94,15 @@ class _VoiceComposerState extends State<VoiceComposer>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused) {
-      if (_recording && !_busy) _finish(send: false);
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      // Permission dialogs can briefly make the visible app inactive. An
+      // actual background transition also cancels a pending permission wait.
+      if (_starting || (_busy && state != AppLifecycleState.inactive)) {
+        _pauseRequested = true;
+      }
+      if (_recording) _finish(send: false);
     }
   }
 
@@ -100,7 +112,7 @@ class _VoiceComposerState extends State<VoiceComposer>
     _timer?.cancel();
     _recorder?.dispose();
     final draft = _draft;
-    if (draft != null) _delete(draft);
+    if (draft != null && draft != _uploadingDraft) _delete(draft);
     super.dispose();
   }
 
@@ -123,6 +135,7 @@ class _VoiceComposerState extends State<VoiceComposer>
     if (_busy || _recording || widget.isSending) return;
     _released = false;
     _cancelled = false;
+    _pauseRequested = false;
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _busy = true);
     try {
@@ -131,8 +144,13 @@ class _VoiceComposerState extends State<VoiceComposer>
         _error('Разрешите доступ к микрофону в настройках приложения.');
         return;
       }
-      if (!mounted || _cancelled) return;
-      await recorder.start();
+      if (!mounted || _cancelled || _pauseRequested) return;
+      _starting = true;
+      try {
+        await recorder.start();
+      } finally {
+        _starting = false;
+      }
       if (!mounted) {
         await recorder.cancel();
         return;
@@ -151,6 +169,8 @@ class _VoiceComposerState extends State<VoiceComposer>
       });
       if (_cancelled) {
         await _cancel();
+      } else if (_pauseRequested) {
+        await _finish(send: false);
       } else if (_released) {
         await _finish();
       }
@@ -188,7 +208,11 @@ class _VoiceComposerState extends State<VoiceComposer>
 
   Future<void> _finish({bool send = true}) async {
     if (_busy || widget.isSending) {
-      _released = true;
+      if (send) {
+        _released = true;
+      } else {
+        _pauseRequested = true;
+      }
       return;
     }
     setState(() => _busy = true);
@@ -216,10 +240,18 @@ class _VoiceComposerState extends State<VoiceComposer>
       }
       if (!send || _draft == null) return;
       final draft = _draft!;
-      final sent = await widget.onVoiceSend(draft, _seconds);
-      if (sent) {
-        await _delete(draft);
-        if (mounted) setState(() => _draft = null);
+      _uploadingDraft = draft;
+      var sent = false;
+      try {
+        sent = await widget.onVoiceSend(draft, _seconds);
+      } finally {
+        // The upload may still read the file after this widget is disposed.
+        // Keep ownership until its future finishes, including error paths.
+        if (sent || !mounted) {
+          await _delete(draft);
+          if (mounted) setState(() => _draft = null);
+        }
+        _uploadingDraft = null;
       }
     } catch (_) {
       _error('Не удалось отправить запись. Попробуйте ещё раз.');
@@ -238,41 +270,32 @@ class _VoiceComposerState extends State<VoiceComposer>
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         if (!voice && (widget.onFiles != null || widget.onVideo != null))
-          PopupMenuButton<String>(
+          AppActionMenuButton<String>(
             key: const Key('chat-attachments'),
+            title: 'Прикрепить',
             tooltip: 'Прикрепить',
+            icon: LucideIcons.paperclip,
             enabled: !blocked,
-            icon: const Icon(
-              LucideIcons.plus,
-              color: AppColors.accent,
-              size: 22,
-            ),
             onSelected: (value) => value == 'files'
                 ? widget.onFiles?.call()
                 : widget.onVideo?.call(),
-            itemBuilder: (_) => [
-              if (widget.onFiles != null)
-                const PopupMenuItem(
-                  value: 'files',
-                  child: Row(
-                    children: [
-                      Icon(LucideIcons.paperclip, size: 20),
-                      SizedBox(width: 12),
-                      Text('Файлы'),
-                    ],
+            groups: [
+              [
+                if (widget.onFiles != null)
+                  const AppMenuAction(
+                    value: 'files',
+                    label: 'Файлы',
+                    icon: LucideIcons.paperclip,
+                    opensSubmenu: true,
                   ),
-                ),
-              if (widget.onVideo != null)
-                const PopupMenuItem(
-                  value: 'video',
-                  child: Row(
-                    children: [
-                      Icon(LucideIcons.video, size: 20),
-                      SizedBox(width: 12),
-                      Text('Видеозаметка'),
-                    ],
+                if (widget.onVideo != null)
+                  const AppMenuAction(
+                    value: 'video',
+                    label: 'Видеозаметка',
+                    icon: LucideIcons.video,
+                    opensSubmenu: true,
                   ),
-                ),
+              ],
             ],
           ),
         Expanded(
@@ -286,11 +309,12 @@ class _VoiceComposerState extends State<VoiceComposer>
                       icon: const Icon(
                         LucideIcons.trash2,
                         color: Colors.redAccent,
+                        size: AppIconSizes.standard,
                       ),
                     ),
                     Icon(
                       _recording ? LucideIcons.mic : LucideIcons.audioLines,
-                      size: 18,
+                      size: AppIconSizes.standard,
                       color: _recording ? Colors.redAccent : AppColors.accent,
                     ),
                     const SizedBox(width: 8),
@@ -378,7 +402,7 @@ class _VoiceComposerState extends State<VoiceComposer>
                       voice || widget.hasText
                           ? LucideIcons.sendHorizontal
                           : LucideIcons.mic,
-                      size: 20,
+                      size: AppIconSizes.standard,
                     ),
             ),
           ),

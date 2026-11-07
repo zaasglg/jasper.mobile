@@ -14,6 +14,8 @@ class PlannerItemModel extends Equatable {
     this.completed = false,
     this.archived = false,
     this.task,
+    this.external = false,
+    this.allDay = false,
   });
 
   factory PlannerItemModel.fromJson(Map<String, dynamic> json) {
@@ -52,6 +54,8 @@ class PlannerItemModel extends Equatable {
           task?.archived == true ||
           (inbox is Map && inbox['archived'] == true),
       task: task,
+      external: json['external'] == true,
+      allDay: json['allDay'] == true,
     );
   }
 
@@ -60,10 +64,19 @@ class PlannerItemModel extends Equatable {
   final DateTime? scheduledAt;
   final int durationMinutes;
   final bool completed, archived;
+  final bool external, allDay;
   final ProjectTaskModel? task;
   bool get isStandalone => taskId == null && inboxTaskId == null;
+  String get displayTitle {
+    if (taskId == null) return title;
+    final displayId = task?.displayId.trim() ?? '';
+    final identifier = displayId.isNotEmpty ? displayId : taskId!.trim();
+    return identifier.isEmpty ? title : '$identifier $title';
+  }
 
   Map<String, dynamic> toJson() => {
+    'external': external,
+    'allDay': allDay,
     'id': id,
     'title': title,
     'projectId': projectId,
@@ -96,6 +109,8 @@ class PlannerItemModel extends Equatable {
     bool? completed,
     bool? archived,
     ProjectTaskModel? task,
+    bool? external,
+    bool? allDay,
   }) => PlannerItemModel(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -108,6 +123,8 @@ class PlannerItemModel extends Equatable {
     completed: completed ?? this.completed,
     archived: archived ?? this.archived,
     task: task ?? this.task,
+    external: external ?? this.external,
+    allDay: allDay ?? this.allDay,
   );
 
   @override
@@ -122,6 +139,8 @@ class PlannerItemModel extends Equatable {
     durationMinutes,
     completed,
     archived,
+    external,
+    allDay,
     task,
   ];
 }

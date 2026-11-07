@@ -3,11 +3,199 @@ import 'package:dio/dio.dart';
 import '../../domain/repositories/task_details_repository.dart';
 import '../models/kanban_column_model.dart';
 import '../models/task_detail_model.dart';
+import '../../../projects/data/models/project_task_model.dart';
 
-class TaskDetailsRepositoryImpl implements TaskDetailsRepository {
+class TaskDetailsRepositoryImpl
+    implements
+        TaskDetailsRepository,
+        TaskAdvancedRepository,
+        TaskTitleRepository,
+        TaskExtrasRepository,
+        TaskAssigneesRepository,
+        TaskTimingRepository,
+        TaskTimerRepository {
   const TaskDetailsRepositoryImpl(this._dio);
 
   final Dio _dio;
+
+  @override
+  Future<TaskDetailsPayload> updateStart(String taskId, DateTime? start) =>
+      _patch(taskId, {'start': start?.toUtc().toIso8601String()});
+  @override
+  Future<TaskDetailsPayload> updateDependencies(
+    String taskId,
+    List<String> displayIds,
+  ) => _patch(taskId, {'deps': displayIds.toSet().toList()});
+  @override
+  Future<TaskCommentModel> postComment(
+    String taskId,
+    String text,
+    List<TaskFileModel> files,
+  ) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        'project-tasks/${Uri.encodeComponent(taskId)}/comments',
+        data: {
+          'text': text.trim(),
+          if (files.isNotEmpty)
+            'files': files
+                .map(
+                  (f) => {
+                    'name': f.name,
+                    'dataUrl': f.dataUrl,
+                    'size': f.size.toString(),
+                    'type': f.type,
+                  },
+                )
+                .toList(),
+        },
+      );
+      return TaskCommentModel.fromJson(_object(response.data));
+    } on DioException catch (e) {
+      throw TaskDetailsException(_messageFor(e, 'отправить комментарий'));
+    }
+  }
+
+  @override
+  Future<List<TaskEpicModel>> getEpics(String projectId) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        'epics',
+        queryParameters: {'projectId': projectId},
+      );
+      final data = response.data;
+      final items = data is List
+          ? data
+          : data is Map
+          ? data['data'] ?? data['items'] ?? []
+          : [];
+      return (items as List)
+          .whereType<Map>()
+          .map(
+            (item) => TaskEpicModel.fromJson(Map<String, dynamic>.from(item)),
+          )
+          .toList();
+    } on DioException {
+      throw const TaskDetailsException('Не удалось загрузить эпики.');
+    }
+  }
+
+  @override
+  Future<TaskDetailsPayload> updateEpics(String taskId, List<String> ids) =>
+      _patch(taskId, {'epicIds': ids});
+  @override
+  Future<void> saveResource(
+    String taskId,
+    TaskResourceModel resource, {
+    required bool create,
+  }) async {
+    final data = <String, dynamic>{
+      'name': resource.name,
+      'planValue': resource.planValue.toString(),
+      'factValue': resource.factValue.toString(),
+    };
+    try {
+      if (create) {
+        await _dio.post<dynamic>(
+          'tasks/${Uri.encodeComponent(taskId)}/resources',
+          data: data,
+        );
+      } else {
+        await _dio.patch<dynamic>(
+          'resources/${Uri.encodeComponent(resource.id)}',
+          data: data,
+        );
+      }
+    } on DioException catch (e) {
+      throw TaskDetailsException(
+        e.response?.statusCode == 403
+            ? 'Недостаточно прав для изменения ресурсов.'
+            : 'Не удалось сохранить ресурс.',
+      );
+    }
+  }
+
+  @override
+  Future<void> deleteResource(String resourceId) async {
+    try {
+      await _dio.delete<dynamic>(
+        'resources/${Uri.encodeComponent(resourceId)}',
+      );
+    } on DioException {
+      throw const TaskDetailsException('Не удалось удалить ресурс.');
+    }
+  }
+
+  @override
+  Future<TaskDetailsPayload> updateTitle(String taskId, String title) =>
+      _patch(taskId, {'title': title.trim()});
+
+  @override
+  Future<TaskDetailsPayload> updateEstimate(
+    String taskId,
+    int minutes, {
+    TaskDetailModel? detail,
+  }) => _patch(taskId, {
+    'est': (minutes / 60).ceil(),
+    'detail': (detail ?? const TaskDetailModel())
+        .copyWith(estimateMinutes: minutes)
+        .toJson(),
+  });
+
+  @override
+  Future<TaskDetailsPayload> timerAction(String taskId, String action) {
+    if (!['start', 'pause', 'reset'].contains(action)) {
+      throw const TaskDetailsException('Неизвестное действие таймера.');
+    }
+    return _patch(taskId, {'timerAction': action});
+  }
+
+  @override
+  Future<List<TaskAssigneeModel>> getAssigneeCandidates(
+    String projectId,
+  ) async {
+    try {
+      final project = _object(
+        (await _dio.get<dynamic>(
+          'projects/${Uri.encodeComponent(projectId)}',
+        )).data,
+      );
+      final workspaceId =
+          project['workspaceId']?.toString() ??
+          project['workspace_id']?.toString() ??
+          '';
+      if (workspaceId.isEmpty) {
+        throw const TaskDetailsException(
+          'Не удалось определить рабочее пространство проекта.',
+        );
+      }
+      final response = await _dio.get<dynamic>(
+        'users',
+        queryParameters: {'workspaceId': workspaceId},
+      );
+      return _list(response.data)
+          .whereType<Map>()
+          .map(
+            (user) => TaskAssigneeModel.fromJson({
+              'user': Map<String, dynamic>.from(user),
+            }),
+          )
+          .where((user) => user.userId.isNotEmpty)
+          .toList();
+    } on DioException catch (error) {
+      throw TaskDetailsException(_messageFor(error, 'загрузить исполнителей'));
+    } on TaskDetailsException {
+      rethrow;
+    } catch (_) {
+      throw const TaskDetailsException('Не удалось загрузить исполнителей.');
+    }
+  }
+
+  @override
+  Future<TaskDetailsPayload> updateAssignees(
+    String taskId,
+    List<String> userIds,
+  ) => _patch(taskId, {'assigneeIds': userIds.toSet().toList()});
 
   @override
   Future<TaskDetailsPayload> getTask(String taskId) async {
@@ -119,7 +307,13 @@ class TaskDetailsRepositoryImpl implements TaskDetailsRepository {
     if (data is List) return data;
     if (data is Map) {
       final payload = Map<String, dynamic>.from(data);
-      for (final key in const <String>['data', 'history', 'items', 'columns']) {
+      for (final key in const <String>[
+        'data',
+        'history',
+        'items',
+        'columns',
+        'users',
+      ]) {
         final value = payload[key];
         if (value is List) return value;
       }

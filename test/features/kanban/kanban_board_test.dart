@@ -1,3 +1,7 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:jospar/core/di/service_locator.dart';
+import 'package:jospar/features/kanban/data/storage/card_view_storage.dart';
+import 'package:jospar/features/kanban/data/models/card_view_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:jospar/features/tasks/data/models/task_label_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -111,6 +115,126 @@ class _BoardCubit extends Cubit<KanbanState> implements KanbanCubit {
 }
 
 void main() {
+  testWidgets('card view toggles update cards, persist and reset', (
+    tester,
+  ) async {
+    GoogleFonts.config.allowRuntimeFetching = false;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    FlutterSecureStorage.setMockInitialValues({});
+    final storage = CardViewStorage(const FlutterSecureStorage());
+    sl.registerSingleton<CardViewStorage>(storage);
+    addTearDown(() => sl.unregister<CardViewStorage>());
+    final cubit = _BoardCubit();
+    addTearDown(cubit.close);
+    final semantics = tester.ensureSemantics();
+    Widget board() => MaterialApp(
+      home: Scaffold(
+        body: BlocProvider<KanbanCubit>.value(
+          value: cubit,
+          child: const KanbanBoard(
+            project: ProjectModel(
+              id: 'p',
+              code: 'P',
+              name: 'Проект',
+              workspaceId: 'w',
+              start: null,
+              end: null,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpWidget(board());
+    await tester.pumpAndSettle();
+    expect(find.text('a'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Чек-лист: 2 из 4')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('card-view-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('card-field-id')));
+    final checklists = find.byKey(const ValueKey('card-field-checklists'));
+    await tester.scrollUntilVisible(
+      checklists,
+      180,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await Scrollable.ensureVisible(tester.element(checklists), alignment: 0.4);
+    await tester.pumpAndSettle();
+    await tester.tap(checklists);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Закрыть'));
+    await tester.pumpAndSettle();
+    expect(find.text('a'), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Чек-лист: 2 из 4')), findsNothing);
+    final saved = await storage.read();
+    expect(saved.shows(CardField.id), isFalse);
+    expect(saved.shows(CardField.checklists), isFalse);
+    // Recreating the screen reads the same persisted preferences.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(board());
+    await tester.pumpAndSettle();
+    expect(find.text('a'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('card-view-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Сбросить настройки'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Закрыть'));
+    await tester.pumpAndSettle();
+    expect(find.text('a'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Чек-лист: 2 из 4')), findsOneWidget);
+    expect((await storage.read()).hidden, isEmpty);
+    semantics.dispose();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('task menu moves to another column', (tester) async {
+    GoogleFonts.config.allowRuntimeFetching = false;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final cubit = _BoardCubit();
+    addTearDown(cubit.close);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BlocProvider<KanbanCubit>.value(
+            value: cubit,
+            child: const KanbanBoard(
+              project: ProjectModel(
+                id: 'p',
+                code: 'P',
+                name: 'Проект',
+                workspaceId: 'w',
+                start: null,
+                end: null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Перенести'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('task-actions-a')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Переместить'));
+    await tester.pumpAndSettle();
+    expect(find.text('Переместить задачу'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('move-to-done')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Перенести в «Готово»'));
+    await tester.pumpAndSettle();
+    expect(
+      cubit.state.tasks.firstWhere((task) => task.id == 'a').status,
+      'DONE',
+    );
+    expect(cubit.moves, [0]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'drag keeps width and opens an animated gap before saving the new position',
     (tester) async {
@@ -164,7 +288,7 @@ void main() {
         expect(find.text(label), findsOneWidget);
       }
       expect(find.text('Переместить задачу'), findsNothing);
-      await tester.tap(find.text('Дублировать'));
+      await tester.tap(find.text('Отмена'));
       await tester.pumpAndSettle();
       expect(cubit.moves, isEmpty);
       expect(cubit.archived, isEmpty);
@@ -257,11 +381,11 @@ void main() {
       await changeColumn.up();
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byKey(const ValueKey('move-to-done')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Готово').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Переместить'));
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Перенести в «Готово»'),
+      );
       await tester.pumpAndSettle();
       expect(
         cubit.state.tasks.firstWhere((task) => task.id == 'b').status,

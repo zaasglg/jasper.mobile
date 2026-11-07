@@ -7,6 +7,48 @@ import 'package:jospar/features/inbox/data/models/inbox_task_model.dart';
 import 'package:jospar/features/inbox/data/repositories/inbox_repository_impl.dart';
 
 void main() {
+  test('menu actions use website endpoints and preserve task detail', () async {
+    final adapter = _InboxApiAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/'))
+      ..httpClientAdapter = adapter;
+    final repository = InboxRepositoryImpl(dio);
+    final task = InboxTaskModel.fromJson({
+      'id': 'inbox-1',
+      'title': 'Отчёт',
+      'start': '2026-10-16',
+      'end': '2026-10-18',
+      'priority': 'HIGH',
+      'detail': {
+        'description': 'Описание',
+        'files': [
+          {'id': 'file'},
+        ],
+        'labels': [
+          {'id': 'tag', 'text': 'Работа'},
+        ],
+      },
+    });
+    expect(task.description, 'Описание');
+    expect(InboxTaskModel.fromJson(task.toJson()), task);
+    await repository.updateTask(task.id, {'detail': task.detail, 'end': null});
+    expect(adapter.lastRequest!.method, 'PATCH');
+    expect(adapter.lastRequest!.path, 'inbox/inbox-1');
+    expect(adapter.lastRequest!.data['detail']['files'], [
+      {'id': 'file'},
+    ]);
+    expect(adapter.lastRequest!.data['end'], isNull);
+    await repository.copyTask(task);
+    expect(adapter.lastRequest!.path, 'inbox');
+    expect(adapter.lastRequest!.data['title'], 'Отчёт (копия)');
+    expect(adapter.lastRequest!.data['detail'], task.detail);
+    await repository.moveTask(task.id, 'project');
+    expect(adapter.lastRequest!.path, 'inbox/inbox-1/move');
+    expect(adapter.lastRequest!.data['projectId'], 'project');
+    await repository.deleteTask(task.id);
+    expect(adapter.lastRequest!.method, 'DELETE');
+    expect(adapter.lastRequest!.path, 'inbox/inbox-1');
+  });
+
   test('loads inbox with archived and sort query parameters', () async {
     final adapter = _InboxApiAdapter();
     final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/'))
@@ -66,6 +108,7 @@ void main() {
 }
 
 class _InboxApiAdapter implements HttpClientAdapter {
+  RequestOptions? lastRequest;
   int? archived;
   int? sort;
   String? createdTitle;
@@ -77,6 +120,11 @@ class _InboxApiAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    lastRequest = options;
+    if (options.path == 'inbox/inbox-1' ||
+        options.path == 'inbox/inbox-1/move') {
+      return _jsonResponse('{}');
+    }
     if (options.path == 'inbox' && options.method == 'GET') {
       archived = options.queryParameters['archived'] as int?;
       sort = options.queryParameters['sort'] as int?;

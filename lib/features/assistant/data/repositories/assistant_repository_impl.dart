@@ -9,13 +9,20 @@ class AssistantRepositoryImpl implements AssistantRepository {
   Future<AssistantMessageModel> chat({
     required String workspaceId,
     required List<AssistantMessageModel> messages,
+    List<String> images = const [],
+    String? currentProjectId,
   }) async {
     try {
       final response = await _dio.post<dynamic>(
         'ai/assistant/chat',
+        options: Options(headers: {'X-Workspace-Id': workspaceId}),
         data: {
           'workspaceId': workspaceId,
-          'messages': messages.map((e) => e.toJson()).toList(),
+          'currentProjectId': ?currentProjectId,
+          if (images.isNotEmpty) 'images': images,
+          'messages': messages
+              .map((e) => {'role': e.role, 'content': e.content})
+              .toList(),
         },
       );
       final body = response.data;
@@ -23,16 +30,18 @@ class AssistantRepositoryImpl implements AssistantRepository {
           ? body['data'] as Map
           : body;
       if (json is! Map ||
-          json['content'] is! String ||
-          (json['content'] as String).trim().isEmpty) {
+          ((json['content'] is! String ||
+                  (json['content'] as String).trim().isEmpty) &&
+              (json['toolCalls'] is! List ||
+                  (json['toolCalls'] as List).isEmpty))) {
         throw const AssistantException(
           'Помощник вернул пустой ответ. Попробуйте ещё раз.',
         );
       }
-      return AssistantMessageModel(
-        role: 'assistant',
-        content: json['content'] as String,
-      );
+      return AssistantMessageModel.fromJson({
+        ...Map<String, dynamic>.from(json),
+        'role': 'assistant',
+      });
     } on DioException catch (error) {
       throw AssistantException(
         error.response?.statusCode == 403

@@ -3,10 +3,54 @@ import 'package:dio/dio.dart';
 import '../../domain/repositories/inbox_repository.dart';
 import '../models/inbox_task_model.dart';
 
-class InboxRepositoryImpl implements InboxRepository {
+class InboxRepositoryImpl implements InboxRepository, InboxActionsRepository {
   const InboxRepositoryImpl(this._dio);
 
   final Dio _dio;
+
+  Future<void> _action(Future<dynamic> Function() request) async {
+    try {
+      await request();
+    } on DioException catch (error) {
+      throw InboxException(
+        error.type == DioExceptionType.connectionError
+            ? 'Нет подключения к интернету.'
+            : 'Не удалось сохранить изменения задачи. Попробуйте ещё раз.',
+      );
+    }
+  }
+
+  @override
+  Future<void> updateTask(String id, Map<String, dynamic> changes) => _action(
+    () =>
+        _dio.patch<dynamic>('inbox/${Uri.encodeComponent(id)}', data: changes),
+  );
+
+  @override
+  Future<void> deleteTask(String id) =>
+      _action(() => _dio.delete<dynamic>('inbox/${Uri.encodeComponent(id)}'));
+
+  @override
+  Future<void> copyTask(InboxTaskModel task) => _action(
+    () => _dio.post<dynamic>(
+      'inbox',
+      data: {
+        'title': '${task.title} (копия)',
+        'detail': task.detail,
+        if (task.start != null) 'start': task.start,
+        if (task.end != null) 'end': task.end,
+        'priority': task.priority,
+      },
+    ),
+  );
+
+  @override
+  Future<void> moveTask(String id, String projectId) => _action(
+    () => _dio.post<dynamic>(
+      'inbox/${Uri.encodeComponent(id)}/move',
+      data: {'projectId': projectId, 'status': 'TODO', 'position': 0},
+    ),
+  );
 
   @override
   Future<void> createInbox({required String title}) async {

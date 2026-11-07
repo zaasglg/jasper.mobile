@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -91,7 +92,7 @@ class _FileAttachmentSheetState extends State<FileAttachmentSheet> {
                 ),
                 IconButton(
                   onPressed: _sending ? null : () => Navigator.pop(context),
-                  icon: const Icon(LucideIcons.x),
+                  icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
                 ),
               ],
             ),
@@ -113,6 +114,7 @@ class _FileAttachmentSheetState extends State<FileAttachmentSheet> {
                         leading: const Icon(
                           LucideIcons.file,
                           color: AppColors.accent,
+                          size: AppIconSizes.standard,
                         ),
                         title: Text(
                           file.name,
@@ -127,7 +129,10 @@ class _FileAttachmentSheetState extends State<FileAttachmentSheet> {
                                   setState(() => _pending.remove(file));
                                   if (_pending.isEmpty) Navigator.pop(context);
                                 },
-                          icon: const Icon(LucideIcons.x, size: 18),
+                          icon: const Icon(
+                            LucideIcons.x,
+                            size: AppIconSizes.standard,
+                          ),
                         ),
                       ),
                     )
@@ -150,7 +155,10 @@ class _FileAttachmentSheetState extends State<FileAttachmentSheet> {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(LucideIcons.sendHorizontal),
+                  : const Icon(
+                      LucideIcons.sendHorizontal,
+                      size: AppIconSizes.standard,
+                    ),
               label: Text(
                 _sending ? 'Отправка…' : 'Отправить (${_pending.length})',
               ),

@@ -2,6 +2,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 
 void main() {
+  test('clearing checklist metadata overrides raw server values', () {
+    final item = TaskChecklistItemModel.fromJson({
+      'id': 'one',
+      'text': 'Пункт',
+      'dueDate': '2026-10-17',
+      'assigneeIds': ['user'],
+      'custom': 'keep',
+    });
+    final cleared = item.copyWith(dueDate: null, assigneeIds: []).toJson();
+    expect(cleared['dueDate'], isNull);
+    expect(cleared['assigneeIds'], isEmpty);
+    expect(cleared['custom'], 'keep');
+    expect(item.copyWith(text: 'Новое').dueDate, item.dueDate);
+    final list = TaskChecklistModel.fromJson({
+      'id': 'list',
+      'name': 'Список',
+      'sections': [
+        {'id': 'section', 'name': 'Раздел'},
+      ],
+    });
+    expect(list.copyWith(sections: []).toJson()['sections'], isEmpty);
+  });
+
   test('parses task detail, resources, comments, and checklist progress', () {
     final payload = TaskDetailsPayload.fromJson(<String, dynamic>{
       'id': 'task-1',

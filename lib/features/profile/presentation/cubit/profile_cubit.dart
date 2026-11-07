@@ -10,7 +10,10 @@ class ProfileCubit extends Cubit<ProfileState> {
   final ProfileRepository _repository;
 
   Future<void> load() async {
-    if (state is ProfileLoading) return;
+    if (state is ProfileLoading ||
+        (state is ProfileLoaded && (state as ProfileLoaded).isSavingPhoto)) {
+      return;
+    }
     emit(const ProfileLoading());
     try {
       final profile = await _repository.getCurrentUser();
@@ -20,6 +23,25 @@ class ProfileCubit extends Cubit<ProfileState> {
     } catch (_) {
       if (!isClosed) {
         emit(const ProfileFailure('Не удалось загрузить данные профиля.'));
+      }
+    }
+  }
+
+  Future<void> updateAvatar(String avatarUrl) async {
+    final current = state;
+    if (current is! ProfileLoaded || current.isSavingPhoto) return;
+    emit(ProfileLoaded(current.profile, isSavingPhoto: true));
+    try {
+      final profile = await _repository.updateAvatar(avatarUrl);
+      if (!isClosed) emit(ProfileLoaded(profile));
+    } catch (_) {
+      if (!isClosed) {
+        emit(
+          ProfileLoaded(
+            current.profile,
+            photoError: 'Не удалось сохранить фото. Попробуйте ещё раз.',
+          ),
+        );
       }
     }
   }

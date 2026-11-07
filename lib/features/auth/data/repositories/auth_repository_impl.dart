@@ -1,18 +1,93 @@
 import 'package:dio/dio.dart';
 
+import '../../../../core/auth/auth_session.dart';
 import '../../../../core/storage/auth_token_storage.dart';
 import '../../../../core/storage/workspace_selection_storage.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../models/login_request.dart';
+import '../google_auth_browser.dart';
 
-class AuthRepositoryImpl implements AuthRepository {
-  const AuthRepositoryImpl({
+class AuthRepositoryImpl implements AuthRepository, GoogleLoginRepository {
+  AuthRepositoryImpl({
     required Dio dio,
     required AuthTokenStorage storage,
     required WorkspaceSelectionStorage workspaceSelectionStorage,
+    GoogleAuthBrowser googleBrowser = const GoogleAuthBrowser(),
   }) : _dio = dio,
        _storage = storage,
-       _workspaceSelectionStorage = workspaceSelectionStorage;
+       _workspaceSelectionStorage = workspaceSelectionStorage,
+       _googleBrowser = googleBrowser;
+
+  final GoogleAuthBrowser _googleBrowser;
+  int _revision = 0;
+  Future<void> _pendingCommit = Future<void>.value();
+
+  (int, int) _begin() => (++_revision, authSession.generation);
+
+  bool _isCurrent((int, int) operation) =>
+      operation.$1 == _revision && operation.$2 == authSession.generation;
+
+  void _ensureCurrent((int, int) operation) {
+    if (!_isCurrent(operation)) {
+      throw const AuthException(
+        'Сессия изменилась. Повторите вход при необходимости.',
+      );
+    }
+  }
+
+  Future<T> _commit<T>((int, int) operation, Future<T> Function() write) {
+    final result = _pendingCommit.then((_) async {
+      _ensureCurrent(operation);
+      final value = await write();
+      _ensureCurrent(operation);
+      return value;
+    });
+    _pendingCommit = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return result;
+  }
+
+  Future<String> _saveToken((int, int) operation, String token) async {
+    final saved = await _storage.saveIfCurrent(
+      token,
+      () => _isCurrent(operation),
+    );
+    if (!saved) _ensureCurrent(operation);
+    return token;
+  }
+
+  @override
+  Future<String?> loginWithGoogle() async {
+    final operation = _begin();
+    try {
+      final grant = await _googleBrowser.authorize();
+      _ensureCurrent(operation);
+      if (grant == null) return null;
+      final response = await _dio.post<dynamic>(
+        'auth/google/mobile/exchange',
+        data: {'code': grant.code, 'codeVerifier': grant.verifier},
+      );
+      final token = _extractToken(response.data);
+      return await _commit(operation, () async {
+        await _workspaceSelectionStorage.clear();
+        return _saveToken(operation, token);
+      });
+    } on DioException catch (error) {
+      throw AuthException(
+        error.response?.statusCode == 404
+            ? 'Вход Google пока недоступен на сервере. Попробуйте позже.'
+            : 'Не удалось завершить вход через Google. Повторите попытку.',
+      );
+    } on AuthException {
+      rethrow;
+    } catch (_) {
+      throw const AuthException(
+        'Не удалось войти через Google. Повторите попытку.',
+      );
+    }
+  }
 
   final Dio _dio;
   final AuthTokenStorage _storage;
@@ -20,14 +95,14 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<String> login(LoginRequest request) async {
+    final operation = _begin();
     try {
       final response = await _dio.post<dynamic>(
         'auth/login',
         data: request.toJson(),
       );
       final token = _extractToken(response.data);
-      await _storage.save(token);
-      return token;
+      return await _commit(operation, () => _saveToken(operation, token));
     } on DioException catch (error) {
       throw AuthException(_messageForDioError(error));
     } on AuthException {
@@ -41,10 +116,20 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> logout() async {
-    await Future.wait<void>(<Future<void>>[
-      _storage.clear(),
-      _workspaceSelectionStorage.clear(),
-    ]);
+    final operation = _begin();
+    try {
+      await _dio.post<dynamic>('auth/logout');
+    } on DioException {
+      // Local sign-out must still work offline; push is also suppressed natively.
+    } finally {
+      await _commit(
+        operation,
+        () => Future.wait<void>(<Future<void>>[
+          _storage.clear(),
+          _workspaceSelectionStorage.clear(),
+        ]),
+      );
+    }
   }
 
   String _extractToken(dynamic data) {

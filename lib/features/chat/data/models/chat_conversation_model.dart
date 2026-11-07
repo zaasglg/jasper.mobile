@@ -27,12 +27,14 @@ class ChatConversationModel extends Equatable {
   factory ChatConversationModel.fromUserJson(
     Map<String, dynamic> json, {
     Map<String, dynamic>? thread,
+    String? currentUserId,
   }) {
     final id = json['id']?.toString() ?? '';
     return ChatConversationModel(
       id: id,
       threadId:
-          _string(thread ?? json, const ['threadId', 'thread_id', 'id']) ?? id,
+          _string(thread ?? json, const ['threadId', 'thread_id']) ??
+          (currentUserId == null ? '' : directThreadId(currentUserId, id)),
       title:
           _string(json, const ['name', 'fullName', 'full_name', 'email']) ??
           'Пользователь',
@@ -44,6 +46,11 @@ class ChatConversationModel extends Equatable {
         'unread_count',
       ]),
     );
+  }
+
+  static String directThreadId(String currentUserId, String recipientId) {
+    final participants = [currentUserId, recipientId]..sort();
+    return 'dm:${participants.join(":")}';
   }
 
   final String id;

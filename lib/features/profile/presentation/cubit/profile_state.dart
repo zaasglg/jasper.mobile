@@ -18,12 +18,18 @@ final class ProfileLoading extends ProfileState {
 }
 
 final class ProfileLoaded extends ProfileState {
-  const ProfileLoaded(this.profile);
+  const ProfileLoaded(
+    this.profile, {
+    this.isSavingPhoto = false,
+    this.photoError,
+  });
 
   final UserProfile profile;
+  final bool isSavingPhoto;
+  final String? photoError;
 
   @override
-  List<Object?> get props => <Object?>[profile];
+  List<Object?> get props => <Object?>[profile, isSavingPhoto, photoError];
 }
 
 final class ProfileFailure extends ProfileState {

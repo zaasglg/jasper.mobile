@@ -4,6 +4,8 @@ abstract interface class AssistantRepository {
   Future<AssistantMessageModel> chat({
     required String workspaceId,
     required List<AssistantMessageModel> messages,
+    List<String> images = const [],
+    String? currentProjectId,
   });
 }
 

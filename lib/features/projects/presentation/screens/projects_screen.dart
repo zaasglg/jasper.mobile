@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -16,7 +17,7 @@ import '../widgets/create_project_sheet.dart';
 const _ink = Color(0xFF16181D);
 const _secondary = Color(0xFF697180);
 const _border = Color(0xFFE3E6EC);
-const _surface = Color(0xFFF7F8FA);
+const _surface = Color(0xFFFAFAFC);
 const _accent = Color(0xFF6D5FE0);
 
 class ProjectsScreen extends StatelessWidget {
@@ -37,35 +38,68 @@ class ProjectsScreen extends StatelessWidget {
             leading: IconButton(
               tooltip: 'Открыть меню',
               onPressed: MainShell.openDrawer,
-              icon: const Icon(LucideIcons.menu, color: _ink),
+              icon: const Icon(
+                LucideIcons.menu,
+                color: _ink,
+                size: AppIconSizes.standard,
+              ),
             ),
             title: Text(
               'Проекты',
               style: GoogleFonts.manrope(
-                fontSize: 21,
+                fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: _ink,
                 letterSpacing: -0.35,
               ),
             ),
             actions: <Widget>[
+              IconButton(
+                tooltip: 'Архив проектов',
+                icon: const Icon(
+                  LucideIcons.archive,
+                  size: AppIconSizes.standard,
+                ),
+                onPressed: workspace == null
+                    ? null
+                    : () async {
+                        final cubit = context.read<ProjectsCubit>();
+                        await context.push(
+                          '/archives/projects?workspaceId=${Uri.encodeQueryComponent(workspace.id)}',
+                        );
+                        await cubit.loadForWorkspace(
+                          workspace.id,
+                          refresh: true,
+                        );
+                      },
+              ),
+
               Padding(
                 padding: const EdgeInsets.only(right: 16),
-                child: IconButton.filled(
-                  key: const Key('create_project_button'),
-                  tooltip: workspace == null
-                      ? 'Выберите workspace'
-                      : 'Создать проект',
-                  onPressed: workspace == null
-                      ? null
-                      : () => showCreateProjectFlow(context),
-                  style: IconButton.styleFrom(
-                    backgroundColor: _accent,
-                    disabledBackgroundColor: _border,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.square(40),
+                child: _ProjectPressFeedback(
+                  enabled: workspace != null,
+                  child: IconButton.filled(
+                    key: const Key('create_project_button'),
+                    tooltip: workspace == null
+                        ? 'Выберите workspace'
+                        : 'Создать проект',
+                    onPressed: workspace == null
+                        ? null
+                        : () => showCreateProjectFlow(context),
+                    style: IconButton.styleFrom(
+                      backgroundColor: _accent,
+                      disabledBackgroundColor: _border,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.square(36),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(
+                      LucideIcons.plus,
+                      size: AppIconSizes.standard,
+                    ),
                   ),
-                  icon: const Icon(LucideIcons.plus, size: 20),
                 ),
               ),
             ],
@@ -117,12 +151,16 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
         return Column(
           children: <Widget>[
             Container(
-              height: 42,
+              height: 40,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              color: _surface,
+              color: Colors.white,
               child: Row(
                 children: <Widget>[
-                  const Icon(LucideIcons.folder, size: 14, color: _accent),
+                  const Icon(
+                    LucideIcons.folder,
+                    size: AppIconSizes.standard,
+                    color: _accent,
+                  ),
                   const SizedBox(width: 7),
                   Expanded(
                     child: Text(
@@ -144,7 +182,7 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Row(
                 children: [
                   Expanded(
@@ -164,7 +202,7 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
                         ),
                         prefixIcon: const Icon(
                           LucideIcons.search,
-                          size: 18,
+                          size: AppIconSizes.standard,
                           color: _secondary,
                         ),
                         suffixIcon: _search.text.isEmpty
@@ -172,30 +210,30 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
                             : IconButton(
                                 tooltip: 'Очистить поиск',
                                 icon: const Icon(
-                                  Icons.cancel_rounded,
-                                  size: 18,
+                                  LucideIcons.x,
+                                  size: AppIconSizes.standard,
                                   color: _secondary,
                                 ),
                                 onPressed: () => setState(_search.clear),
                               ),
                         filled: true,
-                        fillColor: const Color(0xFFEEEFF3),
+                        fillColor: const Color(0xFFF1F1F5),
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
-                          vertical: 14,
+                          vertical: 12,
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
                             color: _accent.withValues(alpha: 0.45),
                           ),
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                       ),
@@ -203,10 +241,10 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.all(2),
+                    padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEEEFF3),
-                      borderRadius: BorderRadius.circular(14),
+                      color: const Color(0xFFF1F1F5),
+                      borderRadius: BorderRadius.circular(13),
                     ),
                     child: Row(
                       children: [
@@ -221,8 +259,8 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
                             isSelected: _listView == list,
                             onPressed: () => setState(() => _listView = list),
                             style: IconButton.styleFrom(
-                              fixedSize: const Size.square(42),
-                              minimumSize: const Size.square(42),
+                              fixedSize: const Size.square(38),
+                              minimumSize: const Size.square(38),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               padding: const EdgeInsets.all(6),
                               backgroundColor: _listView == list
@@ -237,7 +275,7 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
                             ),
                             icon: Icon(
                               list ? LucideIcons.list : LucideIcons.layoutGrid,
-                              size: 18,
+                              size: AppIconSizes.standard,
                             ),
                           ),
                       ],
@@ -301,7 +339,11 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(LucideIcons.search, color: _secondary, size: 28),
+              const Icon(
+                LucideIcons.search,
+                color: _secondary,
+                size: AppIconSizes.standard,
+              ),
               const SizedBox(height: 12),
               const Text(
                 'Проекты не найдены',
@@ -396,42 +438,35 @@ class _ProjectRow extends StatelessWidget {
       );
     }
     final cardColor = isDark ? colorScheme.surfaceContainerLow : Colors.white;
-    final textColor = isDark ? const Color(0xFFF4F4F5) : _ink;
     final mutedColor = isDark ? const Color(0xFFA4A7B0) : _secondary;
     return Semantics(
       button: true,
       selected: isActive,
       label: project.name,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        decoration: BoxDecoration(
-          color: isActive
-              ? Color.alphaBlend(
-                  _accent.withValues(alpha: isDark ? 0.11 : 0.055),
-                  cardColor,
-                )
-              : cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isActive ? _accent.withValues(alpha: 0.45) : _border,
-          ),
-        ),
+      child: _ProjectPressFeedback(
         child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isActive
+              ? Color.alphaBlend(_accent.withValues(alpha: .035), cardColor)
+              : cardColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: isActive
+                  ? _accent.withValues(alpha: .28)
+                  : Colors.transparent,
+            ),
+          ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             key: Key('project-row-${project.id}'),
             onTap: onTap,
-            borderRadius: BorderRadius.circular(14),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
+                children: [
                   Row(
-                    children: <Widget>[
+                    children: [
                       Expanded(
                         child: Text(
                           project.code.isEmpty
@@ -441,42 +476,59 @@ class _ProjectRow extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.manrope(
                             fontSize: 10,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                             color: mutedColor,
-                            letterSpacing: 0.4,
+                            letterSpacing: .5,
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Expanded(
-                        child: Text(
-                          project.name.trim().isEmpty
-                              ? 'Без названия'
-                              : project.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.manrope(
-                            fontSize: 17,
-                            height: 1.3,
-                            fontWeight: FontWeight.w700,
-                            color: textColor,
-                            letterSpacing: -0.2,
+                      if (project.isPinned)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(
+                            LucideIcons.pin,
+                            size: AppIconSizes.standard,
+                            color: _secondary,
                           ),
                         ),
-                      ),
-                      if (project.isPinned) ...<Widget>[
-                        const SizedBox(width: 10),
-                        Icon(LucideIcons.pin, size: 15, color: mutedColor),
+                      if (isActive) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _accent.withValues(alpha: .08),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Текущий',
+                            style: GoogleFonts.manrope(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: _accent,
+                            ),
+                          ),
+                        ),
                       ],
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    project.name.trim().isEmpty ? 'Без названия' : project.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.manrope(
+                      fontSize: 16,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
+                      letterSpacing: -.2,
+                    ),
+                  ),
                   if (project.description?.trim() case final description?
-                      when description.isNotEmpty) ...<Widget>[
+                      when description.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       description,
@@ -484,24 +536,29 @@ class _ProjectRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.manrope(
                         fontSize: 12,
-                        height: 1.35,
+                        height: 1.4,
                         color: mutedColor,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 11),
+                  const SizedBox(height: 14),
                   Row(
-                    children: <Widget>[
-                      Icon(LucideIcons.calendar, size: 13, color: mutedColor),
-                      const SizedBox(width: 5),
+                    children: [
+                      Icon(
+                        LucideIcons.calendar,
+                        size: AppIconSizes.standard,
+                        color: mutedColor,
+                      ),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           _dateRange(project.start, project.end),
                           style: GoogleFonts.manrope(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 11,
                             color: mutedColor,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -512,7 +569,7 @@ class _ProjectRow extends StatelessWidget {
                       Text(
                         'Выполнено',
                         style: GoogleFonts.manrope(
-                          fontSize: 11,
+                          fontSize: 10,
                           color: mutedColor,
                         ),
                       ),
@@ -521,31 +578,27 @@ class _ProjectRow extends StatelessWidget {
                         '${progress.round()}%',
                         style: GoogleFonts.manrope(
                           fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: textColor,
+                          fontWeight: FontWeight.w600,
+                          color: progress == 100
+                              ? const Color(0xFF4B9460)
+                              : _accent,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(99),
-                          child: LinearProgressIndicator(
-                            value: progress / 100,
-                            minHeight: 5,
-                            backgroundColor: isDark
-                                ? const Color(0xFF303139)
-                                : const Color(0xFFE8E9ED),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              _accent,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress / 100,
+                      minHeight: 3,
+                      backgroundColor: isDark
+                          ? const Color(0xFF303139)
+                          : const Color(0xFFF0EFF5),
+                      color: progress == 100
+                          ? const Color(0xFF4B9460)
+                          : _accent,
+                    ),
                   ),
                 ],
               ),
@@ -598,94 +651,102 @@ class _CompactProjectRow extends StatelessWidget {
       button: true,
       selected: isActive,
       label: project.name,
-      child: Material(
-        color: isActive ? _accent.withValues(alpha: 0.07) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          key: Key('project-row-${project.id}'),
+      child: _ProjectPressFeedback(
+        child: Material(
+          color: isActive
+              ? _accent.withValues(alpha: 0.07)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-            child: Row(
-              children: [
-                const Icon(LucideIcons.folder, size: 24, color: _accent),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        project.name.trim().isEmpty
-                            ? 'Без названия'
-                            : project.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.manrope(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: _ink,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      if (project.code.isNotEmpty) ...[
+          child: InkWell(
+            key: Key('project-row-${project.id}'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+              child: Row(
+                children: [
+                  const Icon(
+                    LucideIcons.folder,
+                    size: AppIconSizes.standard,
+                    color: _accent,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          project.code,
+                          project.name.trim().isEmpty
+                              ? 'Без названия'
+                              : project.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.manrope(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _ink,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (project.code.isNotEmpty) ...[
+                          Text(
+                            project.code,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.manrope(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: _secondary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                        ],
+                        Text(
+                          dates,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.manrope(
                             fontSize: 10,
-                            fontWeight: FontWeight.w600,
                             color: _secondary,
                           ),
                         ),
-                        const SizedBox(height: 3),
                       ],
-                      Text(
-                        dates,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.manrope(
-                          fontSize: 10,
-                          color: _secondary,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 42,
-                  child: Column(
-                    children: [
-                      Text(
-                        '${progress.round()}%',
-                        style: GoogleFonts.manrope(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _ink,
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 42,
+                    child: Column(
+                      children: [
+                        Text(
+                          '${progress.round()}%',
+                          style: GoogleFonts.manrope(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _ink,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 5),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: progress / 100,
-                          minHeight: 3,
-                          color: _accent,
-                          backgroundColor: _border,
+                        const SizedBox(height: 5),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: progress / 100,
+                            minHeight: 3,
+                            color: _accent,
+                            backgroundColor: _border,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  LucideIcons.chevronRight,
-                  size: 15,
-                  color: _secondary,
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  const Icon(
+                    LucideIcons.chevronRight,
+                    size: AppIconSizes.standard,
+                    color: _secondary,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -715,21 +776,28 @@ class _LoadingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: 'Загрузка проекта',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              _block(width: 46, height: 26),
-              const SizedBox(width: 12),
-              Expanded(child: _block(height: 18)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _block(width: 190, height: 12),
-          const SizedBox(height: 14),
-          _block(height: 3),
-        ],
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                _block(width: 46, height: 26),
+                const SizedBox(width: 12),
+                Expanded(child: _block(height: 18)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _block(width: 190, height: 12),
+            const SizedBox(height: 14),
+            _block(height: 3),
+          ],
+        ),
       ),
     );
   }
@@ -767,7 +835,7 @@ class _EmptyProjects extends StatelessWidget {
               child: const Icon(
                 LucideIcons.folderKanban,
                 color: _accent,
-                size: 25,
+                size: AppIconSizes.standard,
               ),
             ),
             const SizedBox(height: 20),
@@ -794,7 +862,7 @@ class _EmptyProjects extends StatelessWidget {
             const SizedBox(height: 22),
             FilledButton.icon(
               onPressed: onCreate,
-              icon: const Icon(LucideIcons.plus, size: 18),
+              icon: const Icon(LucideIcons.plus, size: AppIconSizes.standard),
               label: const Text('Создать проект'),
               style: FilledButton.styleFrom(
                 backgroundColor: _accent,
@@ -830,7 +898,11 @@ class _ProjectsError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Icon(LucideIcons.circleAlert, size: 28, color: _secondary),
+            const Icon(
+              LucideIcons.circleAlert,
+              size: AppIconSizes.standard,
+              color: _secondary,
+            ),
             const SizedBox(height: 14),
             Text(
               message,
@@ -874,6 +946,43 @@ class _WorkspaceUnavailable extends StatelessWidget {
           textAlign: TextAlign.center,
           style: GoogleFonts.manrope(color: _secondary),
         ),
+      ),
+    );
+  }
+}
+
+class _ProjectPressFeedback extends StatefulWidget {
+  const _ProjectPressFeedback({required this.child, this.enabled = true});
+  final Widget child;
+  final bool enabled;
+  @override
+  State<_ProjectPressFeedback> createState() => _ProjectPressFeedbackState();
+}
+
+class _ProjectPressFeedbackState extends State<_ProjectPressFeedback> {
+  bool _pressed = false;
+  void _setPressed(bool value) {
+    if (widget.enabled && _pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return Listener(
+      onPointerDown: (_) => _setPressed(true),
+      onPointerUp: (_) => _setPressed(false),
+      onPointerCancel: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale:
+            widget.enabled &&
+                _pressed &&
+                !media.disableAnimations &&
+                !media.accessibleNavigation
+            ? .96
+            : 1,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: widget.child,
       ),
     );
   }

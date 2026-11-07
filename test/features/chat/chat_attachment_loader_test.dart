@@ -26,6 +26,75 @@ class _AttachmentAdapter implements HttpClientAdapter {
 }
 
 void main() {
+  test('detects WebM bytes independently of URL and filename', () {
+    expect(
+      ChatAttachmentLoader.videoExtension([0x1A, 0x45, 0xDF, 0xA3]),
+      'webm',
+    );
+    expect(
+      ChatAttachmentLoader.videoExtension([0, 0, 0, 24, 102, 116, 121, 112]),
+      'mp4',
+    );
+  });
+  test(
+    'downloads HTTPS dataUrl from attachment API without API credentials',
+    () async {
+      const url = 'https://storage.example/objects/video.mp4?signature=abc';
+      final api = Dio(
+        BaseOptions(headers: {'Authorization': 'Bearer api-token'}),
+      );
+      final storage = Dio();
+      addTearDown(api.close);
+      addTearDown(storage.close);
+      var downloaded = false;
+      api.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            expect(options.path, 'messages/message-1/attachment');
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                data: utf8.encode(
+                  jsonEncode({
+                    'messageId': 'message-1',
+                    'name': 'attachment',
+                    'size': null,
+                    'dataUrl': url,
+                  }),
+                ),
+                // Recognize JSON even when Content-Type is absent.
+              ),
+            );
+          },
+        ),
+      );
+      storage.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            downloaded = true;
+            expect(options.uri.toString(), url);
+            expect(
+              options.headers.keys.map((key) => key.toLowerCase()),
+              isNot(contains('authorization')),
+            );
+            expect(options.responseType, ResponseType.bytes);
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                data: <int>[0, 0, 0, 24, 102, 116, 121, 112],
+              ),
+            );
+          },
+        ),
+      );
+      expect(
+        await ChatAttachmentLoader(api, downloadDio: storage).load('message-1'),
+        [0, 0, 0, 24, 102, 116, 121, 112],
+      );
+      expect(downloaded, isTrue);
+    },
+  );
+
   test(
     'loads JSON attachment API as decoded bytes instead of image JSON',
     () async {

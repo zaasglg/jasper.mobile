@@ -1,3 +1,4 @@
+import '../../domain/utils/task_column_label.dart';
 import 'package:equatable/equatable.dart';
 
 import '../../../projects/data/models/project_model.dart';
@@ -40,24 +41,11 @@ class MyTasksState extends Equatable {
   final String? actionErrorMessage;
   final int actionRevision;
 
-  String columnName(ProjectTaskModel task) {
-    final normalizedStatus = task.status.toUpperCase();
-    for (final column
-        in columnsByProjectId[task.projectId] ?? const <KanbanColumnModel>[]) {
-      if (column.statusMap.toUpperCase() == normalizedStatus &&
-          column.name.trim().isNotEmpty) {
-        return column.name.trim();
-      }
-    }
-    return switch (normalizedStatus) {
-      'BACKLOG' => 'Очередь',
-      'TODO' => 'К работе',
-      'PROGRESS' || 'IN_PROGRESS' => 'В работе',
-      'REVIEW' => 'На проверке',
-      'DONE' => 'Готово',
-      _ => '—',
-    };
-  }
+  String columnName(ProjectTaskModel task) => taskColumnLabel(
+    task.status,
+    columns: columnsByProjectId[task.projectId] ?? const [],
+    unavailable: '—',
+  );
 
   MyTasksState copyWith({
     MyTasksStatus? status,

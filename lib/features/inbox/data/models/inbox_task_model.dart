@@ -11,6 +11,10 @@ class InboxTaskModel extends Equatable {
     this.order = 0,
     this.createdAt,
     this.isLocalOnly = false,
+    this.detail = const {},
+    this.start,
+    this.end,
+    this.priority = 'MED',
   });
 
   factory InboxTaskModel.fromJson(Map<String, dynamic> json) {
@@ -29,16 +33,27 @@ class InboxTaskModel extends Equatable {
         'text',
       ]),
       description: _optionalText(
-        json['description'] ?? json['detail'] ?? json['body'],
+        json['description'] ??
+            (json['detail'] is Map
+                ? json['detail']['description']
+                : json['detail']) ??
+            json['body'],
       ),
       completed:
           _parseBool(json['completed'] ?? json['isCompleted']) ||
+          (json['detail'] is Map && _parseBool(json['detail']['completed'])) ||
           status == 'DONE' ||
           json['completedAt'] != null ||
           json['completed_at'] != null,
       archived: _parseBool(json['archived'] ?? json['isArchived']),
       order: _parseInt(json['order'] ?? json['sort'] ?? json['position']),
       createdAt: _parseDate(json['createdAt'] ?? json['created_at']),
+      detail: json['detail'] is Map
+          ? Map<String, dynamic>.from(json['detail'] as Map)
+          : const {},
+      start: json['start']?.toString(),
+      end: json['end']?.toString(),
+      priority: json['priority']?.toString() ?? 'MED',
     );
   }
 
@@ -51,6 +66,9 @@ class InboxTaskModel extends Equatable {
   final int order;
   final DateTime? createdAt;
   final bool isLocalOnly;
+  final Map<String, dynamic> detail;
+  final String? start, end;
+  final String priority;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'id': id,
@@ -60,6 +78,10 @@ class InboxTaskModel extends Equatable {
     'completed': completed,
     'archived': archived,
     'order': order,
+    'detail': detail,
+    'start': start,
+    'end': end,
+    'priority': priority,
     if (createdAt != null) 'createdAt': createdAt!.toUtc().toIso8601String(),
   };
 
@@ -73,6 +95,10 @@ class InboxTaskModel extends Equatable {
     int? order,
     DateTime? createdAt,
     bool? isLocalOnly,
+    Map<String, dynamic>? detail,
+    String? start,
+    String? end,
+    String? priority,
   }) {
     return InboxTaskModel(
       id: id ?? this.id,
@@ -84,6 +110,10 @@ class InboxTaskModel extends Equatable {
       order: order ?? this.order,
       createdAt: createdAt ?? this.createdAt,
       isLocalOnly: isLocalOnly ?? this.isLocalOnly,
+      detail: detail ?? this.detail,
+      start: start ?? this.start,
+      end: end ?? this.end,
+      priority: priority ?? this.priority,
     );
   }
 
@@ -131,5 +161,9 @@ class InboxTaskModel extends Equatable {
     order,
     createdAt,
     isLocalOnly,
+    detail,
+    start,
+    end,
+    priority,
   ];
 }

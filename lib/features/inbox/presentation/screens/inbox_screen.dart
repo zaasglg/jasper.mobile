@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +8,7 @@ import '../../../shell/presentation/screens/main_shell.dart';
 import '../../data/models/inbox_task_model.dart';
 import '../cubit/inbox_cubit.dart';
 import '../cubit/inbox_state.dart';
+import '../widgets/inbox_task_menu.dart';
 
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key});
@@ -37,7 +39,11 @@ class _InboxScreenState extends State<InboxScreen> {
         leading: IconButton(
           tooltip: 'Открыть меню',
           onPressed: MainShell.openDrawer,
-          icon: const Icon(Icons.menu_rounded, color: AppColors.ink),
+          icon: const Icon(
+            Icons.menu_rounded,
+            color: AppColors.ink,
+            size: AppIconSizes.standard,
+          ),
         ),
         title: Text(
           'Инбокс',
@@ -154,9 +160,6 @@ class _InboxContent extends StatelessWidget {
                 onToggle: () => task.isLocalOnly
                     ? context.read<InboxCubit>().toggleLocal(task.id)
                     : _completeTask(context, task.id),
-                onDelete: task.isLocalOnly
-                    ? () => context.read<InboxCubit>().removeLocal(task.id)
-                    : null,
               );
             },
           ),
@@ -307,7 +310,11 @@ class _QuickTaskComposer extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.add_task_rounded, size: 21, color: AppColors.muted),
+          const Icon(
+            Icons.add_task_rounded,
+            size: AppIconSizes.standard,
+            color: AppColors.muted,
+          ),
           const SizedBox(width: 9),
           Expanded(
             child: TextField(
@@ -353,7 +360,10 @@ class _QuickTaskComposer extends StatelessWidget {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.arrow_upward_rounded, size: 19),
+                  : const Icon(
+                      Icons.arrow_upward_rounded,
+                      size: AppIconSizes.standard,
+                    ),
             ),
           ),
         ],
@@ -368,13 +378,11 @@ class _QuickTaskTile extends StatelessWidget {
     required this.task,
     required this.isCompleting,
     required this.onToggle,
-    required this.onDelete,
   });
 
   final InboxTaskModel task;
   final bool isCompleting;
   final VoidCallback? onToggle;
-  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -419,30 +427,7 @@ class _QuickTaskTile extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (onDelete != null)
-                PopupMenuButton<_QuickTaskAction>(
-                  tooltip: 'Действия задачи',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 150),
-                  position: PopupMenuPosition.under,
-                  onSelected: (action) {
-                    if (action == _QuickTaskAction.delete) onDelete?.call();
-                  },
-                  itemBuilder: (context) =>
-                      const <PopupMenuEntry<_QuickTaskAction>>[
-                        PopupMenuItem<_QuickTaskAction>(
-                          value: _QuickTaskAction.delete,
-                          child: Text('Удалить'),
-                        ),
-                      ],
-                  icon: const Icon(
-                    Icons.more_horiz_rounded,
-                    size: 20,
-                    color: AppColors.muted,
-                  ),
-                )
-              else
-                const SizedBox(height: 40),
+              InboxTaskMenu(task: task, busy: isCompleting),
             ],
           ),
           const SizedBox(height: 8),
@@ -513,7 +498,7 @@ class _QuickTaskTile extends StatelessWidget {
             children: <Widget>[
               const Icon(
                 Icons.folder_open_rounded,
-                size: 15,
+                size: AppIconSizes.standard,
                 color: AppColors.muted,
               ),
               const SizedBox(width: 5),
@@ -532,8 +517,6 @@ class _QuickTaskTile extends StatelessWidget {
     );
   }
 }
-
-enum _QuickTaskAction { delete }
 
 class _TaskCount extends StatelessWidget {
   const _TaskCount({required this.count});
@@ -584,7 +567,7 @@ class _QuickTasksEmpty extends StatelessWidget {
               ),
               child: const Icon(
                 Icons.playlist_add_rounded,
-                size: 29,
+                size: AppIconSizes.standard,
                 color: AppColors.accent,
               ),
             ),

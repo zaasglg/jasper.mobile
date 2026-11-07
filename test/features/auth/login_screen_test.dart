@@ -18,9 +18,12 @@ void main() {
     );
 
     expect(find.text('С возвращением'), findsOneWidget);
+    expect(find.byKey(const Key('google_login_button')), findsOneWidget);
     expect(find.text('Войти'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('login_submit_button')));
+    final submitButton = find.byKey(const Key('login_submit_button'));
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
     await tester.pump();
 
     expect(find.text('Введите email'), findsOneWidget);

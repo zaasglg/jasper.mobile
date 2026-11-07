@@ -6,9 +6,8 @@ import '../models/inbox_task_model.dart';
 
 /// Keeps the native Android/iOS home-screen widget in sync with Inbox.
 abstract final class InboxHomeWidgetService {
-  static const String appGroupId = 'group.com.example.jospar';
-  static const String androidProvider =
-      'com.example.jospar.InboxWidgetProvider';
+  static const String appGroupId = 'group.com.jospar.app';
+  static const String androidProvider = 'com.jospar.app.InboxWidgetProvider';
   static const String iOSWidgetKind = 'InboxHomeWidget';
 
   static Future<void> initialize() async {

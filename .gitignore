@@ -43,3 +43,14 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local Yandex Maps build configuration
+.config/yandex_maps.local.json
+
+# Local Firebase server credentials and test device tokens
+.config/firebase-admin*.json
+.config/firebase-test-device.local.json
+
+# Apple APNs private keys belong in secure storage, never in the app.
+AuthKey_*.p8
+.config/*.p8

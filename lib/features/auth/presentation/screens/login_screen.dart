@@ -1,5 +1,7 @@
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -20,7 +22,6 @@ class _LoginScreenState extends State<LoginScreen> {
   static const Color _ink = Color(0xFF20212B);
   static const Color _muted = Color(0xFF737587);
   static const Color _accent = AppColors.accent;
-  static const Color _border = Color(0xFFE1E2EA);
   static const Color _fieldFill = Color(0xFFFAFAFC);
   static const Color _canvas = Color(0xFFF7F7FC);
 
@@ -30,6 +31,15 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
   bool _obscurePassword = true;
+
+  static const String _googleLogo = '''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.06H12v3.9h5.38a4.6 4.6 0 0 1-2 3.02v2.53h3.24c1.9-1.75 2.98-4.33 2.98-7.39Z"/>
+  <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.38l-3.24-2.53c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.61A10 10 0 0 0 12 22Z"/>
+  <path fill="#FBBC05" d="M6.39 13.92A6.01 6.01 0 0 1 6.08 12c0-.67.12-1.32.31-1.92V7.47H3.04A10 10 0 0 0 2 12c0 1.63.39 3.17 1.04 4.53l3.35-2.61Z"/>
+  <path fill="#EA4335" d="M12 5.95c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.96 5.47l3.35 2.61C7.18 7.71 9.39 5.95 12 5.95Z"/>
+</svg>
+''';
 
   @override
   void dispose() {
@@ -47,6 +57,11 @@ class _LoginScreenState extends State<LoginScreen> {
       email: _emailController.text,
       password: _passwordController.text,
     );
+  }
+
+  Future<void> _signInWithGoogle() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await context.read<AuthCubit>().loginWithGoogle();
   }
 
   @override
@@ -125,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
     required bool showLogo,
   }) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+      padding: const EdgeInsets.fromLTRB(28, 30, 28, 26),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -165,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Войдите в рабочее пространство JosparBee',
+              'Продолжите работу с командой и проектами',
               style: GoogleFonts.manrope(
                 color: _muted,
                 fontSize: 14,
@@ -173,7 +188,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 fontWeight: FontWeight.w400,
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
+            _buildGoogleButton(isLoading),
+            const SizedBox(height: 22),
+            const _LoginDivider(),
+            const SizedBox(height: 22),
             _buildLabel('Рабочая почта'),
             const SizedBox(height: 8),
             _buildEmailField(isLoading),
@@ -189,7 +208,11 @@ class _LoginScreenState extends State<LoginScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(LucideIcons.lockKeyhole, size: 14, color: _muted),
+                const Icon(
+                  LucideIcons.lockKeyhole,
+                  size: AppIconSizes.standard,
+                  color: _muted,
+                ),
                 const SizedBox(width: 7),
                 Flexible(
                   child: Text(
@@ -218,6 +241,43 @@ class _LoginScreenState extends State<LoginScreen> {
       fontWeight: FontWeight.w700,
     ),
   );
+
+  Widget _buildGoogleButton(bool isLoading) {
+    return SizedBox(
+      height: 54,
+      child: OutlinedButton(
+        key: const Key('google_login_button'),
+        onPressed: isLoading ? null : _signInWithGoogle,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _ink,
+          backgroundColor: Colors.white,
+          disabledForegroundColor: _muted,
+          side: const BorderSide(color: Color(0xFFE4E5EC)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.string(
+              _googleLogo,
+              width: 20,
+              height: 20,
+              semanticsLabel: 'Google',
+            ),
+            const SizedBox(width: 11),
+            const Text('Войти через Google'),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildEmailField(bool isLoading) {
     return TextFormField(
@@ -267,7 +327,7 @@ class _LoginScreenState extends State<LoginScreen> {
           tooltip: _obscurePassword ? 'Показать пароль' : 'Скрыть пароль',
           icon: Icon(
             _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
-            size: 19,
+            size: AppIconSizes.standard,
           ),
         ),
       ),
@@ -305,19 +365,19 @@ class _LoginScreenState extends State<LoginScreen> {
         fontSize: 14,
         fontWeight: FontWeight.w400,
       ),
-      prefixIcon: Icon(prefixIcon, size: 19),
+      prefixIcon: Icon(prefixIcon, size: AppIconSizes.standard),
       prefixIconColor: const Color(0xFF77798B),
       suffixIcon: suffixIcon,
       suffixIconColor: const Color(0xFF686A78),
       filled: true,
       fillColor: _fieldFill,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: border(_border),
-      enabledBorder: border(_border),
-      disabledBorder: border(_border),
-      focusedBorder: border(_accent, 1.6),
+      border: border(Colors.transparent),
+      enabledBorder: border(Colors.transparent),
+      disabledBorder: border(Colors.transparent),
+      focusedBorder: border(_accent),
       errorBorder: border(const Color(0xFFD14B4B)),
-      focusedErrorBorder: border(const Color(0xFFD14B4B), 1.6),
+      focusedErrorBorder: border(const Color(0xFFD14B4B)),
       errorStyle: GoogleFonts.manrope(
         color: const Color(0xFFB33A3A),
         fontSize: 12,
@@ -393,10 +453,36 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Text('Войти'),
                   SizedBox(width: 9),
-                  Icon(LucideIcons.arrowRight, size: 18),
+                  Icon(LucideIcons.arrowRight, size: AppIconSizes.standard),
                 ],
               ),
       ),
+    );
+  }
+}
+
+class _LoginDivider extends StatelessWidget {
+  const _LoginDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    const line = Expanded(child: Divider(color: Color(0xFFE8E9EF), height: 1));
+    return Row(
+      children: [
+        line,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'или по рабочей почте',
+            style: GoogleFonts.manrope(
+              color: _LoginScreenState._muted,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        line,
+      ],
     );
   }
 }
@@ -478,7 +564,7 @@ class _Feature extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 17, color: AppColors.accent),
+        Icon(icon, size: AppIconSizes.standard, color: AppColors.accent),
         const SizedBox(width: 8),
         Text(
           text,

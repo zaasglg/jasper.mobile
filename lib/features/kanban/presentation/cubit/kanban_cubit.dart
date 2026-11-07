@@ -1,3 +1,6 @@
+import '../../../assistant/data/services/assistant_task_changes.dart';
+import '../../../../core/auth/auth_session.dart';
+import '../../data/models/task_translation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../projects/data/models/project_task_model.dart';
@@ -11,14 +14,33 @@ import 'kanban_state.dart';
 class KanbanCubit extends Cubit<KanbanState> {
   KanbanCubit(this._repository, {KanbanBoardCache? cache})
     : _cache = cache ?? KanbanBoardCache(),
-      super(const KanbanState());
+      super(const KanbanState()) {
+    assistantTaskChanges.addListener(_onAiTasksChanged);
+    authSession.addListener(_onSessionChanged);
+  }
+
+  bool _sessionInvalidated = false;
+  void _onSessionChanged() {
+    _sessionInvalidated = true;
+    _loadRevision++;
+    _cache.clear();
+    _repository.cancelPendingLoads();
+    if (!isClosed) emit(const KanbanState());
+  }
+
+  void _onAiTasksChanged() {
+    _cache.clear();
+    if (!isClosed && state.projectId.isNotEmpty) {
+      load(state.projectId, refresh: true);
+    }
+  }
 
   final KanbanRepository _repository;
   final KanbanBoardCache _cache;
   int _loadRevision = 0;
 
   Future<void> load(String projectId, {bool refresh = false}) async {
-    if (projectId.isEmpty) return;
+    if (_sessionInvalidated || isClosed || projectId.isEmpty) return;
     final revision = ++_loadRevision;
     final cached = _cache.read(projectId);
     if (cached != null && !refresh) {
@@ -80,7 +102,9 @@ class KanbanCubit extends Cubit<KanbanState> {
   );
 
   Future<void> toggleCompleted(ProjectTaskModel task) async {
-    if (state.movingTaskIds.isNotEmpty) return;
+    if (_sessionInvalidated || isClosed || state.movingTaskIds.isNotEmpty) {
+      return;
+    }
     final projectId = state.projectId;
     final progress = task.isDone ? 0 : 100;
     final reopenedStatus = task.isDone && task.status.toUpperCase() == 'DONE'
@@ -133,8 +157,14 @@ class KanbanCubit extends Cubit<KanbanState> {
     }
   }
 
-  Future<void> archiveTask(ProjectTaskModel task) async {
-    if (state.movingTaskIds.isNotEmpty) return;
+  Future<void> archiveTask(ProjectTaskModel task) => _removeTask(task);
+  Future<void> deleteTask(ProjectTaskModel task) =>
+      _removeTask(task, delete: true);
+
+  Future<void> _removeTask(ProjectTaskModel task, {bool delete = false}) async {
+    if (_sessionInvalidated || isClosed || state.movingTaskIds.isNotEmpty) {
+      return;
+    }
     final projectId = state.projectId;
     final oldTasks = state.tasks;
     emit(
@@ -145,7 +175,11 @@ class KanbanCubit extends Cubit<KanbanState> {
       ),
     );
     try {
-      await _repository.archiveTask(task.id);
+      if (delete) {
+        await _repository.deleteTask(task.id);
+      } else {
+        await _repository.archiveTask(task.id);
+      }
       if (isClosed || state.projectId != projectId) return;
       _cache.write(
         projectId,
@@ -168,8 +202,94 @@ class KanbanCubit extends Cubit<KanbanState> {
       _actionError(
         error is KanbanException
             ? error.message
+            : delete
+            ? 'Не удалось удалить задачу.'
             : 'Не удалось архивировать задачу.',
       );
+    }
+  }
+
+  Future<bool> duplicateTask(ProjectTaskModel task) =>
+      _updateCard(task, () => _repository.duplicateTask(task.id), insert: true);
+
+  Future<bool> updateCover(
+    ProjectTaskModel task,
+    Map<String, dynamic>? cover,
+  ) => _updateCard(task, () => _repository.updateCover(task.id, cover));
+
+  Future<bool> applyTranslation(
+    ProjectTaskModel task,
+    TaskTranslation translation,
+  ) => _updateCard(
+    task,
+    () => _repository.applyTranslation(task.id, translation),
+  );
+
+  Future<TaskTranslation?> translateTask(
+    ProjectTaskModel task,
+    String workspaceId,
+    String language,
+  ) async {
+    if (_sessionInvalidated || isClosed || state.movingTaskIds.isNotEmpty) {
+      return null;
+    }
+    final projectId = state.projectId;
+    emit(state.copyWith(movingTaskIds: {task.id}, clearActionError: true));
+    try {
+      final result = await _repository.translateTask(
+        task.id,
+        workspaceId,
+        language,
+      );
+      if (isClosed || state.projectId != projectId) return null;
+      emit(state.copyWith(movingTaskIds: {}));
+      return result;
+    } catch (error) {
+      if (isClosed || state.projectId != projectId) return null;
+      emit(state.copyWith(movingTaskIds: {}));
+      _actionError(
+        error is KanbanException
+            ? error.message
+            : 'Не удалось перевести задачу.',
+      );
+      return null;
+    }
+  }
+
+  Future<bool> _updateCard(
+    ProjectTaskModel task,
+    Future<ProjectTaskModel> Function() operation, {
+    bool insert = false,
+  }) async {
+    if (_sessionInvalidated || isClosed || state.movingTaskIds.isNotEmpty) {
+      return false;
+    }
+    final projectId = state.projectId;
+    emit(state.copyWith(movingTaskIds: {task.id}, clearActionError: true));
+    try {
+      final updated = await operation();
+      if (isClosed || state.projectId != projectId) return false;
+      final tasks = insert
+          ? [...state.tasks, updated]
+          : [
+              for (final item in state.tasks)
+                if (item.id == task.id) updated else item,
+            ];
+      _cache.write(
+        projectId,
+        KanbanBoardData(columns: state.columns, tasks: tasks),
+      );
+      emit(state.copyWith(tasks: tasks, movingTaskIds: {}));
+      return true;
+    } catch (error) {
+      if (isClosed || state.projectId != projectId) return false;
+      emit(state.copyWith(movingTaskIds: {}));
+      _actionError(
+        error is KanbanException
+            ? error.message
+            : 'Не удалось сохранить изменения задачи.',
+      );
+      return false;
     }
   }
 
@@ -363,6 +483,8 @@ class KanbanCubit extends Cubit<KanbanState> {
 
   @override
   Future<void> close() {
+    authSession.removeListener(_onSessionChanged);
+    assistantTaskChanges.removeListener(_onAiTasksChanged);
     _repository.cancelPendingLoads();
     return super.close();
   }

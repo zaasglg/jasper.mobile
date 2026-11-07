@@ -34,6 +34,20 @@ class TaskDetailsState extends Equatable {
   final String? actionErrorMessage;
   final int actionRevision;
 
+  List<TaskLabelModel> get visibleLabels {
+    final personal = detail.raw['personalLabels'];
+    final values = personal is Map ? personal[currentUser?.id] : null;
+    return [
+      ...detail.labels,
+      if (values is List)
+        ...values.whereType<Map>().map(
+          (e) => TaskLabelModel.fromJson(
+            Map<String, dynamic>.from(e),
+          ).copyWith(isPersonal: true),
+        ),
+    ];
+  }
+
   TaskDetailsState copyWith({
     TaskDetailsStatus? status,
     ProjectTaskModel? task,

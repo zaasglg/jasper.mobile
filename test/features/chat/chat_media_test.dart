@@ -28,6 +28,31 @@ final class _File extends PlatformFile {
 }
 
 void main() {
+  test('recognizes stored video notes without inline attachment bytes', () {
+    for (final mention in [null, '', 'attachment-stored']) {
+      final message = ChatMessageModel.fromJson({
+        'id': 'stored-video',
+        'kind': 'TEXT',
+        'text': '🎥 видео 5с',
+        'mention': mention,
+      });
+      expect(message.kind, ChatMessageKind.videoMessage);
+      expect(message.durationSeconds, 5);
+      expect(message.attachmentDataUrl, isNull);
+      expect(
+        ChatMessageModel.fromJson(message.toJson()).kind,
+        ChatMessageKind.videoMessage,
+      );
+    }
+    expect(
+      ChatMessageModel.fromJson({
+        'kind': 'TEXT',
+        'text': 'Обсудим видео 5с',
+      }).kind,
+      ChatMessageKind.text,
+    );
+  });
+
   test(
     'file and video payloads match the website format and round trip through message model',
     () {
@@ -131,7 +156,7 @@ void main() {
         'kind': 'TEXT',
         'text': '📹 видео 10с',
         'duration': 10,
-        'mention': 'data:video/mp4;base64,AQID',
+        // Stored responses do not include attachment bytes.
       });
       await tester.pumpWidget(
         MaterialApp(

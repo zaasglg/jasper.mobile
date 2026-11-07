@@ -23,23 +23,52 @@ final class WorkspaceLoaded extends WorkspaceState {
     required this.selected,
     this.isCreating = false,
     this.creationError,
+    this.isRefreshing = false,
+    this.refreshError,
+    this.archivedWorkspaces = const [],
+    this.isLoadingArchived = false,
+    this.hasLoadedArchived = false,
+    this.archivedError,
   });
 
   final List<WorkspaceModel> workspaces;
   final WorkspaceModel? selected;
   final bool isCreating;
   final String? creationError;
+  final bool isRefreshing;
+  final String? refreshError;
+  final List<WorkspaceModel> archivedWorkspaces;
+  final bool isLoadingArchived, hasLoadedArchived;
+  final String? archivedError;
 
   WorkspaceLoaded copyWith({
     List<WorkspaceModel>? workspaces,
-    WorkspaceModel? selected,
+    Object? selected = _unset,
     bool? isCreating,
     Object? creationError = _unset,
+    bool? isRefreshing,
+    Object? refreshError = _unset,
+    List<WorkspaceModel>? archivedWorkspaces,
+    bool? isLoadingArchived,
+    bool? hasLoadedArchived,
+    Object? archivedError = _unset,
   }) {
     return WorkspaceLoaded(
       workspaces: workspaces ?? this.workspaces,
-      selected: selected ?? this.selected,
+      selected: identical(selected, _unset)
+          ? this.selected
+          : selected as WorkspaceModel?,
       isCreating: isCreating ?? this.isCreating,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      refreshError: identical(refreshError, _unset)
+          ? this.refreshError
+          : refreshError as String?,
+      archivedWorkspaces: archivedWorkspaces ?? this.archivedWorkspaces,
+      isLoadingArchived: isLoadingArchived ?? this.isLoadingArchived,
+      hasLoadedArchived: hasLoadedArchived ?? this.hasLoadedArchived,
+      archivedError: identical(archivedError, _unset)
+          ? this.archivedError
+          : archivedError as String?,
       creationError: identical(creationError, _unset)
           ? this.creationError
           : creationError as String?,
@@ -52,6 +81,12 @@ final class WorkspaceLoaded extends WorkspaceState {
     selected,
     isCreating,
     creationError,
+    isRefreshing,
+    refreshError,
+    archivedWorkspaces,
+    isLoadingArchived,
+    hasLoadedArchived,
+    archivedError,
   ];
 }
 

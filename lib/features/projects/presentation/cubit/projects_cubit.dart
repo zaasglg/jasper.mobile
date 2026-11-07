@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/create_project_request.dart';
@@ -16,17 +18,54 @@ class ProjectsCubit extends Cubit<ProjectsState> {
   final ProjectRepository _repository;
   final ProjectTaskRepository? _taskRepository;
   int _loadRevision = 0;
+  bool _createInFlight = false;
+  (String, bool)? _deferredLoad;
   final Map<String, String> _selectedProjectIds = <String, String>{};
 
-  Future<void> loadForWorkspace(String workspaceId) async {
-    if (workspaceId.isEmpty) return;
+  void clearWorkspace() {
+    _loadRevision++;
+    _deferredLoad = null;
+    if (!isClosed) {
+      emit(
+        ProjectsState(
+          isCreating: _createInFlight,
+          creationRevision: state.creationRevision,
+        ),
+      );
+    }
+  }
+
+  Future<void> loadForWorkspace(
+    String workspaceId, {
+    bool refresh = false,
+  }) async {
+    if (isClosed || workspaceId.isEmpty) return;
+    if (_createInFlight) {
+      _deferredLoad = (workspaceId, refresh);
+      if (state.workspaceId != workspaceId) {
+        emit(
+          ProjectsState(
+            workspaceId: workspaceId,
+            isLoading: true,
+            isCreating: true,
+            creationRevision: state.creationRevision,
+          ),
+        );
+      }
+      return;
+    }
     final revision = ++_loadRevision;
+    final previous = state;
+    final keepContent = refresh && previous.workspaceId == workspaceId;
     emit(
-      ProjectsState(
-        workspaceId: workspaceId,
-        isLoading: true,
-        isCreating: state.isCreating,
-      ),
+      keepContent
+          ? previous.copyWith(isLoading: true, clearError: true)
+          : ProjectsState(
+              workspaceId: workspaceId,
+              isLoading: true,
+              isCreating: state.isCreating,
+              creationRevision: state.creationRevision,
+            ),
     );
 
     try {
@@ -54,6 +93,8 @@ class ProjectsCubit extends Cubit<ProjectsState> {
           workspaceId: workspaceId,
           projects: projects,
           selectedProjectId: selectedProjectId,
+          creationRevision: state.creationRevision,
+          creationError: state.creationError,
           isProgressLoading:
               _taskRepository != null && taskProjectIds.isNotEmpty,
         ),
@@ -100,15 +141,29 @@ class ProjectsCubit extends Cubit<ProjectsState> {
     } on ProjectException catch (error) {
       if (revision != _loadRevision || isClosed) return;
       emit(
-        ProjectsState(workspaceId: workspaceId, errorMessage: error.message),
+        keepContent
+            ? state.copyWith(isLoading: false, errorMessage: error.message)
+            : ProjectsState(
+                workspaceId: workspaceId,
+                errorMessage: error.message,
+                creationRevision: state.creationRevision,
+                creationError: state.creationError,
+              ),
       );
     } catch (_) {
       if (revision != _loadRevision || isClosed) return;
       emit(
-        ProjectsState(
-          workspaceId: workspaceId,
-          errorMessage: 'Не удалось загрузить проекты.',
-        ),
+        keepContent
+            ? state.copyWith(
+                isLoading: false,
+                errorMessage: 'Не удалось обновить проекты.',
+              )
+            : ProjectsState(
+                workspaceId: workspaceId,
+                errorMessage: 'Не удалось загрузить проекты.',
+                creationRevision: state.creationRevision,
+                creationError: state.creationError,
+              ),
       );
     }
   }
@@ -125,16 +180,25 @@ class ProjectsCubit extends Cubit<ProjectsState> {
   }
 
   Future<bool> createProject(CreateProjectRequest request) async {
-    if (state.isCreating) return false;
+    if (isClosed || _createInFlight) return false;
     final validationMessage = _validate(request);
     if (validationMessage != null) {
       emit(state.copyWith(creationError: validationMessage, clearError: true));
       return false;
     }
 
+    _createInFlight = true;
+    if ((state.isLoading || state.isProgressLoading) &&
+        state.workspaceId != null) {
+      _deferredLoad = (state.workspaceId!, true);
+    }
+    // Reads started before this mutation must not replace the created project.
+    _loadRevision++;
     emit(
       state.copyWith(
         isCreating: true,
+        isLoading: false,
+        isProgressLoading: false,
         clearCreationError: true,
         clearError: true,
       ),
@@ -159,7 +223,10 @@ class ProjectsCubit extends Cubit<ProjectsState> {
       }
       emit(
         state.copyWith(
-          projects: _pinnedFirst(<ProjectModel>[...state.projects, created]),
+          projects: _pinnedFirst(<ProjectModel>[
+            ...state.projects.where((project) => project.id != created.id),
+            created,
+          ]),
           selectedProjectId: selectedProjectId,
           isCreating: false,
           clearCreationError: true,
@@ -169,7 +236,14 @@ class ProjectsCubit extends Cubit<ProjectsState> {
       return true;
     } on ProjectException catch (error) {
       if (!isClosed) {
-        emit(state.copyWith(isCreating: false, creationError: error.message));
+        emit(
+          state.copyWith(
+            isCreating: false,
+            creationError: state.workspaceId == request.workspaceId
+                ? error.message
+                : null,
+          ),
+        );
       }
       return false;
     } catch (_) {
@@ -177,11 +251,23 @@ class ProjectsCubit extends Cubit<ProjectsState> {
         emit(
           state.copyWith(
             isCreating: false,
-            creationError: 'Не удалось создать проект.',
+            creationError: state.workspaceId == request.workspaceId
+                ? 'Не удалось создать проект.'
+                : null,
           ),
         );
       }
       return false;
+    } finally {
+      _createInFlight = false;
+      final deferred = _deferredLoad;
+      _deferredLoad = null;
+      if (!isClosed) {
+        if (state.isCreating) emit(state.copyWith(isCreating: false));
+        if (deferred != null && state.workspaceId == deferred.$1) {
+          unawaited(loadForWorkspace(deferred.$1, refresh: deferred.$2));
+        }
+      }
     }
   }
 

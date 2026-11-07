@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-31",
+  "scope": "Isolated LiveKit room, Android API 36 emulator and browser SDK; no human invitees",
+  "native": {
+    "status": "Waiting for media",
+    "screenSharing": true,
+    "sentVideoBytes": 8118153,
+    "sentVideoFrames": 2016,
+    "connected": true,
+    "remotePeers": 1,
+    "receivedVideoBytes": 6052358,
+    "decodedVideoFrames": 911,
+    "receivedAudioBytes": 0,
+    "sentAudioBytes": 12149,
+    "note": "Browser intentionally published video only; generic probe status waits for audio, so screen verification uses decoded frames and source publication."
+  },
+  "browser": [
+    {
+      "bytes": 10827,
+      "kind": "audio",
+      "source": "microphone"
+    },
+    {
+      "bytes": 569021,
+      "frames": 750,
+      "kind": "video",
+      "source": "camera"
+    },
+    {
+      "bytes": 1128776,
+      "frames": 299,
+      "kind": "video",
+      "source": "screen_share"
+    }
+  ],
+  "backgroundAndroid": true,
+  "ios": "Signed simulator build and embedded ReplayKit extension only; physical iPhone unavailable",
+  "stopAndCancel": {
+    "connected": true,
+    "screenSharing": false,
+    "projectionServiceRemoved": true,
+    "browserSourcesAfterStop": [
+      "microphone",
+      "camera"
+    ]
+  },
+  "checks": {
+    "flutterAnalyze": "No issues found",
+    "callsChatAndAppTests": 69,
+    "screenCallTestsAfterCleanupChange": 28,
+    "iosSimulatorBuild": "passed",
+    "iosExtensionEmbedded": true,
+    "androidArm64Build": "passed"
+  }
+}

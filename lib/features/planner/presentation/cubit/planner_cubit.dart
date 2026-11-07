@@ -58,6 +58,7 @@ class PlannerCubit extends Cubit<PlannerState> {
     required DateTime scheduledAt,
     required int durationMinutes,
   }) async {
+    if (item?.external == true) return false;
     if (state.isSaving ||
         state.workspaceId.isEmpty ||
         state.busyIds.isNotEmpty) {
@@ -107,7 +108,9 @@ class PlannerCubit extends Cubit<PlannerState> {
     Future<void> Function() request,
     PlannerItemModel? updated,
   ) async {
-    if (state.busyIds.contains(item.id) || state.isSaving) return;
+    if (item.external || state.busyIds.contains(item.id) || state.isSaving) {
+      return;
+    }
     final generation = _workspaceRevision;
     ++_revision;
     emit(

@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -22,27 +23,9 @@ class DashboardWelcomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFF5F6F8), Color(0xFFEEF0F7)],
-        ),
-      ),
+      decoration: const BoxDecoration(color: Colors.white),
       child: Stack(
         children: [
-          Positioned(
-            bottom: 12,
-            right: 48,
-            child: Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _accent.withValues(alpha: 0.04),
-              ),
-            ),
-          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 16, 16),
             child: Column(
@@ -110,20 +93,26 @@ class _ActionCluster extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _ActionButton(
+            tooltip: 'Редактировать виджеты',
             onTap: onEdit,
             background: Colors.white,
             child: const Icon(
               LucideIcons.pencil,
-              size: 17,
+              size: AppIconSizes.standard,
               color: Color(0xFF4A4F58),
             ),
           ),
           const SizedBox(width: 4),
           _ActionButton(
+            tooltip: 'Добавить задачу',
             onTap: onCreate,
             background: DashboardWelcomeHeader._accent,
             elevated: true,
-            child: const Icon(LucideIcons.plus, size: 18, color: Colors.white),
+            child: const Icon(
+              LucideIcons.plus,
+              size: AppIconSizes.standard,
+              color: Colors.white,
+            ),
           ),
         ],
       ),
@@ -134,11 +123,13 @@ class _ActionCluster extends StatelessWidget {
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.background,
+    required this.tooltip,
     required this.child,
     this.onTap,
     this.elevated = false,
   });
 
+  final String tooltip;
   final Color background;
   final Widget child;
   final VoidCallback? onTap;
@@ -146,32 +137,35 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: background,
-      borderRadius: BorderRadius.circular(10),
-      elevation: 0,
-      child: InkWell(
-        onTap: onTap,
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: background,
         borderRadius: BorderRadius.circular(10),
-        child: Container(
-          width: 38,
-          height: 36,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: elevated
-                ? [
-                    BoxShadow(
-                      color: DashboardWelcomeHeader._accent.withValues(
-                        alpha: 0.28,
+        elevation: 0,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            width: 38,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: elevated
+                  ? [
+                      BoxShadow(
+                        color: DashboardWelcomeHeader._accent.withValues(
+                          alpha: 0.28,
+                        ),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
+                    ]
+                  : null,
+            ),
+            child: child,
           ),
-          child: child,
         ),
       ),
     );

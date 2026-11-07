@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-31",
+  "environment": {
+    "server": "production LiveKit via existing Jospar API",
+    "android": "isolated Android 36.1 emulator with emulated camera",
+    "web": "authenticated Jospar page with generated test audio/video",
+    "participants": "isolated room without invitations"
+  },
+  "api": {
+    "incoming": 200,
+    "create": 201,
+    "state": 200,
+    "join": 201,
+    "audioMode": 201,
+    "videoMode": 201,
+    "end": 201,
+    "stateAfterEnd": "ended"
+  },
+  "androidMedia": {
+    "status": "LIVE MEDIA VERIFIED",
+    "sentVideoBytes": 13656196,
+    "sentVideoFrames": 2180,
+    "connected": true,
+    "remotePeers": 1,
+    "receivedVideoBytes": 1645422,
+    "decodedVideoFrames": 815,
+    "receivedAudioBytes": 1014182,
+    "sentAudioBytes": 12586
+  },
+  "androidBackground": {
+    "foregroundServiceActive": true,
+    "serviceTypes": "microphone|camera",
+    "mediaContinuesAfterHome": true,
+    "notificationReturnsToCall": true,
+    "notificationHangupStopsMedia": true,
+    "notificationHangupStopsForegroundService": true
+  },
+  "limitations": [
+    "Physical iPhone camera and microphone were not tested: no physical phone is available.",
+    "iOS Simulator audio initialization was unstable (CoreAudio RPC timeout); one native session received 902 decoded frames and exchanged audio, but this is not a physical-device certification.",
+    "Incoming calls while the app is terminated are deferred by user decision."
+  ],
+  "remoteEnd": {
+    "status": "REMOTE END VERIFIED",
+    "sentVideoBytes": 8407122,
+    "sentVideoFrames": 1328,
+    "connected": true,
+    "remotePeers": 1,
+    "receivedVideoBytes": 951744,
+    "decodedVideoFrames": 517,
+    "receivedAudioBytes": 641706,
+    "sentAudioBytes": 8063,
+    "endedByServer": true
+  },
+  "checks": {
+    "automatedTestsPassed": 66,
+    "iosSimulatorBuild": "passed",
+    "androidArm64Build": "passed"
+  }
+}

@@ -1,4 +1,6 @@
+import 'app_icon_sizes.dart';
 import 'package:flutter/material.dart';
+import 'app_input_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 abstract final class AppColors {
@@ -21,6 +23,8 @@ abstract final class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      iconTheme: const IconThemeData(size: AppIconSizes.standard),
+      inputDecorationTheme: AppInputTheme.light,
       brightness: Brightness.light,
       scaffoldBackgroundColor: Colors.white,
       colorScheme: ColorScheme.fromSeed(
@@ -29,12 +33,97 @@ abstract final class AppTheme {
       ),
       textTheme: textTheme,
       primaryTextTheme: textTheme,
+      checkboxTheme: CheckboxThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        side: const BorderSide(color: Color(0xFFA0A3B3), width: 1.5),
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return const Color(0xFFE8E9EF);
+          }
+          if (states.contains(WidgetState.selected)) return AppColors.accent;
+          return Colors.transparent;
+        }),
+        checkColor: const WidgetStatePropertyAll(Colors.white),
+        materialTapTargetSize: MaterialTapTargetSize.padded,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          minimumSize: const Size(48, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.ink,
+          minimumSize: const Size(48, 48),
+          side: const BorderSide(color: Color(0xFFDFE1E9)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.accent,
+          minimumSize: const Size(44, 44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: GoogleFonts.manrope(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      listTileTheme: const ListTileThemeData(
+        contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 2),
+        titleTextStyle: TextStyle(
+          fontFamily: 'Manrope',
+          color: AppColors.ink,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+        selectedTileColor: Color(0xFFF1EFFF),
+        selectedColor: AppColors.accent,
+      ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: Colors.white,
         modalBackgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         modalBarrierColor: Color(0x66000000),
-        dragHandleColor: Color(0xFF4A4A55),
+        dragHandleColor: Color(0xFFD6D8E1),
+        dragHandleSize: Size(36, 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
       ),
       navigationBarTheme: const NavigationBarThemeData(
         backgroundColor: Colors.white,

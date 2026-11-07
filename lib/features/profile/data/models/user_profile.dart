@@ -6,6 +6,7 @@ class UserProfile extends Equatable {
     required this.name,
     required this.email,
     this.avatarUrl,
+    this.role = '',
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -16,6 +17,7 @@ class UserProfile extends Equatable {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
+      role: json['role']?.toString() ?? '',
       avatarUrl: rawAvatarUrl is String && rawAvatarUrl.trim().isNotEmpty
           ? _resolveAvatarUrl(rawAvatarUrl.trim())
           : null,
@@ -26,6 +28,16 @@ class UserProfile extends Equatable {
   final String name;
   final String email;
   final String? avatarUrl;
+  final String role;
+
+  String get roleLabel => switch (role.trim().toUpperCase()) {
+    'SUPER_ADMIN' || 'SUPERADMIN' => 'Суперадмин',
+    'ADMIN' => 'Админ',
+    'EXECUTOR' || 'MEMBER' || 'USER' => 'Участник',
+    'OWNER' => 'Владелец',
+    '' => 'Не указана',
+    _ => role,
+  };
 
   static String _resolveAvatarUrl(String value) {
     final uri = Uri.tryParse(value);
@@ -38,6 +50,7 @@ class UserProfile extends Equatable {
     'name': name,
     'email': email,
     'avatarUrl': avatarUrl,
+    'role': role,
   };
 
   UserProfile copyWith({
@@ -45,15 +58,17 @@ class UserProfile extends Equatable {
     String? name,
     String? email,
     String? avatarUrl,
+    String? role,
   }) {
     return UserProfile(
       id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      role: role ?? this.role,
     );
   }
 
   @override
-  List<Object?> get props => <Object?>[id, name, email, avatarUrl];
+  List<Object?> get props => <Object?>[id, name, email, avatarUrl, role];
 }

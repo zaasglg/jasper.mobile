@@ -23,6 +23,21 @@ class ProfileRepositoryImpl implements ProfileRepository {
     }
   }
 
+  @override
+  Future<UserProfile> updateAvatar(String avatarUrl) async {
+    try {
+      await _dio.patch<dynamic>(
+        'users/me/profile',
+        data: <String, dynamic>{'avatarUrl': avatarUrl},
+      );
+      return await getCurrentUser();
+    } on DioException {
+      throw const ProfileException(
+        'Не удалось сохранить фото. Попробуйте ещё раз.',
+      );
+    }
+  }
+
   Map<String, dynamic> _unwrapPayload(dynamic data) {
     if (data is! Map) {
       throw const ProfileException(

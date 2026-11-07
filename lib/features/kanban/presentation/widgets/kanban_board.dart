@@ -1,4 +1,12 @@
-import 'package:flutter/cupertino.dart';
+import '../../../../core/widgets/app_dialog.dart';
+import 'dart:async';
+import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/widgets/app_form_surface.dart';
+import '../../../../core/widgets/app_action_menu.dart';
+import 'task_card_actions.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../data/models/card_view_settings.dart';
+import '../../data/storage/card_view_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,13 +29,256 @@ class KanbanBoard extends StatefulWidget {
   State<KanbanBoard> createState() => _KanbanBoardState();
 }
 
-class _KanbanBoardState extends State<KanbanBoard> {
-  static const double _columnViewportFraction = 0.98;
-  static const double _columnHorizontalInset = 4;
+class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
+  Timer? _cardViewRefresh;
+  static const double _columnViewportFraction = 0.82;
+  static const double _columnHorizontalInset = 6;
 
   final PageController _horizontalController = PageController(
     viewportFraction: _columnViewportFraction,
   );
+
+  String? _currentUserId;
+  CardViewSettings _cardView = const CardViewSettings();
+  int _viewRevision = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCardView();
+    WidgetsBinding.instance.addObserver(this);
+    if (sl.isRegistered<CardViewStorage>() &&
+        sl<CardViewStorage>().syncEnabled) {
+      _cardViewRefresh = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted &&
+            TickerMode.valuesOf(context).enabled &&
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed) {
+          _loadCardView();
+        }
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadCardView();
+  }
+
+  Future<void> _loadCardView() async {
+    if (!sl.isRegistered<CardViewStorage>()) return;
+    final revision = _viewRevision;
+    try {
+      final settings = await sl<CardViewStorage>().read(
+        workspaceId: widget.project.workspaceId,
+        projectId: widget.project.id,
+      );
+      final userId = await sl<CardViewStorage>().currentUserId();
+      if (mounted && revision == _viewRevision) {
+        setState(() {
+          _cardView = settings;
+          _currentUserId = userId;
+        });
+      }
+    } catch (_) {
+      // Keep defaults if saved preferences cannot be read.
+    }
+  }
+
+  Future<void> _setCardView(CardViewSettings settings) async {
+    _viewRevision++;
+    setState(() => _cardView = settings);
+    if (!sl.isRegistered<CardViewStorage>()) return;
+    try {
+      await sl<CardViewStorage>().save(
+        settings,
+        workspaceId: widget.project.workspaceId,
+        projectId: widget.project.id,
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось сохранить вид карточек.')),
+        );
+      }
+    }
+  }
+
+  void _showCardView() {
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => StatefulBuilder(
+        builder: (context, updateSheet) {
+          final colors = Theme.of(context).colorScheme;
+          return SafeArea(
+            top: false,
+            child: SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.78,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 16, 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Вид карточек',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: colors.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Изменения применяются сразу',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 12,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Закрыть',
+                          onPressed: () => Navigator.pop(context),
+                          style: IconButton.styleFrom(
+                            backgroundColor: colors.surfaceContainerHighest
+                                .withValues(alpha: 0.45),
+                            fixedSize: const Size.square(36),
+                          ),
+                          icon: const Icon(
+                            LucideIcons.x,
+                            size: AppIconSizes.standard,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      children: [
+                        for (final field in CardField.values) ...[
+                          if (field == CardField.cover ||
+                              field == CardField.comments)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              child: Divider(
+                                height: 1,
+                                color: colors.outlineVariant.withValues(
+                                  alpha: 0.45,
+                                ),
+                              ),
+                            ),
+                          SwitchListTile(
+                            key: ValueKey('card-field-${field.name}'),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                            ),
+                            dense: true,
+                            visualDensity: const VisualDensity(vertical: -1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            secondary: Container(
+                              width: 32,
+                              height: 32,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color:
+                                    (_cardView.shows(field)
+                                            ? AppColors.accent
+                                            : colors.onSurfaceVariant)
+                                        .withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                _cardFieldIcon(field),
+                                size: AppIconSizes.standard,
+                                color: _cardView.shows(field)
+                                    ? AppColors.accent
+                                    : colors.onSurfaceVariant,
+                              ),
+                            ),
+                            title: Text(
+                              field.label,
+                              style: GoogleFonts.manrope(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: colors.onSurface,
+                              ),
+                            ),
+                            activeTrackColor: AppColors.accent,
+                            activeThumbColor: Colors.white,
+                            inactiveTrackColor: colors.surfaceContainerHighest,
+                            inactiveThumbColor: colors.onSurfaceVariant,
+                            trackOutlineColor: const WidgetStatePropertyAll(
+                              Colors.transparent,
+                            ),
+                            value: _cardView.shows(field),
+                            onChanged: (_) {
+                              _setCardView(_cardView.toggle(field));
+                              updateSheet(() {});
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                    child: SizedBox(
+                      height: 48,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          _setCardView(const CardViewSettings());
+                          updateSheet(() {});
+                        },
+                        icon: const Icon(
+                          LucideIcons.rotateCcw,
+                          size: AppIconSizes.standard,
+                        ),
+                        label: const Text('Сбросить настройки'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: colors.onSurfaceVariant,
+                          backgroundColor: colors.surfaceContainerHighest
+                              .withValues(alpha: 0.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          textStyle: GoogleFonts.manrope(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   final _archiveTarget = GlobalKey();
   final _moveTarget = GlobalKey();
@@ -89,6 +340,10 @@ class _KanbanBoardState extends State<KanbanBoard> {
   void didUpdateWidget(covariant KanbanBoard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.project.id == widget.project.id) return;
+    _viewRevision++;
+    _cardView = const CardViewSettings();
+    _currentUserId = null;
+    _loadCardView();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_horizontalController.hasClients) {
         _horizontalController.jumpToPage(0);
@@ -98,6 +353,8 @@ class _KanbanBoardState extends State<KanbanBoard> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cardViewRefresh?.cancel();
     _horizontalController.dispose();
     super.dispose();
   }
@@ -130,10 +387,11 @@ class _KanbanBoardState extends State<KanbanBoard> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               SizedBox(
-                height: 52,
+                height: 48,
                 child: _draggedTask == null
                     ? _BoardToolbar(
                         onAddColumn: () => _showCreateColumn(context),
+                        onCardView: _showCardView,
                       )
                     : Row(
                         children: [
@@ -157,7 +415,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
                         ],
                       ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 18),
               Expanded(child: _boardContent(context, state)),
             ],
           ),
@@ -190,7 +448,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
       key: PageStorageKey<String>('kanban-${widget.project.id}'),
       controller: _horizontalController,
       scrollDirection: Axis.horizontal,
-      padEnds: true,
+      padEnds: false,
       pageSnapping: true,
       physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
       itemCount: state.columns.length,
@@ -206,12 +464,27 @@ class _KanbanBoardState extends State<KanbanBoard> {
           child: _KanbanColumn(
             key: ValueKey('${widget.project.id}-${column.id}'),
             column: column,
+            onMoveTask: (task) => _showMoveTask(context, task, state),
+            onTaskAction: (task, action) => handleTaskCardAction(
+              context,
+              task,
+              action,
+              widget.project.workspaceId,
+            ),
             canReorder:
+                _cardView.shows(CardField.completed) &&
                 state.movingTaskIds.isEmpty &&
                 state.search.trim().isEmpty &&
                 state.priorityFilter == null,
-            tasks: state.tasksFor(column),
-            exceedsWip: state.exceedsWip(column),
+            cardView: _cardView,
+            currentUserId: _currentUserId,
+            tasks: state
+                .tasksFor(column)
+                .where(
+                  (task) =>
+                      _cardView.shows(CardField.completed) || !task.isDone,
+                )
+                .toList(),
             onAddTask: (title) => context.read<KanbanCubit>().createTask(
               column.statusMap,
               title,
@@ -232,14 +505,14 @@ class _KanbanBoardState extends State<KanbanBoard> {
   }
 
   Future<void> _showCreateColumn(BuildContext context) async {
-    final result = await showModalBottomSheet<(String, int?)>(
+    final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (_) => const _CreateColumnSheet(),
     );
     if (result != null && context.mounted) {
-      await context.read<KanbanCubit>().createColumn(result.$1, result.$2);
+      await context.read<KanbanCubit>().createColumn(result, null);
     }
   }
 
@@ -251,6 +524,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     final result = await showModalBottomSheet<(String, int)>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (_) => _MoveTaskSheet(state: state, task: task),
     );
     if (result != null && context.mounted) {
@@ -270,36 +544,24 @@ class _KanbanBoardState extends State<KanbanBoard> {
       case _ColumnAction.moveRight:
         await cubit.moveColumn(column, 1);
       case _ColumnAction.rename:
-        final result = await showModalBottomSheet<(String, int?)>(
+        final result = await showModalBottomSheet<String>(
           context: context,
           isScrollControlled: true,
           showDragHandle: true,
           builder: (_) => _EditColumnSheet(column: column),
         );
         if (result != null && context.mounted) {
-          await cubit.updateColumn(column, result.$1, result.$2);
+          await cubit.updateColumn(column, result, column.wip);
         }
       case _ColumnAction.archive:
         await cubit.archiveColumn(column);
       case _ColumnAction.delete:
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Удалить колонку?'),
-            content: Text(
-              'Колонка «${column.name}» будет удалена. Сервер проверит, можно ли выполнить это действие.',
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Отмена'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Удалить'),
-              ),
-            ],
-          ),
+        final confirmed = await showAppConfirmation(
+          context,
+          'Удалить колонку?',
+          'Колонка «${column.name}» будет удалена. Это действие нельзя отменить.',
+          confirmLabel: 'Удалить',
+          destructive: true,
         );
         if (confirmed == true) await cubit.deleteColumn(column);
     }
@@ -338,7 +600,11 @@ class _TaskDropZone extends StatelessWidget {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 18, color: active ? Colors.white : AppColors.accent),
+        Icon(
+          icon,
+          size: AppIconSizes.standard,
+          color: active ? Colors.white : AppColors.accent,
+        ),
         const SizedBox(width: 8),
         Flexible(
           child: Text(
@@ -356,42 +622,152 @@ class _TaskDropZone extends StatelessWidget {
 }
 
 class _BoardToolbar extends StatelessWidget {
-  const _BoardToolbar({required this.onAddColumn});
+  const _BoardToolbar({required this.onAddColumn, required this.onCardView});
 
   final VoidCallback onAddColumn;
+  final VoidCallback onCardView;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: TextField(
-                onChanged: context.read<KanbanCubit>().setSearch,
-                decoration: InputDecoration(
-                  hintText: 'Поиск задач',
-                  prefixIcon: const Icon(LucideIcons.search, size: 18),
-                  filled: true,
-                  fillColor: AppColors.subtleSurface,
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+    final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 44,
+            child: TextField(
+              onChanged: context.read<KanbanCubit>().setSearch,
+              style: GoogleFonts.manrope(fontSize: 13, color: colors.onSurface),
+              textAlignVertical: TextAlignVertical.center,
+              decoration: InputDecoration(
+                hintText: 'Поиск задач',
+                hintStyle: GoogleFonts.manrope(
+                  fontSize: 13,
+                  color: colors.onSurfaceVariant,
+                ),
+                prefixIcon: Icon(
+                  LucideIcons.search,
+                  size: AppIconSizes.standard,
+                  color: colors.onSurfaceVariant,
+                ),
+                prefixIconConstraints: const BoxConstraints(minWidth: 40),
+                filled: true,
+                fillColor: dark
+                    ? colors.surfaceContainerHigh
+                    : const Color(0xFFF5F4F7),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: AppColors.accent,
+                    width: 1.5,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 4),
-            IconButton.filled(
-              tooltip: 'Добавить колонку',
-              onPressed: onAddColumn,
-              style: IconButton.styleFrom(backgroundColor: AppColors.accent),
-              icon: const Icon(LucideIcons.plus, color: Colors.white, size: 19),
-            ),
-          ],
+          ),
+        ),
+        const SizedBox(width: 4),
+        _BoardToolbarButton(
+          key: const ValueKey('card-view-button'),
+          tooltip: 'Вид карточек',
+          icon: LucideIcons.slidersHorizontal,
+          onPressed: onCardView,
+        ),
+        const SizedBox(width: 4),
+        _BoardToolbarButton(
+          tooltip: 'Добавить колонку',
+          icon: LucideIcons.plus,
+          onPressed: onAddColumn,
+          filled: true,
         ),
       ],
+    );
+  }
+}
+
+class _BoardToolbarButton extends StatefulWidget {
+  const _BoardToolbarButton({
+    super.key,
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.filled = false,
+  });
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool filled;
+  @override
+  State<_BoardToolbarButton> createState() => _BoardToolbarButtonState();
+}
+
+class _BoardToolbarButtonState extends State<_BoardToolbarButton> {
+  bool _pressed = false;
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final reduceMotion =
+        MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.accessibleNavigationOf(context);
+    return Listener(
+      onPointerDown: (_) => setState(() => _pressed = true),
+      onPointerUp: (_) => setState(() => _pressed = false),
+      onPointerCancel: (_) => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed && !reduceMotion ? 0.96 : 1,
+        duration: reduceMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: IconButton(
+          tooltip: widget.tooltip,
+          onPressed: widget.onPressed,
+          icon: widget.filled
+              ? Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: AppColors.accent,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    widget.icon,
+                    size: AppIconSizes.standard,
+                    color: Colors.white,
+                  ),
+                )
+              : Icon(widget.icon, size: AppIconSizes.standard),
+          style: IconButton.styleFrom(
+            fixedSize: const Size.square(48),
+            minimumSize: const Size.square(48),
+            maximumSize: const Size.square(48),
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            shape: const CircleBorder(),
+            foregroundColor: widget.filled
+                ? Colors.white
+                : colors.onSurfaceVariant,
+            backgroundColor: Colors.transparent,
+            side: BorderSide.none,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -401,8 +777,11 @@ class _KanbanColumn extends StatefulWidget {
     super.key,
     required this.column,
     required this.canReorder,
+    required this.cardView,
+    this.currentUserId,
+    required this.onMoveTask,
+    required this.onTaskAction,
     required this.tasks,
-    required this.exceedsWip,
     required this.onAddTask,
     required this.onMove,
     required this.onDragStart,
@@ -412,8 +791,11 @@ class _KanbanColumn extends StatefulWidget {
 
   final KanbanColumnModel column;
   final bool canReorder;
+  final CardViewSettings cardView;
+  final String? currentUserId;
+  final ValueChanged<ProjectTaskModel> onMoveTask;
+  final void Function(ProjectTaskModel, TaskCardAction) onTaskAction;
   final List<ProjectTaskModel> tasks;
-  final bool exceedsWip;
   final Future<void> Function(String title) onAddTask;
   final void Function(ProjectTaskModel task, int position) onMove;
   final ValueChanged<ProjectTaskModel> onDragStart;
@@ -498,58 +880,47 @@ class _KanbanColumnState extends State<_KanbanColumn> {
   }
 
   Future<void> _showColumnMenu() async {
-    final action = await showCupertinoModalPopup<_ColumnAction>(
-      context: context,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: <Widget>[
-          _columnAction(
-            sheetContext,
-            action: _ColumnAction.moveLeft,
+    final action = await showAppActionMenu<_ColumnAction>(
+      context,
+      title: widget.column.name,
+      eyebrow: 'Действия колонки',
+      groups: [
+        const [
+          AppMenuAction(
+            value: _ColumnAction.moveLeft,
             label: 'Переместить левее',
+            icon: LucideIcons.arrowLeft,
           ),
-          _columnAction(
-            sheetContext,
-            action: _ColumnAction.moveRight,
+          AppMenuAction(
+            value: _ColumnAction.moveRight,
             label: 'Переместить правее',
+            icon: LucideIcons.arrowRight,
           ),
-          _columnAction(
-            sheetContext,
-            action: _ColumnAction.rename,
+          AppMenuAction(
+            value: _ColumnAction.rename,
             label: 'Переименовать',
-          ),
-          _columnAction(
-            sheetContext,
-            action: _ColumnAction.archive,
-            label: 'Архивировать',
-          ),
-          _columnAction(
-            sheetContext,
-            action: _ColumnAction.delete,
-            label: 'Удалить',
-            isDestructive: true,
+            icon: LucideIcons.pencil,
+            opensSubmenu: true,
           ),
         ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('Отмена'),
-        ),
-      ),
+        const [
+          AppMenuAction(
+            value: _ColumnAction.archive,
+            label: 'Архивировать',
+            icon: LucideIcons.archive,
+            muted: true,
+          ),
+          AppMenuAction(
+            value: _ColumnAction.delete,
+            label: 'Удалить',
+            icon: LucideIcons.trash2,
+            destructive: true,
+          ),
+        ],
+      ],
     );
 
     if (action != null && mounted) widget.onManage(action);
-  }
-
-  Widget _columnAction(
-    BuildContext sheetContext, {
-    required _ColumnAction action,
-    required String label,
-    bool isDestructive = false,
-  }) {
-    return CupertinoActionSheetAction(
-      isDestructiveAction: isDestructive,
-      onPressed: () => Navigator.pop(sheetContext, action),
-      child: Text(label),
-    );
   }
 
   @override
@@ -562,7 +933,6 @@ class _KanbanColumnState extends State<_KanbanColumn> {
       colors.surface,
     );
     final headerColor = Color.lerp(columnColor, colors.onSurface, 0.58)!;
-    final wip = widget.column.wip;
     return Listener(
       onPointerDown: (event) => _pointerStartX = event.position.dx,
       onPointerMove: _trackDrag,
@@ -602,15 +972,11 @@ class _KanbanColumnState extends State<_KanbanColumn> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: widget.exceedsWip
-                          ? AppColors.error
-                          : columnColor.withValues(alpha: 0.88),
+                      color: columnColor.withValues(alpha: 0.88),
                       borderRadius: BorderRadius.circular(99),
                     ),
                     child: Text(
-                      wip == null
-                          ? '${widget.tasks.length}'
-                          : '${widget.tasks.length} / $wip',
+                      '${widget.tasks.length}',
                       style: GoogleFonts.manrope(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -623,7 +989,7 @@ class _KanbanColumnState extends State<_KanbanColumn> {
                     onPressed: _showColumnMenu,
                     icon: Icon(
                       LucideIcons.ellipsis,
-                      size: 17,
+                      size: AppIconSizes.standard,
                       color: headerColor,
                     ),
                   ),
@@ -680,9 +1046,8 @@ class _KanbanColumnState extends State<_KanbanColumn> {
                         _isDragging = false;
                         _skipReorder = widget.onDragEnd();
                       },
-                      onReorder: (oldIndex, newIndex) {
+                      onReorderItem: (oldIndex, newIndex) {
                         if (_skipReorder) return;
-                        if (newIndex > oldIndex) newIndex--;
                         if (newIndex == oldIndex) return;
                         widget.onMove(widget.tasks[oldIndex], newIndex);
                       },
@@ -696,6 +1061,18 @@ class _KanbanColumnState extends State<_KanbanColumn> {
                             enabled: widget.canReorder,
                             child: TaskCard(
                               task: task,
+                              cardView: widget.cardView,
+                              currentUserId: widget.currentUserId,
+                              onAction: (action) =>
+                                  widget.onTaskAction(task, action),
+                              onMove:
+                                  context
+                                      .watch<KanbanCubit>()
+                                      .state
+                                      .movingTaskIds
+                                      .isEmpty
+                                  ? () => widget.onMoveTask(task)
+                                  : null,
                               isUpdating: context
                                   .watch<KanbanCubit>()
                                   .state
@@ -763,7 +1140,10 @@ class _KanbanColumnState extends State<_KanbanColumn> {
                             width: double.infinity,
                             child: TextButton.icon(
                               onPressed: _openTaskComposer,
-                              icon: const Icon(LucideIcons.plus, size: 17),
+                              icon: const Icon(
+                                LucideIcons.plus,
+                                size: AppIconSizes.standard,
+                              ),
                               label: const Text('Добавить задачу'),
                               style: TextButton.styleFrom(
                                 foregroundColor: headerColor,
@@ -864,7 +1244,7 @@ class _InlineTaskComposer extends StatelessWidget {
                 IconButton(
                   tooltip: 'Отмена',
                   onPressed: isSubmitting ? null : onCancel,
-                  icon: const Icon(LucideIcons.x, size: 20),
+                  icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
                 ),
               ],
             ),
@@ -945,7 +1325,7 @@ class _BoardMessage extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, color: AppColors.muted),
+          Icon(icon, color: AppColors.muted, size: AppIconSizes.standard),
           const SizedBox(height: 10),
           Text(message, style: GoogleFonts.manrope(color: AppColors.muted)),
           const SizedBox(height: 8),
@@ -965,61 +1345,59 @@ class _CreateColumnSheet extends StatefulWidget {
 
 class _CreateColumnSheetState extends State<_CreateColumnSheet> {
   final _name = TextEditingController();
-  final _wip = TextEditingController();
 
   @override
   void dispose() {
     _name.dispose();
-    _wip.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          4,
-          20,
-          20 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              'Новая колонка',
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+    return AppFormSurface(
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            4,
+            20,
+            20 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(
+                'Новая колонка',
+                style: GoogleFonts.manrope(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _name,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Название'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _wip,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'WIP-лимит (необязательно)',
+              const SizedBox(height: 14),
+              AppFormField(
+                label: 'Название',
+                child: TextField(
+                  controller: _name,
+                  onChanged: (_) => setState(() {}),
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Введите название',
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: () {
-                final name = _name.text.trim();
-                if (name.isNotEmpty) {
-                  Navigator.pop(context, (name, int.tryParse(_wip.text)));
-                }
-              },
-              child: const Text('Создать'),
-            ),
-          ],
+              const SizedBox(height: 18),
+              AppFormButton(
+                onPressed: () {
+                  final name = _name.text.trim();
+                  if (name.isNotEmpty) {
+                    Navigator.pop(context, name);
+                  }
+                },
+                child: const Text('Создать'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1038,60 +1416,58 @@ class _EditColumnSheetState extends State<_EditColumnSheet> {
   late final TextEditingController _name = TextEditingController(
     text: widget.column.name,
   );
-  late final TextEditingController _wip = TextEditingController(
-    text: widget.column.wip?.toString() ?? '',
-  );
 
   @override
   void dispose() {
     _name.dispose();
-    _wip.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          4,
-          20,
-          20 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              'Настройки колонки',
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+    return AppFormSurface(
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            4,
+            20,
+            20 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(
+                'Настройки колонки',
+                style: GoogleFonts.manrope(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _name,
-              decoration: const InputDecoration(labelText: 'Название'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _wip,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'WIP-лимит'),
-            ),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: () {
-                final name = _name.text.trim();
-                if (name.isNotEmpty) {
-                  Navigator.pop(context, (name, int.tryParse(_wip.text)));
-                }
-              },
-              child: const Text('Сохранить'),
-            ),
-          ],
+              const SizedBox(height: 14),
+              AppFormField(
+                label: 'Название',
+                child: TextField(
+                  controller: _name,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    hintText: 'Введите название',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              AppFormButton(
+                onPressed: () {
+                  final name = _name.text.trim();
+                  if (name.isNotEmpty) {
+                    Navigator.pop(context, name);
+                  }
+                },
+                child: const Text('Сохранить'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1128,7 +1504,7 @@ class _MoveTaskSheetState extends State<_MoveTaskSheet> {
               .length;
     _position = _position.clamp(0, count);
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1142,36 +1518,108 @@ class _MoveTaskSheetState extends State<_MoveTaskSheet> {
               ),
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              initialValue: _status,
-              decoration: const InputDecoration(labelText: 'Колонка'),
-              items: <DropdownMenuItem<String>>[
-                for (final item in widget.state.columns)
-                  DropdownMenuItem(
-                    value: item.statusMap,
-                    child: Text(item.name),
-                  ),
-              ],
-              onChanged: (value) => setState(() {
-                _status = value ?? _status;
-                _position = 0;
-              }),
+            Text(
+              widget.task.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'В какую колонку?',
+              style: GoogleFonts.manrope(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.35,
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: widget.state.columns.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
+                itemBuilder: (context, index) {
+                  final item = widget.state.columns[index];
+                  final selected = item.statusMap == _status;
+                  final current =
+                      item.statusMap.toUpperCase() ==
+                      widget.task.status.toUpperCase();
+                  return Material(
+                    color: selected
+                        ? AppColors.accent.withValues(alpha: 0.1)
+                        : Theme.of(context).colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ListTile(
+                      key: ValueKey('move-to-${item.id}'),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      leading: Icon(
+                        LucideIcons.columns3,
+                        color: _parseColumnColor(item.color),
+                        size: AppIconSizes.standard,
+                      ),
+                      title: Text(item.name),
+                      subtitle: current ? const Text('Текущая колонка') : null,
+                      trailing: Icon(
+                        selected ? LucideIcons.circleCheck : LucideIcons.circle,
+                        color: selected
+                            ? AppColors.accent
+                            : Theme.of(context).colorScheme.outline,
+                        size: AppIconSizes.standard,
+                      ),
+                      onTap: () => setState(() {
+                        _status = item.statusMap;
+                        _position = 0;
+                      }),
+                    ),
+                  );
+                },
+              ),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<int>(
-              key: ValueKey<String>(_status),
-              initialValue: _position,
-              decoration: const InputDecoration(labelText: 'Позиция'),
-              items: <DropdownMenuItem<int>>[
-                for (var index = 0; index <= count; index++)
-                  DropdownMenuItem(value: index, child: Text('${index + 1}')),
-              ],
-              onChanged: (value) => setState(() => _position = value ?? 0),
+            AppFormField(
+              label: 'Позиция',
+              child: DropdownButtonFormField<int>(
+                isExpanded: true,
+                key: ValueKey<String>(_status),
+                initialValue: _position,
+                decoration: const InputDecoration(hintText: 'Позиция'),
+                items: <DropdownMenuItem<int>>[
+                  for (var index = 0; index <= count; index++)
+                    DropdownMenuItem(value: index, child: Text('${index + 1}')),
+                ],
+                onChanged: (value) => setState(() => _position = value ?? 0),
+              ),
             ),
             const SizedBox(height: 18),
             FilledButton(
               onPressed: () => Navigator.pop(context, (_status, _position)),
-              child: const Text('Переместить'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    LucideIcons.arrowRightLeft,
+                    size: AppIconSizes.standard,
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      'Перенести в «${column?.name ?? ''}»',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1179,3 +1627,19 @@ class _MoveTaskSheetState extends State<_MoveTaskSheet> {
     );
   }
 }
+
+IconData _cardFieldIcon(CardField field) => switch (field) {
+  CardField.completed => LucideIcons.circleCheck,
+  CardField.cover => LucideIcons.image,
+  CardField.id => LucideIcons.hash,
+  CardField.assignees => LucideIcons.users,
+  CardField.dates => LucideIcons.calendarDays,
+  CardField.epics => LucideIcons.layers,
+  CardField.labels => LucideIcons.tag,
+  CardField.personalLabels => LucideIcons.lockKeyhole,
+  CardField.comments => LucideIcons.messageCircle,
+  CardField.timing => LucideIcons.clock,
+  CardField.checklists => LucideIcons.listChecks,
+  CardField.resources => LucideIcons.chartNoAxesCombined,
+  CardField.files => LucideIcons.paperclip,
+};

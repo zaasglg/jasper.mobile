@@ -1,8 +1,10 @@
+import '../../data/models/task_translation.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/data/models/kanban_column_model.dart';
 import '../entities/kanban_board_data.dart';
 
 abstract interface class KanbanRepository {
+  /// Loads every task page. [take] is the batch size, not a total limit.
   Future<KanbanBoardData> loadBoard(
     String projectId, {
     String? search,
@@ -47,6 +49,21 @@ abstract interface class KanbanRepository {
 
   Future<void> reorderColumns(String projectId, List<String> ids);
   Future<void> archiveTask(String taskId);
+  Future<void> deleteTask(String taskId);
+  Future<ProjectTaskModel> duplicateTask(String taskId);
+  Future<ProjectTaskModel> updateCover(
+    String taskId,
+    Map<String, dynamic>? cover,
+  );
+  Future<TaskTranslation> translateTask(
+    String taskId,
+    String workspaceId,
+    String language,
+  );
+  Future<ProjectTaskModel> applyTranslation(
+    String taskId,
+    TaskTranslation translation,
+  );
   Future<void> archiveColumn(String columnId);
   Future<void> deleteColumn(String columnId);
 }

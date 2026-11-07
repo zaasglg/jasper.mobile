@@ -1,3 +1,8 @@
+import '../../../../core/widgets/app_widget_heading.dart';
+import '../../../dashboard/presentation/widgets/dashboard_widget_skeleton.dart';
+import '../../../dashboard/presentation/widgets/dashboard_expandable_content.dart';
+import '../../../../core/theme/dashboard_surface.dart';
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -13,7 +18,13 @@ import '../cubit/my_tasks_cubit.dart';
 import '../cubit/my_tasks_state.dart';
 
 class MyTasksWidget extends StatelessWidget {
-  const MyTasksWidget({super.key});
+  const MyTasksWidget({
+    super.key,
+    this.height = 456,
+    this.expandContent = false,
+  });
+  final double height;
+  final bool expandContent;
 
   static const Color _ink = AppColors.ink;
   static const Color _muted = AppColors.muted;
@@ -39,17 +50,21 @@ class MyTasksWidget extends StatelessWidget {
       },
       builder: (context, state) {
         final projectMap = _flattenProjects(state.projects);
-        final entries = _buildEntries(state, projectMap);
+        final entries = DashboardPreviewScope.limit(
+          context,
+          _buildEntries(state, projectMap),
+        );
         return Container(
           key: const Key('my-tasks-widget'),
-          height: 456,
+          height: expandContent ? null : height,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _border),
+            border: Border.all(color: DashboardSurface.border),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               _Header(
                 state: state,
@@ -58,7 +73,15 @@ class MyTasksWidget extends StatelessWidget {
                 onSortTap: context.read<MyTasksCubit>().toggleSort,
               ),
               const Divider(height: 1, color: _border),
-              Expanded(child: _content(context, state, entries)),
+              if (expandContent)
+                state.tasks.isEmpty
+                    ? SizedBox(
+                        height: 220,
+                        child: _content(context, state, entries),
+                      )
+                    : _content(context, state, entries)
+              else
+                Expanded(child: _content(context, state, entries)),
             ],
           ),
         );
@@ -95,7 +118,11 @@ class MyTasksWidget extends StatelessWidget {
       onRefresh: context.read<MyTasksCubit>().refresh,
       child: ListView.builder(
         key: const Key('my-tasks-list'),
-        physics: const AlwaysScrollableScrollPhysics(),
+        primary: false,
+        shrinkWrap: expandContent,
+        physics: expandContent
+            ? const NeverScrollableScrollPhysics()
+            : const AlwaysScrollableScrollPhysics(),
         itemCount: entries.length,
         itemBuilder: (context, index) {
           final entry = entries[index];
@@ -297,34 +324,15 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
+      padding: const EdgeInsets.fromLTRB(18, 16, 16, 12),
       child: Column(
         children: <Widget>[
           Row(
             children: <Widget>[
-              Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  LucideIcons.userRoundCheck,
-                  size: 18,
-                  color: AppColors.accent,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Мои задачи',
-                  style: GoogleFonts.manrope(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: MyTasksWidget._ink,
-                  ),
+              const Expanded(
+                child: AppWidgetHeading(
+                  icon: LucideIcons.userRoundCheck,
+                  title: 'Мои задачи',
                 ),
               ),
               TextButton(
@@ -347,20 +355,23 @@ class _Header extends StatelessWidget {
                     const SizedBox(width: 5),
                     _CountBadge(state.visibleFields.length),
                     const SizedBox(width: 2),
-                    const Icon(LucideIcons.chevronDown, size: 14),
+                    const Icon(
+                      LucideIcons.chevronDown,
+                      size: AppIconSizes.standard,
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 2),
           Row(
             children: <Widget>[
               Expanded(
                 child: _HeaderAction(
                   key: const Key('my-tasks-project-filter'),
                   label: _projectFilterLabel(state),
-                  icon: LucideIcons.chevronDown,
+                  icon: Icons.expand_more_rounded,
                   onTap: onProjectsTap,
                 ),
               ),
@@ -369,8 +380,8 @@ class _Header extends StatelessWidget {
                 key: const Key('my-tasks-sort'),
                 label: 'Срок',
                 icon: state.sortAscending
-                    ? LucideIcons.arrowUp
-                    : LucideIcons.arrowDown,
+                    ? Icons.north_rounded
+                    : Icons.south_rounded,
                 onTap: onSortTap,
               ),
             ],
@@ -429,7 +440,11 @@ class _HeaderAction extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 5),
-            Icon(icon, size: 14, color: MyTasksWidget._muted),
+            Icon(
+              icon,
+              size: AppIconSizes.standard,
+              color: MyTasksWidget._muted,
+            ),
           ],
         ),
       ),
@@ -439,29 +454,21 @@ class _HeaderAction extends StatelessWidget {
 
 class _CountBadge extends StatelessWidget {
   const _CountBadge(this.count);
-
   final int count;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 22,
-      height: 22,
-      alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        color: AppColors.badgeSurface,
-        shape: BoxShape.circle,
-      ),
-      child: Text(
-        '$count',
-        style: GoogleFonts.manrope(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: MyTasksWidget._muted,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    width: 18,
+    height: 18,
+    alignment: Alignment.center,
+    decoration: const BoxDecoration(
+      color: AppColors.badgeSurface,
+      shape: BoxShape.circle,
+    ),
+    child: Text(
+      '$count',
+      style: GoogleFonts.manrope(fontSize: 9.5, color: MyTasksWidget._muted),
+    ),
+  );
 }
 
 sealed class _TaskListEntry {
@@ -483,52 +490,34 @@ class _TaskEntry extends _TaskListEntry {
 
 class _ProjectGroupHeader extends StatelessWidget {
   const _ProjectGroupHeader({required this.name, required this.count});
-
   final String name;
   final int count;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+  Widget build(BuildContext context) => Container(
+    height: 32,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    decoration: const BoxDecoration(
       color: AppColors.subtleSurface,
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.manrope(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: MyTasksWidget._muted,
-              ),
+      border: Border(bottom: BorderSide(color: MyTasksWidget._border)),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.manrope(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: MyTasksWidget._muted,
             ),
           ),
-          Container(
-            height: 22,
-            constraints: const BoxConstraints(minWidth: 22),
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: AppColors.badgeSurface,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              '$count',
-              style: GoogleFonts.manrope(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: MyTasksWidget._muted,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+        _CountBadge(count),
+      ],
+    ),
+  );
 }
 
 class _TaskRow extends StatelessWidget {
@@ -540,38 +529,31 @@ class _TaskRow extends StatelessWidget {
     required this.onToggle,
     required this.onTap,
   });
-
   final ProjectTaskModel task;
   final String columnName;
   final Set<TaskExtraField> visibleFields;
   final bool isUpdating;
-  final VoidCallback onToggle;
-  final VoidCallback onTap;
-
+  final VoidCallback onToggle, onTap;
   @override
   Widget build(BuildContext context) {
     final overdue = isTaskOverdue(task, DateTime.now());
-    final epicNames = task.epicNames;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-      decoration: BoxDecoration(
-        color: task.isDone
-            ? AppColors.success.withValues(alpha: 0.035)
-            : Colors.white,
-        border: const Border(bottom: BorderSide(color: MyTasksWidget._border)),
+    final epics = task.epicNames;
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: MyTasksWidget._border)),
       ),
       child: InkWell(
         key: Key('my-task-${task.id}'),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 14, 13),
+          padding: const EdgeInsets.fromLTRB(10, 11, 16, 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
+            children: [
               SizedBox(
-                width: 36,
-                height: 36,
+                width: 32,
+                height: 32,
                 child: IconButton(
                   key: Key('my-task-checkbox-${task.id}'),
                   tooltip: task.isDone
@@ -585,14 +567,13 @@ class _TaskRow extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 7),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
+                  children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: <Widget>[
+                      children: [
                         if (visibleFields.contains(TaskExtraField.id))
                           Expanded(
                             child: Text(
@@ -600,55 +581,49 @@ class _TaskRow extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.manrope(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
                                 color: MyTasksWidget._muted,
-                                letterSpacing: 0.2,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           )
                         else
                           const Spacer(),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         _DeadlineBadge(task: task, overdue: overdue),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 240),
-                      curve: Curves.easeOutCubic,
+                    const SizedBox(height: 5),
+                    Text(
+                      task.title.isEmpty ? 'Без названия' : task.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.manrope(
-                        fontSize: 14,
-                        height: 1.28,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
                         color: task.isDone
                             ? MyTasksWidget._muted
                             : MyTasksWidget._ink,
-                        decoration: TextDecoration.none,
-                      ),
-                      child: Text(
-                        task.title.isEmpty ? 'Без названия' : task.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if ((visibleFields.contains(TaskExtraField.column) &&
                             columnName.trim().isNotEmpty &&
                             columnName != '—') ||
                         (visibleFields.contains(TaskExtraField.epics) &&
-                            epicNames.isNotEmpty)) ...<Widget>[
-                      const SizedBox(height: 8),
+                            epics.isNotEmpty)) ...[
+                      const SizedBox(height: 6),
                       Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: <Widget>[
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: [
                           if (visibleFields.contains(TaskExtraField.column) &&
                               columnName.trim().isNotEmpty &&
                               columnName != '—')
                             _ColumnBadge(value: columnName),
                           if (visibleFields.contains(TaskExtraField.epics) &&
-                              epicNames.isNotEmpty)
-                            _EpicBadge(value: epicNames.join(', ')),
+                              epics.isNotEmpty)
+                            _EpicBadge(value: epics.join(', ')),
                         ],
                       ),
                     ],
@@ -668,164 +643,137 @@ class _AnimatedTaskCheckbox extends StatelessWidget {
     required this.checked,
     required this.isUpdating,
   });
-
-  final bool checked;
-  final bool isUpdating;
-
+  final bool checked, isUpdating;
   @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: checked ? 1 : 0),
-      duration: const Duration(milliseconds: 320),
-      curve: checked ? Curves.easeOutBack : Curves.easeOutCubic,
-      builder: (context, value, _) {
-        final color = Color.lerp(
-          MyTasksWidget._muted,
-          AppColors.success,
-          value,
-        )!;
-        return AnimatedOpacity(
-          duration: const Duration(milliseconds: 160),
-          opacity: isUpdating ? 0.72 : 1,
-          child: Container(
-            width: 22,
-            height: 22,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color.lerp(Colors.transparent, color, value),
-              border: Border.all(color: color, width: 1.8),
-            ),
-            child: Transform.scale(
-              scale: value.clamp(0, 1),
-              child: const Icon(
-                LucideIcons.check,
-                size: 14,
+  Widget build(BuildContext context) => AnimatedOpacity(
+    duration: const Duration(milliseconds: 160),
+    opacity: isUpdating ? .55 : 1,
+    child: Container(
+      width: 18,
+      height: 18,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: checked ? AppColors.success : Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: checked ? AppColors.success : MyTasksWidget._muted,
+          width: 1.2,
+        ),
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 160),
+        child: checked
+            ? const Icon(
+                Icons.check_rounded,
+                key: ValueKey(true),
+                size: 12,
                 color: Colors.white,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
+              )
+            : const SizedBox.shrink(key: ValueKey(false)),
+      ),
+    ),
+  );
 }
 
 class _DeadlineBadge extends StatelessWidget {
   const _DeadlineBadge({required this.task, required this.overdue});
-
   final ProjectTaskModel task;
   final bool overdue;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: overdue
-            ? MyTasksWidget._error.withValues(alpha: 0.07)
-            : AppColors.subtleSurface,
-        borderRadius: BorderRadius.circular(7),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(
-            LucideIcons.calendar,
-            size: 11,
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+    decoration: BoxDecoration(
+      color: overdue
+          ? MyTasksWidget._error.withValues(alpha: .07)
+          : AppColors.subtleSurface,
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          LucideIcons.calendar,
+          size: 12,
+          color: overdue ? MyTasksWidget._error : MyTasksWidget._muted,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          task.end == null ? 'Без срока' : formatRussianTaskDate(task.end!),
+          style: GoogleFonts.manrope(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w500,
             color: overdue ? MyTasksWidget._error : MyTasksWidget._muted,
           ),
-          const SizedBox(width: 4),
-          Text(
-            task.end == null ? 'Без срока' : formatRussianTaskDate(task.end!),
-            style: GoogleFonts.manrope(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: overdue ? MyTasksWidget._error : MyTasksWidget._muted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
 
 class _EpicBadge extends StatelessWidget {
   const _EpicBadge({required this.value});
-
   final String value;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 210),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.09),
-        borderRadius: BorderRadius.circular(7),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const Icon(LucideIcons.layers3, size: 11, color: AppColors.accent),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.manrope(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: AppColors.accent,
-              ),
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(maxWidth: 190),
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+    decoration: BoxDecoration(
+      color: AppColors.accent.withValues(alpha: .08),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(LucideIcons.layers3, size: 12, color: AppColors.accent),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.manrope(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+              color: AppColors.accent,
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
 
 class _ColumnBadge extends StatelessWidget {
   const _ColumnBadge({required this.value});
-
   final String value;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 150),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.badgeSurface,
-        borderRadius: BorderRadius.circular(7),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const Icon(
-            LucideIcons.columns3,
-            size: 11,
-            color: MyTasksWidget._muted,
-          ),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.manrope(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: MyTasksWidget._muted,
-              ),
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(maxWidth: 140),
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+    decoration: BoxDecoration(
+      color: AppColors.badgeSurface,
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(LucideIcons.columns3, size: 12, color: MyTasksWidget._muted),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.manrope(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+              color: MyTasksWidget._muted,
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
 
 class _LoadingList extends StatelessWidget {
@@ -833,17 +781,7 @@ class _LoadingList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: 5,
-      itemBuilder: (_, _) => const ListTile(
-        leading: CircleAvatar(radius: 10, backgroundColor: AppColors.skeleton),
-        title: LinearProgressIndicator(
-          minHeight: 8,
-          color: AppColors.border,
-          backgroundColor: AppColors.skeletonTrack,
-        ),
-      ),
-    );
+    return const DashboardWidgetSkeleton(showHeading: false);
   }
 }
 
@@ -872,7 +810,11 @@ class _MessageList extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Icon(icon, size: 28, color: MyTasksWidget._muted),
+              Icon(
+                icon,
+                size: AppIconSizes.standard,
+                color: MyTasksWidget._muted,
+              ),
               const SizedBox(height: 12),
               Text(
                 message,

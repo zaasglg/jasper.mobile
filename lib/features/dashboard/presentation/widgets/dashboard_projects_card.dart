@@ -1,3 +1,5 @@
+import '../../../../core/widgets/app_widget_heading.dart';
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -103,20 +105,10 @@ class _CardHeader extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: <Widget>[
-            const Icon(
-              LucideIcons.folderKanban,
-              size: 20,
-              color: Color(0xFF77736F),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Проекты',
-                style: GoogleFonts.manrope(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: DashboardProjectsCard._ink,
-                ),
+            const Expanded(
+              child: AppWidgetHeading(
+                icon: LucideIcons.folderKanban,
+                title: 'Проекты',
               ),
             ),
             TextButton.icon(
@@ -131,7 +123,10 @@ class _CardHeader extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              icon: const Icon(LucideIcons.arrowRight, size: 19),
+              icon: const Icon(
+                LucideIcons.arrowRight,
+                size: AppIconSizes.standard,
+              ),
               label: const Text('Задачи'),
             ),
           ],
@@ -279,7 +274,11 @@ class _ProjectsMessage extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(icon, size: 26, color: const Color(0xFF9295A2)),
+              Icon(
+                icon,
+                size: AppIconSizes.standard,
+                color: const Color(0xFF9295A2),
+              ),
               const SizedBox(height: 12),
               Text(
                 message,

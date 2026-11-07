@@ -1,3 +1,4 @@
+import '../storage/workspace_selection_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
@@ -5,7 +6,10 @@ import '../storage/auth_token_storage.dart';
 import 'api_constants.dart';
 import 'auth_interceptor.dart';
 
-Dio createDio(AuthTokenStorage tokenStorage) {
+Dio createDio(
+  AuthTokenStorage tokenStorage, {
+  WorkspaceSelectionStorage? workspaceStorage,
+}) {
   final dio = Dio(
     BaseOptions(
       baseUrl: ApiConstants.baseUrl,
@@ -18,13 +22,15 @@ Dio createDio(AuthTokenStorage tokenStorage) {
     ),
   );
 
-  dio.interceptors.add(AuthInterceptor(tokenStorage));
+  dio.interceptors.add(
+    AuthInterceptor(tokenStorage, workspaceStorage: workspaceStorage),
+  );
 
   if (kDebugMode) {
     dio.interceptors.add(
       LogInterceptor(
-        requestBody: true,
-        responseBody: true,
+        requestBody: false,
+        responseBody: false,
         requestHeader: false,
         responseHeader: false,
         logPrint: (value) {

@@ -1,3 +1,11 @@
+import '../widgets/messenger_refresh_lifecycle.dart';
+import '../widgets/message_interactions.dart';
+import '../../../calls/data/call_models.dart';
+import '../../../calls/presentation/call_cubit.dart';
+import '../../../../core/storage/workspace_selection_storage.dart';
+import '../../../storage/data/storage_models.dart';
+import '../widgets/message_actions.dart';
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
@@ -31,16 +39,37 @@ import '../../data/models/chat_message_model.dart';
 import '../cubit/conversation_cubit.dart';
 
 class ConversationScreen extends StatefulWidget {
-  const ConversationScreen({super.key, required this.conversation});
+  const ConversationScreen({
+    super.key,
+    required this.conversation,
+    this.initialMessageId,
+  });
+  final String? initialMessageId;
   final ChatConversationModel conversation;
 
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
 }
 
-class _ConversationScreenState extends State<ConversationScreen> {
+class _ConversationScreenState extends State<ConversationScreen>
+    with MessengerRefreshLifecycle<ConversationScreen> {
+  late ConversationCubit _refreshCubit;
+  @override
+  String get messengerRefreshPath => '/messenger/${widget.conversation.id}';
+  @override
+  bool get isMessengerConversation => true;
+  @override
+  void setMessengerRefresh(bool active) => _refreshCubit.setAutoRefresh(active);
+  @override
+  void invalidateMessenger() => _refreshCubit.invalidate();
   final _controller = TextEditingController();
+  final _composerFocus = FocusNode();
+  String? _focusedReplyId;
+  final _messageScroll = ScrollController();
   bool _hasText = false;
+  bool _searching = false;
+  String _searchQuery = '';
+  String? _storageMessageId;
   String? _currentUserId;
   List<ChatConversationModel> _people = const [];
   final _sentMessageIds = <String>{};
@@ -48,7 +77,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   void initState() {
     super.initState();
+    _refreshCubit = context.read<ConversationCubit>();
+    _composerFocus.addListener(_onComposerFocus);
+    _storageMessageId = widget.initialMessageId;
     _loadPeople();
+  }
+
+  void _onComposerFocus() {
+    if (!_composerFocus.hasFocus) _refreshCubit.stopTyping();
   }
 
   Future<void> _loadPeople() async {
@@ -78,8 +114,149 @@ class _ConversationScreenState extends State<ConversationScreen> {
     ]);
   }
 
+  Future<void> _startCall(bool video) async {
+    final calls = sl<CallCubit>();
+    if (calls.state.busy) {
+      await context.push('/call');
+      return;
+    }
+    if (calls.state.incoming != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Сначала ответьте на входящий звонок.')),
+      );
+      return;
+    }
+    try {
+      final workspaceId = await sl<WorkspaceSelectionStorage>().read();
+      if (workspaceId == null) {
+        throw const ChatException('Выберите рабочее пространство.');
+      }
+      final chat = widget.conversation;
+      List<String> invitees = [chat.id];
+      if (chat.isChannel) {
+        final repository = sl<ChatRepository>();
+        if (repository is! ChatActionsRepository) {
+          throw const ChatException('Не удалось загрузить участников канала.');
+        }
+        final userId =
+            _currentUserId ??
+            (await sl<ProfileRepository>().getCurrentUser()).id;
+        final members =
+            (await (repository as ChatActionsRepository).channelMembers(
+              chat.id,
+            )).where((e) => e.userId != userId).toList();
+        if (members.isEmpty) {
+          throw const ChatException('В канале нет других участников.');
+        }
+        if (!mounted) return;
+        final selected = members.map((e) => e.userId).toSet();
+        final result = await showModalBottomSheet<List<String>>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (context) => StatefulBuilder(
+            builder: (context, setSheetState) => SafeArea(
+              child: SizedBox(
+                height: MediaQuery.sizeOf(context).height * .65,
+                child: Column(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'Участники звонка',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView(
+                        children: [
+                          for (final member in members)
+                            CheckboxListTile(
+                              title: Text(member.name),
+                              value: selected.contains(member.userId),
+                              onChanged: (value) => setSheetState(() {
+                                if (value == true) {
+                                  selected.add(member.userId);
+                                } else {
+                                  selected.remove(member.userId);
+                                }
+                              }),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: FilledButton(
+                        onPressed: selected.isEmpty
+                            ? null
+                            : () => context.pop(selected.toList()),
+                        child: const Text('Позвонить'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        if (result == null) return;
+        invitees = result;
+      }
+      if (!mounted) return;
+      final connection = calls.start(
+        workspaceId: workspaceId,
+        invitees: invitees,
+        video: video,
+        threadId: chat.threadId,
+        title: chat.title,
+      );
+      await context.push('/call');
+      await connection;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e is ChatException ? e.message : 'Не удалось начать звонок.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openStorage() async {
+    final workspaceId = await sl<WorkspaceSelectionStorage>().read();
+    if (!mounted || workspaceId == null) return;
+    final messageId = await context.push<String>(
+      '/storage',
+      extra: StorageScope(
+        source: StorageSource.chat,
+        id: widget.conversation.threadId,
+        workspaceId: workspaceId,
+        title: widget.conversation.title,
+      ),
+    );
+    if (!mounted) return;
+    await context.read<ConversationCubit>().load();
+    if (mounted && messageId != null) {
+      setState(() {
+        _storageMessageId = messageId;
+        _searchQuery = '';
+        _searching = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _composerFocus.removeListener(_onComposerFocus);
+    _composerFocus.dispose();
+    _messageScroll.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -88,52 +265,91 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Widget build(BuildContext context) {
     final chat = widget.conversation;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF0F2F6),
       appBar: AppBar(
-        backgroundColor: AppColors.accent,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.ink,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           key: const Key('conversation-back'),
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(LucideIcons.arrowLeft),
+          icon: const Icon(LucideIcons.arrowLeft, size: AppIconSizes.standard),
         ),
         titleSpacing: 2,
-        title: Row(
-          children: [
-            _Avatar(conversation: chat, size: 34),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        title: _searching
+            ? TextField(
+                key: const Key('conversation-search'),
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Поиск в переписке',
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) =>
+                    setState(() => _searchQuery = value.trim()),
+              )
+            : Row(
                 children: [
-                  Text(
-                    chat.isChannel ? '# ${chat.title}' : chat.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.manrope(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                  _Avatar(conversation: chat, size: 34),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          chat.isChannel
+                              ? '# ${chat.title.replaceFirst(RegExp(r'^#\s*'), '')}'
+                              : chat.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.manrope(
+                            color: AppColors.ink,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          chat.isChannel
+                              ? 'Канал'
+                              : chat.isOnline
+                              ? 'в сети'
+                              : 'Личная переписка',
+                          style: GoogleFonts.manrope(
+                            color: !chat.isChannel && chat.isOnline
+                                ? AppColors.accent
+                                : AppColors.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  if (!chat.isChannel && chat.isOnline)
-                    Text(
-                      'в сети',
-                      style: GoogleFonts.manrope(
-                        color: Colors.white70,
-                        fontSize: 11,
-                      ),
-                    ),
                 ],
               ),
+        actions: [
+          if (!_searching && sl.isRegistered<CallCubit>()) ...[
+            IconButton(
+              tooltip: 'Аудиозвонок',
+              onPressed: () => _startCall(false),
+              icon: const Icon(LucideIcons.phone, size: 18),
+            ),
+            IconButton(
+              tooltip: 'Видеозвонок',
+              onPressed: () => _startCall(true),
+              icon: const Icon(LucideIcons.video, size: 18),
             ),
           ],
-        ),
-        actions: [
           IconButton(
-            onPressed: () {},
-            icon: const Icon(LucideIcons.search, size: 21),
+            tooltip: _searching ? 'Закрыть поиск' : 'Поиск в переписке',
+            onPressed: () => setState(() {
+              _searching = !_searching;
+              _searchQuery = '';
+            }),
+            icon: Icon(
+              _searching ? LucideIcons.x : LucideIcons.search,
+              size: AppIconSizes.standard,
+            ),
           ),
         ],
       ),
@@ -141,30 +357,159 @@ class _ConversationScreenState extends State<ConversationScreen> {
         top: false,
         child: BlocConsumer<ConversationCubit, ConversationState>(
           listenWhen: (previous, current) =>
-              previous.error != current.error && current.error != null,
+              previous.replyTo?.id != current.replyTo?.id ||
+              previous.messages.lastOrNull?.id !=
+                  current.messages.lastOrNull?.id ||
+              (previous.error != current.error &&
+                  current.error != null &&
+                  (previous.isSending || current.messages.isNotEmpty)),
           listener: (context, state) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.error!)));
+            if (_focusedReplyId != state.replyTo?.id) {
+              _focusedReplyId = state.replyTo?.id;
+              if (_focusedReplyId != null) _composerFocus.requestFocus();
+            }
+            if (state.error != null) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(state.error!)));
+            }
+            if (_messageScroll.hasClients &&
+                _messageScroll.position.pixels > 80) {
+              final offset = _messageScroll.position.pixels;
+              final extent = _messageScroll.position.maxScrollExtent;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted || !_messageScroll.hasClients) return;
+                final position = _messageScroll.position;
+                // Keep the same part of history visible when newer rows arrive.
+                _messageScroll.jumpTo(
+                  (offset + position.maxScrollExtent - extent).clamp(
+                    position.minScrollExtent,
+                    position.maxScrollExtent,
+                  ),
+                );
+              });
+            }
           },
           builder: (context, state) => Column(
             children: [
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Container(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: AppColors.accent, width: 2),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: const Text(
+                        'Переписка',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: _openStorage,
+                      icon: const Icon(LucideIcons.archive, size: 16),
+                      label: const Text(
+                        'Кладовка',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.muted,
+                        minimumSize: const Size(44, 44),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PinnedMessagesBar(
+                messages: state.messages,
+                onSelect: (id) => setState(() => _storageMessageId = id),
+              ),
+              if (_storageMessageId != null)
+                MaterialBanner(
+                  content: const Text('Выбранное сообщение'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => setState(() => _storageMessageId = null),
+                      child: const Text('Показать все'),
+                    ),
+                  ],
+                ),
               Expanded(
                 child: _MessageList(
+                  scrollController: _messageScroll,
                   state: state,
                   conversation: chat,
                   currentUserId: _currentUserId,
                   sentMessageIds: _sentMessageIds,
                   people: _people,
+                  searchQuery: _searchQuery,
+                  focusedMessageId: _storageMessageId,
                 ),
               ),
+              if (state.typingUsers.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 5,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${state.typingUsers.take(3).map((e) => e.name).join(', ')} ${state.typingUsers.length == 1 ? 'печатает…' : 'печатают…'}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ),
+                ),
+              if (state.replyTo != null)
+                ListTile(
+                  dense: true,
+                  leading: const Icon(
+                    Icons.reply,
+                    size: 18,
+                    color: AppColors.accent,
+                  ),
+                  title: Text(
+                    'Ответ: ${state.replyTo!.authorName}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                  subtitle: Text(
+                    state.replyTo!.preview,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    tooltip: 'Отменить ответ',
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: () => _refreshCubit.selectReply(null),
+                  ),
+                ),
               _Composer(
+                focusNode: _composerFocus,
                 controller: _controller,
                 hasText: _hasText,
                 isSending: state.isSending,
                 channelName: chat.isChannel ? chat.title : null,
-                onChanged: (value) =>
-                    setState(() => _hasText = value.trim().isNotEmpty),
+                onChanged: (value) {
+                  _refreshCubit.notifyTyping(value);
+                  setState(() => _hasText = value.trim().isNotEmpty);
+                },
                 onSend: _send,
                 onVoiceSend: _sendVoice,
                 onFiles: _pickFiles,
@@ -242,6 +587,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Future<bool> _sendVoice(String path, int seconds) async {
     final cubit = context.read<ConversationCubit>();
     final data = await File(path).readAsBytes();
+    if (data.isEmpty) {
+      throw const FormatException('Запись не содержит аудио');
+    }
     if (!mounted) return false;
     final sent = await cubit.sendVoice(
       'data:audio/mp4;base64,${base64Encode(data)}',
@@ -271,14 +619,20 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
 class _MessageList extends StatelessWidget {
   const _MessageList({
+    required this.scrollController,
     required this.state,
     required this.conversation,
     required this.currentUserId,
     required this.sentMessageIds,
     required this.people,
+    this.searchQuery = '',
+    this.focusedMessageId,
   });
   final String? currentUserId;
+  final String searchQuery;
+  final String? focusedMessageId;
   final Set<String> sentMessageIds;
+  final ScrollController scrollController;
   final List<ChatConversationModel> people;
   final ConversationState state;
   final ChatConversationModel conversation;
@@ -308,25 +662,135 @@ class _MessageList extends StatelessWidget {
             : 'Начните переписку с ${conversation.title}',
       );
     }
-    final messages = state.messages.toList()
-      ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
+    final messages =
+        state.messages
+            .where(
+              (message) =>
+                  searchQuery.isEmpty ||
+                  '${message.text} ${message.authorName}'
+                      .toLowerCase()
+                      .contains(searchQuery.toLowerCase()),
+            )
+            .toList()
+          ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
+    if (focusedMessageId != null) {
+      final index = messages.indexWhere(
+        (message) => message.id == focusedMessageId,
+      );
+      if (index < 0) {
+        return const _CenteredState(
+          icon: LucideIcons.messageCircle,
+          title: 'Исходное сообщение больше недоступно',
+        );
+      }
+      if (index > 0) {
+        messages.removeRange(0, index);
+      }
+    }
+    if (messages.isEmpty) {
+      return const _CenteredState(
+        icon: LucideIcons.search,
+        title: 'Сообщения не найдены',
+      );
+    }
+    bool sameDay(DateTime a, DateTime b) =>
+        a.year == b.year && a.month == b.month && a.day == b.day;
+    bool grouped(ChatMessageModel a, ChatMessageModel b) =>
+        a.authorId == b.authorId &&
+        sameDay(a.createdAt, b.createdAt) &&
+        a.createdAt.difference(b.createdAt).inMinutes.abs() < 5;
+    String dateLabel(DateTime date) {
+      final now = DateTime.now();
+      if (sameDay(date, now)) return 'Сегодня';
+      if (sameDay(date, now.subtract(const Duration(days: 1)))) return 'Вчера';
+      const months = [
+        'января',
+        'февраля',
+        'марта',
+        'апреля',
+        'мая',
+        'июня',
+        'июля',
+        'августа',
+        'сентября',
+        'октября',
+        'ноября',
+        'декабря',
+      ];
+      return '${date.day} ${months[date.month - 1]}${date.year == now.year ? '' : ' ${date.year}'}';
+    }
+
     return RefreshIndicator(
       onRefresh: context.read<ConversationCubit>().load,
       child: ListView.builder(
-        key: PageStorageKey('conversation-messages-${conversation.threadId}'),
-        reverse: true,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-        itemCount: messages.length,
-        itemBuilder: (context, index) => _MessageRow(
-          message: messages[index],
-          people: people,
-          isMine:
-              (currentUserId != null &&
-                  currentUserId!.isNotEmpty &&
-                  messages[index].authorId == currentUserId) ||
-              sentMessageIds.contains(messages[index].id),
+        controller: scrollController,
+        key: PageStorageKey(
+          'conversation-messages-${conversation.threadId}-${focusedMessageId ?? ''}',
         ),
+        reverse: true,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+        itemCount: messages.length,
+        findChildIndexCallback: (key) {
+          if (key is! ValueKey<String>) return null;
+          final index = messages.indexWhere(
+            (message) => message.id == key.value,
+          );
+          return index < 0 ? null : index;
+        },
+        itemBuilder: (context, index) {
+          final message = messages[index];
+          final older = index + 1 < messages.length
+              ? messages[index + 1]
+              : null;
+          final newer = index > 0 ? messages[index - 1] : null;
+          final groupStart = older == null || !grouped(message, older);
+          final groupEnd = newer == null || !grouped(message, newer);
+          return Column(
+            key: ValueKey(message.id),
+            children: [
+              if (older == null || !sameDay(message.createdAt, older.createdAt))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E4EC),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 4,
+                      ),
+                      child: Text(
+                        dateLabel(message.createdAt),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF626B7D),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              _MessageRow(
+                message: messages[index],
+                people: people,
+                showAuthor: conversation.isChannel && groupStart,
+                showAvatar: conversation.isChannel && groupEnd,
+                reserveAvatar: conversation.isChannel,
+                groupStart: groupStart,
+                groupEnd: groupEnd,
+                isMine:
+                    (currentUserId != null &&
+                        currentUserId!.isNotEmpty &&
+                        messages[index].authorId == currentUserId) ||
+                    sentMessageIds.contains(messages[index].id),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -337,9 +801,15 @@ class _MessageRow extends StatelessWidget {
     required this.message,
     required this.isMine,
     required this.people,
+    this.showAuthor = true,
+    this.showAvatar = true,
+    this.reserveAvatar = true,
+    this.groupStart = true,
+    this.groupEnd = true,
   });
   final ChatMessageModel message;
   final bool isMine;
+  final bool showAuthor, showAvatar, reserveAvatar, groupStart, groupEnd;
   final List<ChatConversationModel> people;
 
   @override
@@ -347,75 +817,119 @@ class _MessageRow extends StatelessWidget {
     final time = TimeOfDay.fromDateTime(message.createdAt).format(context);
     return Padding(
       key: Key('message-row-${message.id}'),
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        mainAxisAlignment: isMine
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (!isMine) ...[
-            _MessageAvatar(message: message),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width * 0.73,
-              ),
-              child: Container(
-                key: Key('message-bubble-${message.id}'),
-                padding: const EdgeInsets.fromLTRB(12, 9, 12, 7),
-                decoration: BoxDecoration(
-                  color: isMine
-                      ? const Color(0xFFE8E2FF)
-                      : const Color(0xFFF3F4F7),
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(16),
-                    topRight: const Radius.circular(16),
-                    bottomLeft: Radius.circular(isMine ? 16 : 4),
-                    bottomRight: Radius.circular(isMine ? 4 : 16),
-                  ),
+      padding: EdgeInsets.only(
+        top: groupStart ? 6 : 1,
+        bottom: groupEnd ? 4 : 1,
+      ),
+      child: GestureDetector(
+        onLongPress: () => showMessageActions(context, message, isMine),
+        child: Row(
+          mainAxisAlignment: isMine
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (!isMine && reserveAvatar) ...[
+              if (showAvatar)
+                _MessageAvatar(message: message)
+              else
+                const SizedBox(width: 28),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.78,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!isMine) ...[
-                      Text(
-                        message.authorName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.manrope(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                    ],
-                    _MessageBody(message: message, people: people),
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        time,
-                        style: GoogleFonts.manrope(
-                          fontSize: 10,
-                          color: AppColors.muted,
-                        ),
-                      ),
+                child: Container(
+                  key: Key('message-bubble-${message.id}'),
+                  constraints: const BoxConstraints(minWidth: 60),
+                  padding: const EdgeInsets.fromLTRB(11, 7, 11, 5),
+                  decoration: BoxDecoration(
+                    color: message.kind == ChatMessageKind.videoMessage
+                        ? Colors.transparent
+                        : isMine
+                        ? const Color(0xFFE7E1FA)
+                        : Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(!isMine && !groupStart ? 5 : 15),
+                      topRight: Radius.circular(isMine && !groupStart ? 5 : 15),
+                      bottomLeft: Radius.circular(!isMine && groupEnd ? 4 : 15),
+                      bottomRight: Radius.circular(isMine && groupEnd ? 4 : 15),
                     ),
-                  ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!isMine && showAuthor) ...[
+                              Text(
+                                message.authorName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.manrope(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.accent,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                            ],
+                            _MessageBody(
+                              message: message,
+                              people: people,
+                              isMine: isMine,
+                            ),
+                            if (message.reactions.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              MessageReactionBar(message: message),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (message.pinned) ...[
+                              const Icon(
+                                Icons.push_pin_outlined,
+                                size: 12,
+                                color: AppColors.muted,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            if (message.favorited) ...[
+                              const Icon(
+                                LucideIcons.bookmark,
+                                size: AppIconSizes.standard,
+                                color: AppColors.accent,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Text(
+                              time,
+                              style: GoogleFonts.manrope(
+                                fontSize: 10,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          if (isMine) ...[
-            const SizedBox(width: 8),
-            _MessageAvatar(message: message),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -426,21 +940,87 @@ class _MessageBody extends StatelessWidget {
     required this.message,
     required this.people,
     this.renderTask = true,
+    this.isMine = false,
   });
   final bool renderTask;
+  final bool isMine;
   final List<ChatConversationModel> people;
 
   final ChatMessageModel message;
 
   @override
   Widget build(BuildContext context) {
+    final quote = message.quote;
+    if (message.text.startsWith('↪ ')) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 5),
+            child: Text(
+              'Переслано',
+              style: TextStyle(fontSize: 11, color: AppColors.muted),
+            ),
+          ),
+          _MessageBody(
+            message: message.copyWith(text: message.text.substring(2)),
+            people: people,
+            renderTask: renderTask,
+            isMine: isMine,
+          ),
+        ],
+      );
+    }
+    if (quote != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: .06),
+              border: const Border(
+                left: BorderSide(color: AppColors.accent, width: 2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  quote.author,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  quote.excerpt,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 7),
+          _MessageBody(
+            message: message.copyWith(text: quote.body),
+            people: people,
+            renderTask: renderTask,
+            isMine: isMine,
+          ),
+        ],
+      );
+    }
     if (message.kind == ChatMessageKind.videoMessage) {
       return VideoNoteMessage(message: message);
     }
     if (message.kind == ChatMessageKind.audio) {
       return VoiceMessage(message: message);
     }
-    if (message.isCall) return _CallMessage(message: message);
+    if (message.isCall) return _CallMessage(message: message, isMine: isMine);
     if (message.isFile) return _AttachmentMessage(message: message);
     if (renderTask) {
       final link = sharedTaskLink(message.text, message.taskRef);
@@ -476,8 +1056,8 @@ class _MessageBody extends StatelessWidget {
       }
     }
     final style = GoogleFonts.manrope(
-      fontSize: 13,
-      height: 1.45,
+      fontSize: 14,
+      height: 1.35,
       color: const Color(0xFF3F3B42),
     );
     final matches = RegExp(r'@\[([^\]]+)\]').allMatches(message.text);
@@ -550,7 +1130,10 @@ class _MessageBody extends StatelessWidget {
       position = match.end;
     }
     spans.add(TextSpan(text: message.text.substring(position)));
-    return Text.rich(TextSpan(style: style, children: spans));
+    return Text.rich(
+      TextSpan(style: style, children: spans),
+      textWidthBasis: TextWidthBasis.longestLine,
+    );
   }
 }
 
@@ -600,7 +1183,10 @@ void _showMention(
                     extra: person,
                   );
                 },
-                icon: const Icon(LucideIcons.messageCircle, size: 18),
+                icon: const Icon(
+                  LucideIcons.messageCircle,
+                  size: AppIconSizes.standard,
+                ),
                 label: const Text('Написать сообщение'),
               ),
             ],
@@ -753,7 +1339,7 @@ class _AttachmentMessageState extends State<_AttachmentMessage> {
                 child: IconButton.filledTonal(
                   tooltip: 'Закрыть',
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(LucideIcons.x),
+                  icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
                 ),
               ),
             ],
@@ -795,7 +1381,7 @@ class _FileCard extends StatelessWidget {
             child: Icon(
               failedPreview ? LucideIcons.imageOff : LucideIcons.file,
               color: AppColors.accent,
-              size: 19,
+              size: AppIconSizes.standard,
             ),
           ),
           const SizedBox(width: 10),
@@ -833,73 +1419,137 @@ class _FileCard extends StatelessWidget {
 }
 
 class _CallMessage extends StatelessWidget {
-  const _CallMessage({required this.message});
+  const _CallMessage({required this.message, required this.isMine});
 
   final ChatMessageModel message;
+  final bool isMine;
 
   @override
   Widget build(BuildContext context) {
-    final details = <String>[
-      if (message.callTitle != null) message.callTitle!,
-      if (message.formattedDuration != null) message.formattedDuration!,
-    ];
-    return Container(
-      key: Key('call-message-${message.id}'),
-      constraints: const BoxConstraints(maxWidth: 310),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: BorderRadius.circular(10),
+    final video = message.callMode?.toLowerCase() == 'video';
+    final status = message.callStatus?.toLowerCase();
+    final missed = status == 'missed' || status == 'unanswered';
+    final declined = status == 'declined' || status == 'rejected';
+    final failed =
+        status == 'failed' || status == 'cancelled' || status == 'canceled';
+    final color = missed || declined || failed
+        ? AppColors.error
+        : AppColors.accent;
+    final title = video ? 'Видеозвонок' : 'Аудиозвонок';
+    final detail = missed
+        ? 'Пропущенный'
+        : declined
+        ? 'Отклонён'
+        : failed
+        ? 'Отменён'
+        : message.formattedDuration ??
+              (status == 'ended'
+                  ? 'Завершён'
+                  : (isMine ? 'Исходящий' : 'Входящий'));
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: !sl.isRegistered<CallCubit>()
+          ? null
+          : () async {
+              final calls = sl<CallCubit>();
+              if (calls.state.busy) {
+                await context.push('/call');
+                return;
+              }
+              if (status != 'started' && status != 'active') {
+                await context
+                    .findAncestorStateOfType<_ConversationScreenState>()
+                    ?._startCall(video);
+                return;
+              }
+              try {
+                final payload = jsonDecode(message.text);
+                final id = payload is Map ? payload['callId'] : null;
+                final workspaceId = await sl<WorkspaceSelectionStorage>()
+                    .read();
+                if (id is! String || workspaceId == null || !context.mounted) {
+                  return;
+                }
+                final room = CallRoom(
+                  id: id,
+                  workspaceId: workspaceId,
+                  mode: video ? 'video' : 'audio',
+                  title: message.callTitle ?? title,
+                  threadId: message.threadId,
+                );
+                final pending = calls.accept(room, creator: isMine);
+                await context.push('/call');
+                await pending;
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Звонок недоступен.')),
+                  );
+                }
+              }
+            },
+      child: Padding(
+        key: Key('call-message-${message.id}'),
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                video ? Icons.videocam_rounded : Icons.call_rounded,
+                color: color,
+                size: AppIconSizes.standard,
+              ),
             ),
-            child: Icon(
-              message.callMode?.toLowerCase() == 'video'
-                  ? LucideIcons.video
-                  : LucideIcons.phone,
-              size: 18,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.callHeading,
-                  style: GoogleFonts.manrope(
-                    color: AppColors.ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (details.isNotEmpty) ...[
-                  const SizedBox(height: 3),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    details.join(' · '),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    title,
                     style: GoogleFonts.manrope(
-                      color: AppColors.muted,
-                      fontSize: 11,
-                      height: 1.35,
+                      color: AppColors.ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isMine
+                            ? Icons.north_east_rounded
+                            : Icons.south_west_rounded,
+                        size: AppIconSizes.standard,
+                        color: color,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          detail,
+                          style: GoogleFonts.manrope(
+                            color: AppColors.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+          ],
+        ),
       ),
     );
   }
@@ -910,7 +1560,7 @@ class _MessageAvatar extends StatelessWidget {
   final ChatMessageModel message;
   @override
   Widget build(BuildContext context) => UserAvatar(
-    size: 36,
+    size: 28,
     userId: message.authorId,
     name: message.authorName,
     avatarUrl: message.authorAvatarUrl,
@@ -930,10 +1580,14 @@ class _Avatar extends StatelessWidget {
         height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Colors.white24,
+          color: AppColors.accent.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(9),
         ),
-        child: const Icon(LucideIcons.hash, size: 20),
+        child: const Icon(
+          LucideIcons.hash,
+          size: AppIconSizes.standard,
+          color: AppColors.accent,
+        ),
       );
     }
     return UserAvatar(
@@ -986,8 +1640,10 @@ class _Composer extends StatelessWidget {
     required this.onFiles,
     required this.onVideo,
     this.channelName,
+    this.focusNode,
   });
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final bool hasText;
   final bool isSending;
   final ValueChanged<String> onChanged;
@@ -999,10 +1655,10 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+    padding: const EdgeInsets.fromLTRB(6, 6, 8, 7),
     decoration: const BoxDecoration(
       color: Colors.white,
-      border: Border(top: BorderSide(color: AppColors.border)),
+      border: Border(top: BorderSide(color: Color(0xFFEBEDF2))),
     ),
     child: VoiceComposer(
       hasText: hasText,
@@ -1012,6 +1668,7 @@ class _Composer extends StatelessWidget {
       onFiles: onFiles,
       onVideo: onVideo,
       textField: TextField(
+        focusNode: focusNode,
         key: const Key('conversation-composer'),
         controller: controller,
         minLines: 1,
@@ -1019,9 +1676,7 @@ class _Composer extends StatelessWidget {
         onChanged: onChanged,
         onSubmitted: (_) => onSend(),
         decoration: InputDecoration(
-          hintText: channelName == null
-              ? 'Сообщение'
-              : 'Сообщение #$channelName',
+          hintText: 'Сообщение',
           filled: true,
           fillColor: AppColors.subtleSurface,
           isDense: true,
@@ -1030,12 +1685,12 @@ class _Composer extends StatelessWidget {
             vertical: 11,
           ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide.none,
           ),
         ),
       ),

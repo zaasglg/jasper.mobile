@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
@@ -34,9 +35,7 @@ class _VideoNoteMessageState extends State<VideoNoteMessage> {
         final bytes = url != null
             ? ChatAttachmentLoader.decodePayload(url)
             : await ChatAttachmentLoader(sl<Dio>()).load(widget.message.id);
-        final extension = url?.startsWith('data:video/webm') == true
-            ? 'webm'
-            : 'mp4';
+        final extension = ChatAttachmentLoader.videoExtension(bytes);
         final dir = await getTemporaryDirectory();
         final file = File(
           '${dir.path}/video-note-${DateTime.now().microsecondsSinceEpoch}.$extension',
@@ -62,7 +61,11 @@ class _VideoNoteMessageState extends State<VideoNoteMessage> {
         }
         await player.play();
       }
-    } catch (_) {
+    } catch (error, stack) {
+      if (kDebugMode) {
+        debugPrint('Video note ${widget.message.id}: $error');
+        debugPrintStack(stackTrace: stack);
+      }
       await _player?.dispose();
       _player = null;
       final file = _file;
@@ -71,7 +74,7 @@ class _VideoNoteMessageState extends State<VideoNoteMessage> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = 'Повторить';
+          _error = 'Не удалось воспроизвести. Повторить';
         });
       }
     }

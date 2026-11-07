@@ -1,3 +1,7 @@
+import '../widgets/conversation_menu.dart';
+import '../widgets/messenger_refresh_lifecycle.dart';
+import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/widgets/app_form_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,7 +21,21 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen>
+    with MessengerRefreshLifecycle<ChatScreen> {
+  late ChatCubit _refreshCubit;
+  @override
+  String get messengerRefreshPath => '/messenger';
+  @override
+  void setMessengerRefresh(bool active) => _refreshCubit.setAutoRefresh(active);
+  @override
+  void invalidateMessenger() => _refreshCubit.invalidate();
+  @override
+  void initState() {
+    super.initState();
+    _refreshCubit = context.read<ChatCubit>();
+  }
+
   final _searchController = TextEditingController();
   String _query = '';
   bool _channelsExpanded = true;
@@ -77,20 +95,20 @@ class _ChatScreenState extends State<ChatScreen> {
                         if (_query.isEmpty) ...[
                           const SizedBox(height: 10),
                           _Shortcut(
-                            icon: LucideIcons.messageSquareText,
-                            label: 'Обсуждения',
-                            onTap: () => _notice('Обсуждения'),
-                          ),
-                          _Shortcut(
                             icon: LucideIcons.atSign,
                             label: 'Упоминания и реакции',
                             count: mentions == 0 ? null : mentions,
-                            onTap: () => _notice('Упоминания и реакции'),
+                            onTap: () => context.push('/activity/mentions'),
                           ),
                           _Shortcut(
                             icon: LucideIcons.bookmark,
                             label: 'Сохранённое',
-                            onTap: () => _notice('Сохранённое'),
+                            onTap: () => context.push('/activity/saved'),
+                          ),
+                          _Shortcut(
+                            icon: LucideIcons.archive,
+                            label: 'Кладовка',
+                            onTap: () => context.push('/messenger-storage'),
                           ),
                           const Padding(
                             padding: EdgeInsets.only(top: 9),
@@ -143,17 +161,6 @@ class _ChatScreenState extends State<ChatScreen> {
             )
             .toList();
 
-  void _notice(String title) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('$title — раздел скоро появится'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
-
   void _openConversation(ChatConversationModel item) {
     final uri = Uri(path: '/messenger/${Uri.encodeComponent(item.id)}');
     context.push(uri.toString(), extra: item);
@@ -183,94 +190,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _showCreateChannel(List<ChatConversationModel> channels) async {
-    final controller = TextEditingController();
-    String? parentId;
+    final cubit = context.read<ChatCubit>();
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            16,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Новый канал',
-                style: GoogleFonts.manrope(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                key: const Key('channel-name-field'),
-                controller: controller,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Название канала',
-                  prefixText: '# ',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              if (channels.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String?>(
-                  initialValue: parentId,
-                  decoration: const InputDecoration(
-                    labelText: 'Родительский канал',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('Без вложенности'),
-                    ),
-                    ...channels.map(
-                      (channel) => DropdownMenuItem<String?>(
-                        value: channel.id,
-                        child: Text('# ${channel.title}'),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) => setSheetState(() => parentId = value),
-                ),
-              ],
-              const SizedBox(height: 16),
-              FilledButton(
-                key: const Key('create-channel-button'),
-                onPressed: () async {
-                  final success = await context.read<ChatCubit>().createChannel(
-                    controller.text,
-                    parentId: parentId,
-                  );
-                  if (sheetContext.mounted && success) {
-                    Navigator.pop(sheetContext, true);
-                  } else if (sheetContext.mounted) {
-                    ScaffoldMessenger.of(sheetContext).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Введите название или повторите попытку.',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Создать канал'),
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (_) => _CreateChannelSheet(channels: channels, cubit: cubit),
     );
-    controller.dispose();
     if (created == true && mounted) {
       setState(() => _channelsExpanded = true);
     }
@@ -339,7 +265,11 @@ class _Header extends StatelessWidget {
           IconButton(
             tooltip: 'Открыть меню',
             onPressed: MainShell.openDrawer,
-            icon: const Icon(LucideIcons.menu, color: Colors.white, size: 23),
+            icon: const Icon(
+              LucideIcons.menu,
+              color: Colors.white,
+              size: AppIconSizes.standard,
+            ),
           ),
           Expanded(
             child: Text(
@@ -354,15 +284,7 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'Настройки мессенджера',
-            onPressed: () {},
-            icon: const Icon(
-              LucideIcons.settings2,
-              color: Colors.white,
-              size: 21,
-            ),
-          ),
+          const SizedBox(width: 48),
         ],
       ),
     );
@@ -393,7 +315,7 @@ class _Search extends StatelessWidget {
           ),
           prefixIcon: const Icon(
             LucideIcons.search,
-            size: 19,
+            size: AppIconSizes.standard,
             color: Color(0xFF6E5B70),
           ),
           suffixIcon: controller.text.isEmpty
@@ -404,7 +326,7 @@ class _Search extends StatelessWidget {
                     controller.clear();
                     onChanged('');
                   },
-                  icon: const Icon(LucideIcons.x, size: 18),
+                  icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
                 ),
           filled: true,
           fillColor: const Color(0xFFF7F3F7),
@@ -416,7 +338,7 @@ class _Search extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.accent, width: 2),
+            borderSide: const BorderSide(color: AppColors.accent),
           ),
         ),
       ),
@@ -444,7 +366,11 @@ class _Shortcut extends StatelessWidget {
       minTileHeight: 43,
       horizontalTitleGap: 12,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18),
-      leading: Icon(icon, size: 20, color: const Color(0xFF4A364B)),
+      leading: Icon(
+        icon,
+        size: AppIconSizes.standard,
+        color: const Color(0xFF4A364B),
+      ),
       title: Text(
         label,
         style: GoogleFonts.manrope(
@@ -491,7 +417,7 @@ class _Section extends StatelessWidget {
               children: [
                 Icon(
                   expanded ? LucideIcons.chevronDown : LucideIcons.chevronRight,
-                  size: 16,
+                  size: AppIconSizes.standard,
                   color: Color(0xFF6F6570),
                 ),
                 const SizedBox(width: 7),
@@ -512,7 +438,10 @@ class _Section extends StatelessWidget {
                   tooltip: 'Добавить',
                   visualDensity: VisualDensity.compact,
                   onPressed: onAdd,
-                  icon: const Icon(LucideIcons.plus, size: 19),
+                  icon: const Icon(
+                    LucideIcons.plus,
+                    size: AppIconSizes.standard,
+                  ),
                 ),
               ],
             ),
@@ -548,7 +477,7 @@ class _Section extends StatelessWidget {
                       ),
                       child: Icon(
                         isChannel ? LucideIcons.plus : LucideIcons.userPlus,
-                        size: 16,
+                        size: AppIconSizes.standard,
                         color: const Color(0xFF5E4B60),
                       ),
                     ),
@@ -614,7 +543,11 @@ class _Conversation extends StatelessWidget {
       leading: isChannel
           ? const SizedBox(
               width: 27,
-              child: Icon(LucideIcons.hash, size: 20, color: Color(0xFF756A76)),
+              child: Icon(
+                LucideIcons.hash,
+                size: AppIconSizes.standard,
+                color: Color(0xFF756A76),
+              ),
             )
           : _Avatar(item),
       title: Text(
@@ -627,7 +560,22 @@ class _Conversation extends StatelessWidget {
           color: item.unreadCount > 0 ? AppColors.ink : const Color(0xFF554B56),
         ),
       ),
-      trailing: item.unreadCount > 0 ? _Badge(item.unreadCount) : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (item.unreadCount > 0) _Badge(item.unreadCount),
+          ConversationMenuButton(
+            key: ValueKey('conversation-menu-${item.id}'),
+            conversation: item,
+            repository: context.read<ChatCubit>().repository,
+            chats: context.read<ChatCubit>().state is ChatLoaded
+                ? (context.read<ChatCubit>().state as ChatLoaded).conversations
+                : const [],
+            onOpen: onTap,
+            onChanged: () => context.read<ChatCubit>().load(silent: true),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -767,4 +715,110 @@ class _LoadError extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CreateChannelSheet extends StatefulWidget {
+  const _CreateChannelSheet({required this.channels, required this.cubit});
+  final List<ChatConversationModel> channels;
+  final ChatCubit cubit;
+  @override
+  State<_CreateChannelSheet> createState() => _CreateChannelSheetState();
+}
+
+class _CreateChannelSheetState extends State<_CreateChannelSheet> {
+  final _controller = TextEditingController();
+  String? _parentId;
+  bool _saving = false;
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    final success = await widget.cubit.createChannel(
+      _controller.text,
+      parentId: _parentId,
+    );
+    if (!mounted) return;
+    if (success) {
+      Navigator.pop(context, true);
+    } else {
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Введите название или повторите попытку.'),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(
+      20,
+      16,
+      20,
+      MediaQuery.viewInsetsOf(context).bottom + 20,
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Новый канал',
+          style: GoogleFonts.manrope(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: AppColors.ink,
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppFormField(
+          label: 'Название канала',
+          child: TextField(
+            key: const Key('channel-name-field'),
+            controller: _controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Название канала',
+              prefixText: '# ',
+            ),
+          ),
+        ),
+        if (widget.channels.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          AppFormField(
+            label: 'Родительский канал',
+            child: DropdownButtonFormField<String?>(
+              isExpanded: true,
+              initialValue: _parentId,
+              decoration: const InputDecoration(hintText: 'Родительский канал'),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Без вложенности'),
+                ),
+                ...widget.channels.map(
+                  (channel) => DropdownMenuItem<String?>(
+                    value: channel.id,
+                    child: Text('# ${channel.title}'),
+                  ),
+                ),
+              ],
+              onChanged: (value) => setState(() => _parentId = value),
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        FilledButton(
+          key: const Key('create-channel-button'),
+          onPressed: _saving ? null : _submit,
+          child: const Text('Создать канал'),
+        ),
+      ],
+    ),
+  );
 }

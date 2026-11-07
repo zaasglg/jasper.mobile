@@ -17,6 +17,7 @@ class _Workspace extends WorkspaceSelectionStorage {
 
 class _Adapter implements HttpClientAdapter {
   bool fail = false;
+  bool omitAttachment = false;
   Map<String, dynamic>? sent;
   @override
   Future<ResponseBody> fetch(
@@ -27,6 +28,24 @@ class _Adapter implements HttpClientAdapter {
     if (options.path == 'users/me') {
       return ResponseBody.fromString(
         '{"id":"sender"}',
+        200,
+        headers: {
+          Headers.contentTypeHeader: ['application/json'],
+        },
+      );
+    }
+    if (options.path == 'messages' && options.method == 'GET') {
+      return ResponseBody.fromString(
+        jsonEncode([
+          if (sent != null)
+            {
+              ...sent!,
+              'id': 'voice',
+              'authorId': 'sender',
+              'createdAt': '2026-10-05T12:00:00Z',
+            },
+          {'id': 'empty-text', 'kind': 'TEXT', 'text': ''},
+        ]),
         200,
         headers: {
           Headers.contentTypeHeader: ['application/json'],
@@ -56,6 +75,8 @@ class _Adapter implements HttpClientAdapter {
             ? {'message': 'Upload failed'}
             : {
                 ...sent!,
+                if (omitAttachment) 'mention': null,
+                if (omitAttachment) 'transcript': null,
                 'id': 'voice',
                 'authorId': 'sender',
                 'createdAt': '2026-10-05T12:00:00Z',
@@ -83,7 +104,7 @@ void main() {
     test(
       'file and video uploads use mention and only allowed API fields',
       () async {
-        final adapter = _Adapter();
+        final adapter = _Adapter()..omitAttachment = true;
         final dio = Dio(BaseOptions(baseUrl: 'https://jospar.me/api/'))
           ..httpClientAdapter = adapter;
         final cubit = ConversationCubit(
@@ -117,6 +138,10 @@ void main() {
         );
         expect(adapter.sent, containsPair('duration', 3));
         expect(cubit.state.messages.last.kind, ChatMessageKind.videoMessage);
+        expect(
+          cubit.state.messages.last.attachmentDataUrl,
+          'data:video/mp4;base64,AQID',
+        );
       },
     );
     test(
@@ -148,7 +173,7 @@ void main() {
   test(
     'voice send matches web AUDIO transcript contract and is added after success',
     () async {
-      final adapter = _Adapter();
+      final adapter = _Adapter()..omitAttachment = true;
       final dio = Dio(BaseOptions(baseUrl: 'https://jospar.me/api/'))
         ..httpClientAdapter = adapter;
       final cubit = ConversationCubit(
@@ -169,6 +194,15 @@ void main() {
       expect(adapter.sent, containsPair('userId', 'sender'));
       expect(adapter.sent, containsPair('threadId', 'thread'));
       expect(cubit.state.messages.single.kind, ChatMessageKind.audio);
+      expect(
+        cubit.state.messages.single.transcript,
+        'data:audio/mp4;base64,AQID',
+      );
+      await cubit.load(silent: true);
+      expect(cubit.state.messages, hasLength(1));
+      expect(cubit.state.messages.single.id, 'voice');
+      expect(cubit.state.messages.single.kind, ChatMessageKind.audio);
+      expect(cubit.state.messages.single.text, isEmpty);
       adapter.fail = true;
       expect(await cubit.sendVoice('data:audio/mp4;base64,AQID', 4), isFalse);
       expect(cubit.state.messages, hasLength(1));

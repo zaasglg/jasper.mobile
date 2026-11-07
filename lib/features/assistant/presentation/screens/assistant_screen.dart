@@ -1,8 +1,13 @@
+import 'package:go_router/go_router.dart';
+import '../widgets/assistant_action_cards.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../widgets/assistant_web_layout.dart';
+import '../../data/services/assistant_image_picker.dart';
+import '../../domain/repositories/assistant_repository.dart';
 import '../../../../core/voice/assistant_launch_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/services/assistant_voice.dart';
@@ -24,6 +29,10 @@ class AssistantScreen extends StatefulWidget {
 class _AssistantScreenState extends State<AssistantScreen>
     with WidgetsBindingObserver {
   final _input = TextEditingController();
+  final _focus = FocusNode();
+  final List<String> _images = [];
+  bool _picking = false;
+  int _handledResponse = 0;
   final _scroll = ScrollController();
   late final AssistantVoice _voice;
   StreamSubscription<VoiceEvent>? _subscription;
@@ -78,6 +87,7 @@ class _AssistantScreenState extends State<AssistantScreen>
     _launchSubscription?.cancel();
     unawaited(_voice.stop());
     unawaited(_voice.stopSpeaking());
+    _focus.dispose();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -158,7 +168,7 @@ class _AssistantScreenState extends State<AssistantScreen>
 
   Future<void> _send({bool voice = false}) async {
     final text = _input.text.trim();
-    if (text.isEmpty ||
+    if ((text.isEmpty && _images.isEmpty) ||
         context.read<AssistantCubit>().state.status ==
             AssistantStatus.sending) {
       return;
@@ -168,8 +178,31 @@ class _AssistantScreenState extends State<AssistantScreen>
     await _voice.stopSpeaking();
     if (!mounted) return;
     _voiceReply = voice;
+    final images = List<String>.from(_images);
     _input.clear();
-    await context.read<AssistantCubit>().ask(text);
+    setState(_images.clear);
+    await context.read<AssistantCubit>().ask(text, images: images);
+  }
+
+  Future<void> _attach() async {
+    if (_picking) return;
+    setState(() => _picking = true);
+    try {
+      final images = await AssistantImagePicker.pick(
+        remaining: 3 - _images.length,
+      );
+      if (mounted) setState(() => _images.addAll(images));
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _voiceError = error is AssistantException
+              ? error.message
+              : 'Не удалось открыть изображение.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _picking = false);
+    }
   }
 
   void _scrollToBottom() => WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -189,6 +222,31 @@ class _AssistantScreenState extends State<AssistantScreen>
     listener: (_, state) {
       _handleInitial(state);
       _scrollToBottom();
+      if (state.responseRevision > _handledResponse) {
+        _handledResponse = state.responseRevision;
+        final ids = <String>{};
+        for (final tool in state.messages.last.tools) {
+          final result = tool['result'];
+          final action = result is Map ? result['action'] : null;
+          if (tool['name'] == 'open_task' &&
+              result is Map &&
+              !result.containsKey('error') &&
+              action is Map &&
+              action['type'] == 'open_task' &&
+              action['workspaceId'] == state.workspaceId &&
+              action['taskId'] is String &&
+              (action['taskId'] as String).trim().isNotEmpty) {
+            ids.add(action['taskId'] as String);
+          }
+        }
+        if (ids.length == 1) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              context.push('/tasks/${Uri.encodeComponent(ids.single)}');
+            }
+          });
+        }
+      }
       if (state.status == AssistantStatus.ready &&
           _voiceReply &&
           state.messages.lastOrNull?.role == 'assistant') {
@@ -196,226 +254,132 @@ class _AssistantScreenState extends State<AssistantScreen>
         unawaited(_voice.speak(state.messages.last.content));
       }
     },
-    builder: (context, state) => Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Jospar AI',
-          style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Остановить озвучивание',
-            onPressed: _voice.stopSpeaking,
-            icon: const Icon(Icons.volume_off_outlined),
-          ),
-          IconButton(
-            tooltip: 'Голосовой вызов',
-            onPressed: () => showVoiceLaunchHelp(context),
-            icon: const Icon(Icons.help_outline),
-          ),
-        ],
+    builder: (context, state) => Theme(
+      data: Theme.of(context).copyWith(
+        textTheme: GoogleFonts.interTextTheme(Theme.of(context).textTheme),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (state.workspaceName.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
-                ),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              AssistantWebHeader(
+                workspaceName:
+                    context.read<AssistantCubit>().currentProjectName ??
                     state.workspaceName,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ),
+                onStopVoice: () => _voice.stopSpeaking(),
+                onVoiceHelp: () => showVoiceLaunchHelp(context),
               ),
-            Expanded(
-              child: state.status == AssistantStatus.loading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: AppColors.accent),
-                    )
-                  : state.messages.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(28),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.auto_awesome,
-                              size: 40,
-                              color: AppColors.accent,
+              Expanded(
+                child: state.status == AssistantStatus.loading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.accent,
+                        ),
+                      )
+                    : ListView(
+                        controller: _scroll,
+                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                        children: [
+                          if (state.messages.isEmpty)
+                            AssistantWebWelcome(
+                              hasWorkspace: state.workspaceId.isNotEmpty,
+                              onSuggestion: (prompt) {
+                                _input.text = prompt;
+                                _input.selection = TextSelection.collapsed(
+                                  offset: prompt.length,
+                                );
+                                _focus.requestFocus();
+                              },
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Чем помочь?',
-                              style: GoogleFonts.manrope(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'Спросите о задачах и проектах — голосом или текстом.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: AppColors.muted),
+                          for (var i = 0; i < state.messages.length; i++) ...[
+                            if (state.messages[i].draft == null)
+                              AssistantWebMessage(message: state.messages[i]),
+                            AssistantActionCards(
+                              key: ValueKey('actions-$i'),
+                              message: state.messages[i],
+                              index: i,
                             ),
                           ],
+                        ],
+                      ),
+              ),
+              if (state.status == AssistantStatus.sending)
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox.square(
+                        dimension: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.accent,
                         ),
                       ),
-                    )
-                  : ListView.builder(
-                      controller: _scroll,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: state.messages.length,
-                      itemBuilder: (_, index) {
-                        final message = state.messages[index];
-                        final user = message.role == 'user';
-                        return Align(
-                          alignment: user
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(14),
-                            constraints: BoxConstraints(
-                              maxWidth: MediaQuery.sizeOf(context).width * 0.86,
-                            ),
-                            decoration: BoxDecoration(
-                              color: user
-                                  ? AppColors.accent.withValues(alpha: 0.1)
-                                  : AppColors.subtleSurface,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: SelectableText(
-                              message.content,
-                              style: GoogleFonts.manrope(
-                                fontSize: 14,
-                                height: 1.5,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            if (state.status == AssistantStatus.sending)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox.square(
-                      dimension: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.accent,
+                      SizedBox(width: 10),
+                      Text(
+                        'Работаю с запросом',
+                        style: TextStyle(fontSize: 12, color: AppColors.muted),
                       ),
-                    ),
-                    SizedBox(width: 10),
-                    Text('Думаю…', style: TextStyle(color: AppColors.muted)),
-                  ],
-                ),
-              ),
-            if (state.error != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        state.error!,
-                        style: const TextStyle(color: AppColors.error),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: context.read<AssistantCubit>().retry,
-                      child: const Text('Повторить'),
-                    ),
-                  ],
-                ),
-              ),
-            if (_voiceError != null)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  _voiceError!,
-                  style: const TextStyle(color: AppColors.error),
-                ),
-              ),
-            if (_listening || _starting)
-              Text(
-                _starting ? 'Подключаю микрофон…' : 'Слушаю… Скажите вопрос',
-                style: const TextStyle(color: AppColors.accent),
-              ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton(
-                    key: const Key('assistant-microphone'),
-                    tooltip: _listening
-                        ? 'Остановить запись'
-                        : 'Задать вопрос голосом',
-                    onPressed:
-                        state.workspaceId.isEmpty ||
-                            state.status == AssistantStatus.sending ||
-                            _starting
-                        ? null
-                        : _listening
-                        ? () {
-                            _acceptResults = false;
-                            _voice.stop();
-                          }
-                        : _startVoice,
-                    icon: Icon(
-                      _listening
-                          ? Icons.stop_circle_outlined
-                          : Icons.mic_none_rounded,
-                      color: AppColors.accent,
-                    ),
+                    ],
                   ),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('assistant-input'),
-                      controller: _input,
-                      minLines: 1,
-                      maxLines: 5,
-                      enabled:
-                          state.workspaceId.isNotEmpty &&
-                          state.status != AssistantStatus.sending,
-                      decoration: const InputDecoration(
-                        hintText: 'Спросите Jospar',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(16)),
+                ),
+              if (state.error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          state.error!,
+                          style: const TextStyle(color: AppColors.error),
                         ),
                       ),
-                    ),
+                      TextButton(
+                        onPressed: context.read<AssistantCubit>().retry,
+                        child: const Text('Повторить'),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    key: const Key('assistant-send'),
-                    tooltip: 'Отправить',
-                    onPressed:
-                        state.workspaceId.isEmpty ||
-                            state.status == AssistantStatus.sending
-                        ? null
-                        : () => _send(),
-                    icon: const Icon(
-                      Icons.arrow_upward_rounded,
-                      color: AppColors.accent,
-                    ),
+                ),
+              if (_voiceError != null)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    _voiceError!,
+                    style: const TextStyle(color: AppColors.error),
                   ),
-                ],
+                ),
+              if (_listening || _starting)
+                Text(
+                  _starting ? 'Подключаю микрофон…' : 'Слушаю… Скажите вопрос',
+                  style: const TextStyle(color: AppColors.accent),
+                ),
+              AssistantWebComposer(
+                input: _input,
+                focus: _focus,
+                enabled:
+                    state.workspaceId.isNotEmpty &&
+                    state.status != AssistantStatus.sending,
+                sending: state.status == AssistantStatus.sending,
+                listening: _listening,
+                picking: _picking,
+                images: _images,
+                onAttach: _attach,
+                onRemove: (i) => setState(() => _images.removeAt(i)),
+                onSend: () => _send(),
+                onVoice: () {
+                  if (_listening) {
+                    _acceptResults = false;
+                    _voice.stop();
+                  } else if (!_starting) {
+                    _startVoice();
+                  }
+                },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),

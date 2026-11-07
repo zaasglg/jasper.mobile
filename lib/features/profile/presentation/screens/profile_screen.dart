@@ -1,3 +1,8 @@
+import '../../../../core/theme/app_icon_sizes.dart';
+import 'dart:convert';
+import 'dart:ui' as ui;
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -51,7 +56,11 @@ class _ProfileView extends StatelessWidget {
         centerTitle: true,
         leading: IconButton(
           onPressed: () => context.pop(),
-          icon: const Icon(LucideIcons.arrowLeft, color: Color(0xFF1A1A1A)),
+          icon: const Icon(
+            LucideIcons.arrowLeft,
+            color: Color(0xFF1A1A1A),
+            size: AppIconSizes.standard,
+          ),
         ),
         title: Text(
           'Профиль',
@@ -62,7 +71,14 @@ class _ProfileView extends StatelessWidget {
           ),
         ),
       ),
-      body: BlocBuilder<ProfileCubit, ProfileState>(
+      body: BlocConsumer<ProfileCubit, ProfileState>(
+        listener: (context, state) {
+          if (state is ProfileLoaded && state.photoError != null) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.photoError!)));
+          }
+        },
         builder: (context, state) {
           if (state is ProfileFailure) {
             return _ProfileError(message: state.message);
@@ -82,14 +98,71 @@ class _ProfileView extends StatelessWidget {
   }
 }
 
-class _ProfileContent extends StatelessWidget {
+class _ProfileContent extends StatefulWidget {
   const _ProfileContent({required this.profile});
 
   final ProfileLoaded profile;
 
   @override
+  State<_ProfileContent> createState() => _ProfileContentState();
+}
+
+class _ProfileContentState extends State<_ProfileContent> {
+  bool _isPicking = false;
+
+  Future<void> _pickPhoto() async {
+    setState(() => _isPicking = true);
+    try {
+      final files = await FilePicker.pickFiles(type: FileType.image);
+      if (files.isEmpty || !mounted) return;
+      if ((await files.first.length() ?? 0) > 20 * 1024 * 1024) {
+        throw const FormatException('Выберите фото размером до 20 МБ.');
+      }
+      final bytes = await files.first.readAsBytes();
+      final codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: 256,
+        targetHeight: 256,
+        allowUpscaling: false,
+      );
+      late final String dataUrl;
+      try {
+        final frame = await codec.getNextFrame();
+        try {
+          final data = await frame.image.toByteData(
+            format: ui.ImageByteFormat.png,
+          );
+          if (data == null) throw const FormatException();
+          dataUrl =
+              'data:image/png;base64,${base64Encode(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes))}';
+        } finally {
+          frame.image.dispose();
+        }
+      } finally {
+        codec.dispose();
+      }
+      if (mounted) await context.read<ProfileCubit>().updateAvatar(dataUrl);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is FormatException && error.message.isNotEmpty
+                  ? error.message
+                  : 'Не удалось открыть фото. Выберите другое изображение.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPicking = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final user = profile.profile;
+    final user = widget.profile.profile;
+    final busy = _isPicking || widget.profile.isSavingPhoto;
     final displayName = user.name.isNotEmpty ? user.name : 'Пользователь';
 
     return RefreshIndicator(
@@ -109,7 +182,27 @@ class _ProfileContent extends StatelessWidget {
               child: ProfileAvatar(size: 88, avatarUrl: user.avatarUrl),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton.icon(
+              key: const Key('profile_change_photo_button'),
+              onPressed: busy ? null : _pickPhoto,
+              icon: busy
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(LucideIcons.camera, size: AppIconSizes.standard),
+              label: Text(
+                busy
+                    ? 'Сохраняем…'
+                    : user.avatarUrl == null
+                    ? 'Добавить фото'
+                    : 'Изменить фото',
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           Text(
             displayName,
             textAlign: TextAlign.center,
@@ -146,6 +239,15 @@ class _ProfileContent extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
+                _ProfileDataRow(
+                  icon: LucideIcons.shield,
+                  label: 'Роль',
+                  value: user.roleLabel,
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Divider(height: 1, color: Color(0xFFF0EEF5)),
+                ),
                 _ProfileDataRow(
                   icon: LucideIcons.userRound,
                   label: 'Имя',
@@ -197,7 +299,10 @@ class _ProfileContent extends StatelessWidget {
                             color: Color(0xFFD64545),
                           ),
                         )
-                      : const Icon(LucideIcons.logOut, size: 19),
+                      : const Icon(
+                          LucideIcons.logOut,
+                          size: AppIconSizes.standard,
+                        ),
                   label: Text(isLoading ? 'Выходим…' : 'Выйти из аккаунта'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFC44E58),
@@ -248,7 +353,11 @@ class _ProfileDataRow extends StatelessWidget {
               color: const Color(0xFFF1EEFD),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, size: 20, color: const Color(0xFF6D5FE0)),
+            child: Icon(
+              icon,
+              size: AppIconSizes.standard,
+              color: const Color(0xFF6D5FE0),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -280,7 +389,7 @@ class _ProfileDataRow extends StatelessWidget {
               onPressed: onCopy,
               icon: const Icon(
                 LucideIcons.copy,
-                size: 18,
+                size: AppIconSizes.standard,
                 color: Color(0xFF858297),
               ),
             ),
@@ -305,7 +414,7 @@ class _ProfileError extends StatelessWidget {
           children: [
             const Icon(
               LucideIcons.circleAlert,
-              size: 32,
+              size: AppIconSizes.standard,
               color: Color(0xFF9AA0A6),
             ),
             const SizedBox(height: 12),

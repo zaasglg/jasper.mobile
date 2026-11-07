@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'chat_interaction_models.dart';
 
 import 'package:equatable/equatable.dart';
 
@@ -24,6 +25,9 @@ class ChatMessageModel extends Equatable {
     this.mimeType,
     this.fileSize,
     this.attachmentDataUrl,
+    this.favorited = false,
+    this.pinned = false,
+    this.reactions = const [],
   });
 
   factory ChatMessageModel.fromJson(Map<String, dynamic> json) {
@@ -41,12 +45,17 @@ class ChatMessageModel extends Equatable {
     final mediaData = _optionalText(
       json['mention'] ?? attachment['dataUrl'] ?? json['attachmentDataUrl'],
     );
-    final kind =
-        mediaData?.startsWith('data:video/') == true &&
-            rawText.trimLeft().startsWith('📹')
-        ? ChatMessageKind.videoMessage
-        : _parseKind(json['kind'] ?? json['type'], callPayload, rawText);
+    // List and send responses can omit the attachment body. The legacy video
+    // marker identifies notes whose bytes are loaded via /attachment.
+    final kind = _parseKind(json['kind'] ?? json['type'], callPayload, rawText);
     return ChatMessageModel(
+      favorited: json['favorited'] == true,
+      pinned: json['pinned'] == true,
+      reactions: (json['reactions'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => ChatReaction.fromJson(Map<String, dynamic>.from(e)))
+          .where((e) => e.emoji.isNotEmpty && e.count > 0)
+          .toList(),
       id: json['id']?.toString() ?? '',
       threadId: (json['threadId'] ?? json['thread_id'] ?? '').toString(),
       authorId:
@@ -111,6 +120,24 @@ class ChatMessageModel extends Equatable {
     );
   }
 
+  final bool favorited, pinned;
+  final List<ChatReaction> reactions;
+  ({String author, String excerpt, String body})? get quote {
+    final match = RegExp(
+      r'^↩ @(.+?): «([\s\S]*?)»\n\n([\s\S]*)$',
+    ).firstMatch(text);
+    return match == null
+        ? null
+        : (author: match[1]!, excerpt: match[2]!, body: match[3]!);
+  }
+
+  String get preview =>
+      fileName ??
+      (kind == ChatMessageKind.audio
+          ? 'Голосовое сообщение'
+          : kind == ChatMessageKind.videoMessage
+          ? 'Видеосообщение'
+          : quote?.body ?? text);
   final String id;
   final String threadId;
   final String authorId;
@@ -165,6 +192,12 @@ class ChatMessageModel extends Equatable {
   String? get formattedDuration {
     final value = durationSeconds;
     if (value == null || value <= 0) return null;
+    if (value >= 3600) {
+      final hours = value ~/ 3600;
+      final minutes = (value % 3600) ~/ 60;
+      final seconds = value % 60;
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
     final minutes = value ~/ 60;
     final seconds = value % 60;
     return minutes == 0
@@ -182,6 +215,9 @@ class ChatMessageModel extends Equatable {
       .toUpperCase();
 
   Map<String, dynamic> toJson() => <String, dynamic>{
+    'favorited': favorited,
+    'pinned': pinned,
+    'reactions': reactions.map((e) => e.toJson()).toList(),
     'id': id,
     'threadId': threadId,
     'authorId': authorId,
@@ -199,7 +235,16 @@ class ChatMessageModel extends Equatable {
     if (attachmentDataUrl != null) 'attachmentDataUrl': attachmentDataUrl,
   };
 
-  ChatMessageModel copyWith({String? id, String? text}) => ChatMessageModel(
+  ChatMessageModel copyWith({
+    String? id,
+    String? text,
+    bool? favorited,
+    bool? pinned,
+    List<ChatReaction>? reactions,
+  }) => ChatMessageModel(
+    favorited: favorited ?? this.favorited,
+    pinned: pinned ?? this.pinned,
+    reactions: reactions ?? this.reactions,
     id: id ?? this.id,
     threadId: threadId,
     authorId: authorId,
@@ -226,11 +271,19 @@ class ChatMessageModel extends Equatable {
     String text,
   ) {
     if (call != null) return ChatMessageKind.call;
+    if (RegExp(
+      r'^\s*(?:📹|🎥)\uFE0F?\s*видео\s+\d+\s*[сs]\s*$',
+      caseSensitive: false,
+    ).hasMatch(text)) {
+      return ChatMessageKind.videoMessage;
+    }
     if (text.trimLeft().startsWith('📎')) return ChatMessageKind.file;
     return switch (value?.toString().toUpperCase()) {
       null || '' || 'TEXT' => ChatMessageKind.text,
       'AUDIO' => ChatMessageKind.audio,
-      'VIDEO_MSG' => ChatMessageKind.videoMessage,
+      'VIDEO_MSG' ||
+      'VIDEOMESSAGE' ||
+      'VIDEO_MESSAGE' => ChatMessageKind.videoMessage,
       'FILE' => ChatMessageKind.file,
       'POLL' => ChatMessageKind.poll,
       'CALL' => ChatMessageKind.call,
@@ -272,6 +325,9 @@ class ChatMessageModel extends Equatable {
 
   @override
   List<Object?> get props => [
+    favorited,
+    pinned,
+    reactions,
     id,
     threadId,
     authorId,

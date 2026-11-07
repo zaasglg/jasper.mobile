@@ -11,8 +11,38 @@ class AuthCubit extends Cubit<AuthState> {
 
   final AuthRepository _repository;
 
+  Future<void> loginWithGoogle() async {
+    if (isClosed || state is AuthLoading) return;
+    emit(const AuthLoading());
+    try {
+      final repository = _repository;
+      if (repository is! GoogleLoginRepository) {
+        throw const AuthException('Вход Google недоступен.');
+      }
+      final token = await (repository as GoogleLoginRepository)
+          .loginWithGoogle();
+      if (isClosed) return;
+      if (token == null) {
+        emit(const AuthInitial());
+        return;
+      }
+      authSession.markAuthenticated();
+      emit(AuthAuthenticated(token));
+    } on AuthException catch (error) {
+      if (!isClosed) emit(AuthFailure(error.message));
+    } catch (_) {
+      if (!isClosed) {
+        emit(
+          const AuthFailure(
+            'Не удалось войти через Google. Повторите попытку.',
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> login({required String email, required String password}) async {
-    if (state is AuthLoading) return;
+    if (isClosed || state is AuthLoading) return;
 
     final normalizedEmail = email.trim();
     if (!_isValidEmail(normalizedEmail)) {
@@ -29,25 +59,32 @@ class AuthCubit extends Cubit<AuthState> {
       final token = await _repository.login(
         LoginRequest(email: normalizedEmail, password: password),
       );
+      if (isClosed) return;
       authSession.markAuthenticated();
       emit(AuthAuthenticated(token));
     } on AuthException catch (error) {
-      emit(AuthFailure(error.message));
+      if (!isClosed) emit(AuthFailure(error.message));
     } catch (_) {
-      emit(const AuthFailure('Не удалось выполнить вход. Попробуйте ещё раз.'));
+      if (!isClosed) {
+        emit(
+          const AuthFailure('Не удалось выполнить вход. Попробуйте ещё раз.'),
+        );
+      }
     }
   }
 
   Future<void> logout() async {
-    if (state is AuthLoading) return;
+    if (isClosed || state is AuthLoading) return;
 
     emit(const AuthLoading());
     try {
       await _repository.logout();
       authSession.markUnauthenticated();
-      emit(const AuthUnauthenticated());
+      if (!isClosed) emit(const AuthUnauthenticated());
     } catch (_) {
-      emit(const AuthFailure('Не удалось выйти. Попробуйте ещё раз.'));
+      if (!isClosed) {
+        emit(const AuthFailure('Не удалось выйти. Попробуйте ещё раз.'));
+      }
     }
   }
 

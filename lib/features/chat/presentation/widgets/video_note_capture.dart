@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:camera/camera.dart';
@@ -244,7 +245,7 @@ class _VideoNoteCaptureState extends State<VideoNoteCapture>
           title: const Text('Видеозаметка'),
           leading: IconButton(
             onPressed: _sending ? null : () => Navigator.pop(context),
-            icon: const Icon(LucideIcons.x),
+            icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
           ),
         ),
         body: SafeArea(
@@ -274,6 +275,7 @@ class _VideoNoteCaptureState extends State<VideoNoteCapture>
                                         value.isPlaying
                                             ? LucideIcons.pause
                                             : LucideIcons.play,
+                                        size: AppIconSizes.standard,
                                       ),
                                     ),
                                   ),
@@ -343,12 +345,18 @@ class _VideoNoteCaptureState extends State<VideoNoteCapture>
                     children: [
                       TextButton.icon(
                         onPressed: _retake,
-                        icon: const Icon(LucideIcons.rotateCcw),
+                        icon: const Icon(
+                          LucideIcons.rotateCcw,
+                          size: AppIconSizes.standard,
+                        ),
                         label: const Text('Перезаписать'),
                       ),
                       FilledButton.icon(
                         onPressed: _send,
-                        icon: const Icon(LucideIcons.sendHorizontal),
+                        icon: const Icon(
+                          LucideIcons.sendHorizontal,
+                          size: AppIconSizes.standard,
+                        ),
                         label: const Text('Отправить'),
                       ),
                     ],
@@ -371,6 +379,7 @@ class _VideoNoteCaptureState extends State<VideoNoteCapture>
                         icon: const Icon(
                           LucideIcons.switchCamera,
                           color: Colors.white,
+                          size: AppIconSizes.standard,
                         ),
                       ),
                       IconButton.filled(
@@ -389,6 +398,7 @@ class _VideoNoteCaptureState extends State<VideoNoteCapture>
                             : _start,
                         icon: Icon(
                           _recording ? LucideIcons.square : LucideIcons.video,
+                          size: AppIconSizes.standard,
                         ),
                       ),
                       const SizedBox(width: 48),

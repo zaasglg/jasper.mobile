@@ -1,3 +1,4 @@
+import 'package:jospar/features/kanban/data/models/task_translation.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -122,6 +123,45 @@ void main() {
 }
 
 class _Repository implements KanbanRepository {
+  @override
+  Future<void> deleteTask(String taskId) async {
+    if (moveCompleter != null) await moveCompleter!.future;
+  }
+
+  @override
+  Future<ProjectTaskModel> duplicateTask(String taskId) async =>
+      const ProjectTaskModel(id: 'copy', projectId: 'project', status: 'TODO');
+  @override
+  Future<ProjectTaskModel> updateCover(
+    String taskId,
+    Map<String, dynamic>? cover,
+  ) async {
+    if (moveCompleter != null) await moveCompleter!.future;
+    return const ProjectTaskModel(
+      id: 'task',
+      projectId: 'project',
+      status: 'TODO',
+      detail: '{"cover":{"type":"color","color":"#fff"}}',
+    );
+  }
+
+  @override
+  Future<TaskTranslation> translateTask(
+    String taskId,
+    String workspaceId,
+    String language,
+  ) async => const TaskTranslation(title: 'Аударма', description: 'Мәтін');
+  @override
+  Future<ProjectTaskModel> applyTranslation(
+    String taskId,
+    TaskTranslation translation,
+  ) async => ProjectTaskModel(
+    id: taskId,
+    projectId: 'project',
+    status: 'TODO',
+    title: translation.title,
+  );
+
   _Repository({this.moveCompleter, this.moveError});
 
   final Completer<void>? moveCompleter;

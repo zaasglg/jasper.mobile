@@ -1,8 +1,9 @@
+import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/theme/dashboard_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 
-import '../../../../core/theme/app_theme.dart';
 import '../../../inbox/presentation/cubit/inbox_cubit.dart';
 import '../../../inbox/presentation/cubit/inbox_state.dart';
 
@@ -25,6 +26,7 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
   }
 
   Future<void> _createTask() async {
+    if (context.read<InboxCubit>().state.isCreating) return;
     final title = _controller.text.trim();
     if (title.isEmpty) return;
 
@@ -57,16 +59,20 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
       buildWhen: (previous, current) =>
           previous.isCreating != current.isCreating,
       builder: (context, state) {
+        final colors = Theme.of(context).colorScheme;
         final canSubmit =
             _controller.text.trim().isNotEmpty && !state.isCreating;
 
         return Container(
           key: const Key('dashboard-inbox-composer'),
-          padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
+          padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8F8FF),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE5E5F5)),
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: .5),
+            ),
+            boxShadow: DashboardSurface.shadows,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,51 +80,44 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
               Row(
                 children: <Widget>[
                   Container(
-                    width: 34,
-                    height: 34,
+                    width: AppSpacing.touchTarget,
+                    height: AppSpacing.touchTarget,
                     decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      color: colors.primaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.inbox_rounded,
-                      size: 19,
-                      color: AppColors.accent,
+                      size: AppIconSizes.standard,
+                      color: colors.onPrimaryContainer,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
                           'Быстро в Инбокс',
-                          style: GoogleFonts.manrope(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.ink,
-                          ),
+                          style: AppTypography.title(context),
                         ),
                         Text(
                           'Запишите сейчас, разберите позже',
-                          style: GoogleFonts.manrope(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.muted,
-                          ),
+                          style: AppTypography.caption(
+                            context,
+                          )?.copyWith(color: colors.onSurfaceVariant),
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               Container(
-                padding: const EdgeInsets.fromLTRB(13, 3, 4, 3),
+                padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
+                  color: colors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Row(
                   children: <Widget>[
@@ -132,19 +131,18 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
                         onSubmitted: (_) => canSubmit ? _createTask() : null,
                         textCapitalization: TextCapitalization.sentences,
                         textInputAction: TextInputAction.done,
-                        style: GoogleFonts.manrope(
-                          fontSize: 14,
-                          color: AppColors.ink,
-                        ),
+                        style: AppTypography.body(context),
                         decoration: InputDecoration(
                           hintText: 'Что нужно не забыть?',
-                          hintStyle: GoogleFonts.manrope(
-                            fontSize: 14,
-                            color: AppColors.muted,
-                          ),
+                          filled: false,
+                          contentPadding: const EdgeInsets.all(AppSpacing.sm),
+                          hintStyle: AppTypography.body(
+                            context,
+                          )?.copyWith(color: colors.onSurfaceVariant),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
                         ),
                       ),
                     ),
@@ -153,21 +151,27 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
                       tooltip: 'Добавить в Инбокс',
                       onPressed: canSubmit ? _createTask : null,
                       style: IconButton.styleFrom(
-                        minimumSize: const Size.square(40),
-                        backgroundColor: AppColors.accent,
-                        disabledBackgroundColor: AppColors.skeleton,
-                        foregroundColor: Colors.white,
-                        disabledForegroundColor: AppColors.muted,
+                        minimumSize: const Size.square(AppSpacing.touchTarget),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        backgroundColor: colors.primary,
+                        disabledBackgroundColor: colors.surfaceContainerHighest,
+                        foregroundColor: colors.onPrimary,
+                        disabledForegroundColor: colors.onSurfaceVariant,
                       ),
                       icon: state.isCreating
-                          ? const SizedBox.square(
-                              dimension: 17,
+                          ? SizedBox.square(
+                              dimension: AppIconSizes.standard,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: colors.onSurfaceVariant,
                               ),
                             )
-                          : const Icon(Icons.add_rounded, size: 23),
+                          : const Icon(
+                              Icons.add_rounded,
+                              size: AppIconSizes.standard,
+                            ),
                     ),
                   ],
                 ),

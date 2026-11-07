@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -12,7 +13,7 @@ import '../../../shell/presentation/screens/main_shell.dart';
 class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
   const DashboardAppBar({super.key});
 
-  static const double _iconSize = 22;
+  static const double _iconSize = AppIconSizes.standard;
   static const Color _iconColor = Color(0xFF1A1A1A);
 
   @override
@@ -21,7 +22,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: const Color(0xFFF5F6F8),
+      backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -42,7 +43,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         IconButton(
-          onPressed: () {},
+          onPressed: () => context.push('/dashboard/search'),
           tooltip: 'Поиск',
           icon: const Icon(
             LucideIcons.search,
@@ -61,7 +62,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
         IconButton(
-          onPressed: () {},
+          onPressed: () => context.push('/activity/notifications'),
           icon: const Icon(
             LucideIcons.bell,
             size: _iconSize,
@@ -72,7 +73,10 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
         Padding(
           padding: const EdgeInsets.only(right: 12),
           child: IconButton(
-            onPressed: () => context.push('/profile'),
+            onPressed: () async {
+              await context.push('/profile');
+              if (context.mounted) await context.read<ProfileCubit>().load();
+            },
             tooltip: 'Профиль',
             icon: BlocBuilder<ProfileCubit, ProfileState>(
               buildWhen: (previous, current) => current is ProfileLoaded,

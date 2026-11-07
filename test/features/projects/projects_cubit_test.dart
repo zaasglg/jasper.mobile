@@ -4,12 +4,118 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/projects/data/models/create_project_request.dart';
 import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
+import 'package:jospar/features/projects/data/repositories/project_repository_impl.dart';
 import 'package:jospar/features/projects/domain/repositories/project_repository.dart';
 import 'package:jospar/features/projects/domain/repositories/project_task_repository.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart';
 
 void main() {
   const workspaceOne = 'w1';
+
+  test('late refresh cannot remove a successfully created project', () async {
+    final repository = _FakeProjectRepository();
+    final cubit = ProjectsCubit(repository);
+    addTearDown(cubit.close);
+    await cubit.loadForWorkspace(workspaceOne);
+    final old = Completer<List<ProjectModel>>();
+    repository.nextLoad = old;
+    final refreshing = cubit.loadForWorkspace(workspaceOne, refresh: true);
+    expect(await cubit.createProject(_request()), isTrue);
+    old.complete([]);
+    await refreshing;
+    await Future<void>.delayed(Duration.zero);
+    expect(cubit.state.projects.map((item) => item.id), ['created']);
+    expect(cubit.state.creationRevision, 1);
+    expect(cubit.state.isLoading, isFalse);
+  });
+
+  test('refresh while creating cannot unlock duplicate submission', () async {
+    final pending = Completer<ProjectModel>();
+    final repository = _FakeProjectRepository(createCompleter: pending);
+    final cubit = ProjectsCubit(repository);
+    addTearDown(cubit.close);
+    await cubit.loadForWorkspace(workspaceOne);
+    final creating = cubit.createProject(_request());
+    await cubit.loadForWorkspace(workspaceOne, refresh: true);
+    final duplicate = cubit.createProject(_request());
+    pending.complete(_project(id: 'created', workspaceId: workspaceOne));
+    expect(await creating, isTrue);
+    expect(await duplicate, isFalse);
+    await Future<void>.delayed(Duration.zero);
+    expect(repository.createCalls, 1);
+    expect(cubit.state.projects.map((item) => item.id), ['created']);
+    expect(cubit.state.isCreating, isFalse);
+  });
+
+  test(
+    'old workspace creation failure does not leak into new workspace',
+    () async {
+      final pending = Completer<ProjectModel>();
+      final repository = _FakeProjectRepository(createCompleter: pending);
+      final cubit = ProjectsCubit(repository);
+      addTearDown(cubit.close);
+      await cubit.loadForWorkspace(workspaceOne);
+      final creating = cubit.createProject(_request());
+      await cubit.loadForWorkspace('w2');
+      pending.completeError(
+        const ProjectException('Нет доступа к первому workspace'),
+      );
+      expect(await creating, isFalse);
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.state.workspaceId, 'w2');
+      expect(cubit.state.creationError, isNull);
+      expect(cubit.state.isCreating, isFalse);
+      expect(cubit.state.isLoading, isFalse);
+    },
+  );
+
+  test(
+    'successful creation stays successful if the queued refresh fails',
+    () async {
+      final pending = Completer<ProjectModel>();
+      final reading = Completer<List<ProjectModel>>();
+      final repository = _FakeProjectRepository(createCompleter: pending);
+      final cubit = ProjectsCubit(repository);
+      addTearDown(cubit.close);
+      await cubit.loadForWorkspace(workspaceOne);
+      final creating = cubit.createProject(_request());
+      repository.nextLoad = reading;
+      await cubit.loadForWorkspace(workspaceOne, refresh: true);
+      pending.complete(_project(id: 'created', workspaceId: workspaceOne));
+      expect(await creating.timeout(const Duration(seconds: 5)), isTrue);
+      reading.completeError(const ProjectException('Ошибка обновления'));
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.state.projects.map((item) => item.id), ['created']);
+      expect(cubit.state.creationRevision, 1);
+      expect(cubit.state.isCreating, isFalse);
+      expect(cubit.state.errorMessage, 'Ошибка обновления');
+    },
+  );
+
+  test('only the latest workspace is loaded after creation finishes', () async {
+    final pending = Completer<ProjectModel>();
+    final repository = _FakeProjectRepository(
+      createCompleter: pending,
+      projects: [
+        _project(id: 'second', workspaceId: 'w2'),
+        _project(id: 'third', workspaceId: 'w3'),
+      ],
+    );
+    final cubit = ProjectsCubit(repository);
+    addTearDown(cubit.close);
+    await cubit.loadForWorkspace(workspaceOne);
+    final creating = cubit.createProject(_request());
+    await cubit.loadForWorkspace('w2');
+    await cubit.loadForWorkspace('w3');
+    pending.complete(_project(id: 'created', workspaceId: workspaceOne));
+    expect(await creating, isTrue);
+    await Future<void>.delayed(Duration.zero);
+    expect(cubit.state.workspaceId, 'w3');
+    expect(cubit.state.projects.map((item) => item.id), ['third']);
+    expect(cubit.state.isCreating, isFalse);
+    expect(cubit.state.isLoading, isFalse);
+    expect(cubit.state.creationRevision, 1);
+  });
 
   test('filters projects by workspace and sorts pinned first stably', () async {
     final repository = _FakeProjectRepository(
@@ -184,21 +290,32 @@ class _FakeProjectRepository implements ProjectRepository {
     this.createCompleter,
   });
 
-  final List<ProjectModel> projects;
+  List<ProjectModel> projects;
+  Completer<List<ProjectModel>>? nextLoad;
   final Completer<ProjectModel>? createCompleter;
   int createCalls = 0;
 
   @override
-  Future<ProjectModel> createProject(CreateProjectRequest request) {
+  Future<ProjectModel> createProject(CreateProjectRequest request) async {
     createCalls++;
-    return createCompleter?.future ??
-        Future<ProjectModel>.value(
-          _project(id: 'created', workspaceId: request.workspaceId),
-        );
+    final created =
+        await (createCompleter?.future ??
+            Future.value(
+              _project(id: 'created', workspaceId: request.workspaceId),
+            ));
+    projects = [
+      ...projects.where((project) => project.id != created.id),
+      created,
+    ];
+    return created;
   }
 
   @override
-  Future<List<ProjectModel>> getProjects() async => projects;
+  Future<List<ProjectModel>> getProjects() async {
+    final pending = nextLoad;
+    nextLoad = null;
+    return pending?.future ?? List.of(projects);
+  }
 }
 
 class _FakeProjectTaskRepository implements ProjectTaskRepository {

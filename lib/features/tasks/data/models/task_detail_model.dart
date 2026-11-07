@@ -5,6 +5,8 @@ export 'task_label_model.dart';
 
 import '../../../projects/data/models/project_task_model.dart';
 
+const _unchangedChecklistDate = Object();
+
 class TaskDetailsPayload extends Equatable {
   const TaskDetailsPayload({
     required this.task,
@@ -195,8 +197,7 @@ class TaskChecklistModel extends Equatable {
     'id': id,
     'name': name,
     'items': items.map((item) => item.toJson()).toList(growable: false),
-    if (sections.isNotEmpty)
-      'sections': sections.map((item) => item.toJson()).toList(growable: false),
+    'sections': sections.map((item) => item.toJson()).toList(growable: false),
   };
 
   TaskChecklistModel copyWith({
@@ -299,15 +300,15 @@ class TaskChecklistItemModel extends Equatable {
     'id': id,
     'text': text,
     'done': done,
-    if (dueDate != null) 'dueDate': dueDate!.toIso8601String(),
-    if (assigneeIds.isNotEmpty) 'assigneeIds': assigneeIds,
+    'dueDate': dueDate?.toIso8601String(),
+    'assigneeIds': assigneeIds,
   };
 
   TaskChecklistItemModel copyWith({
     String? id,
     String? text,
     bool? done,
-    DateTime? dueDate,
+    Object? dueDate = _unchangedChecklistDate,
     List<String>? assigneeIds,
     Map<String, Object?>? raw,
   }) {
@@ -315,7 +316,9 @@ class TaskChecklistItemModel extends Equatable {
       id: id ?? this.id,
       text: text ?? this.text,
       done: done ?? this.done,
-      dueDate: dueDate ?? this.dueDate,
+      dueDate: identical(dueDate, _unchangedChecklistDate)
+          ? this.dueDate
+          : dueDate as DateTime?,
       assigneeIds: assigneeIds ?? this.assigneeIds,
       raw: raw ?? this.raw,
     );
@@ -369,6 +372,17 @@ class TaskCommentModel extends Equatable {
   final bool isPinned;
   final DateTime? deletedAt;
   final Map<String, Object?> raw;
+
+  List<TaskFileModel> get files =>
+      _modelList(raw['files'], TaskFileModel.fromJson)
+          .asMap()
+          .entries
+          .map(
+            (entry) => entry.value.id.isEmpty
+                ? entry.value.copyWith(id: '$id-file-${entry.key}')
+                : entry.value,
+          )
+          .toList();
 
   bool get isDeleted => deletedAt != null;
 

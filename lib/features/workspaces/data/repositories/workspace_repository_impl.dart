@@ -10,9 +10,18 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
   final Dio _dio;
 
   @override
-  Future<List<WorkspaceModel>> getWorkspaces() async {
+  Future<List<WorkspaceModel>> getWorkspaces() => _loadList('workspaces');
+
+  @override
+  Future<List<WorkspaceModel>> getArchivedWorkspaces() =>
+      _loadList('workspaces/archived');
+
+  Future<List<WorkspaceModel>> _loadList(String path) async {
     try {
-      final response = await _dio.get<dynamic>('workspaces');
+      final response = await _dio.get<dynamic>(
+        path,
+        options: Options(headers: {'Cache-Control': 'no-cache'}),
+      );
       final items = _unwrapItems(response.data);
       return items
           .whereType<Map>()
