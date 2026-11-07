@@ -13,6 +13,8 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../data/models/chat_conversation_model.dart';
 import '../cubit/chat_cubit.dart';
 import '../../../shell/presentation/screens/main_shell.dart';
+import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
+import '../../../workspaces/presentation/cubit/workspace_state.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -271,20 +273,32 @@ class _Header extends StatelessWidget {
               size: AppIconSizes.standard,
             ),
           ),
+          const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              'Мессенджер',
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.manrope(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.35,
+            child: BlocSelector<WorkspaceCubit, WorkspaceState, String>(
+              selector: (state) {
+                final name = state is WorkspaceLoaded
+                    ? state.selected?.name.trim()
+                    : null;
+                return name == null || name.isEmpty ? 'Воркспейс' : name;
+              },
+              builder: (context, name) => Tooltip(
+                message: name,
+                child: Text(
+                  name,
+                  textAlign: TextAlign.left,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.manrope(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.35,
+                  ),
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 48),
         ],
       ),
     );

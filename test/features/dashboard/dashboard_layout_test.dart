@@ -62,6 +62,73 @@ DashboardLayout fixture() => DashboardLayout.parse({
   },
 });
 void main() {
+  test('empty dashboard config uses defaults', () {
+    final defaults = DashboardLayout.defaults();
+    for (final value in <dynamic>[
+      null,
+      '',
+      ' \n\t ',
+      'null',
+      {'layout': ''},
+      {'layout': ' \n\t '},
+      {'layout': 'null'},
+    ]) {
+      expect(DashboardLayout.parse(value), defaults);
+    }
+  });
+
+  test('invalid non-empty dashboard config still fails', () {
+    for (final value in <dynamic>[
+      '{broken',
+      {},
+      {'layout': {}},
+      {'widgets': 'invalid'},
+    ]) {
+      expect(() => DashboardLayout.parse(value), throwsFormatException);
+    }
+    expect(DashboardLayout.parse(jsonEncode(fixture().extra)), fixture());
+  });
+
+  test(
+    'switching to a workspace with an empty API response loads defaults',
+    () async {
+      final adapter = DashboardAdapter()
+        ..configResponseBody = jsonEncode({'layout': fixture().extra});
+      final cubit = DashboardLayoutCubit(
+        DashboardRepositoryImpl(Dio()..httpClientAdapter = adapter),
+      );
+      addTearDown(cubit.close);
+      await cubit.configure('u', 'existing');
+      expect(cubit.state.layout, fixture());
+
+      adapter.configResponseBody = '';
+      await cubit.configure('u', 'new');
+      expect(cubit.state.workspaceId, 'new');
+      expect(cubit.state.layout, DashboardLayout.defaults());
+      expect(cubit.state.loading, false);
+      expect(cubit.state.error, isNull);
+      expect(
+        adapter.requests.every((request) => request.method == 'GET'),
+        isTrue,
+      );
+    },
+  );
+
+  test('HTTP errors do not fall back to a default dashboard', () async {
+    final adapter = DashboardAdapter()..configResponseBody = '';
+    final cubit = DashboardLayoutCubit(
+      DashboardRepositoryImpl(Dio()..httpClientAdapter = adapter),
+    );
+    addTearDown(cubit.close);
+    for (final status in [403, 500]) {
+      adapter.configStatusCode = status;
+      await cubit.configure('u', 'w', refresh: true);
+      expect(cubit.state.layout, isNull);
+      expect(cubit.state.loading, false);
+      expect(cubit.state.error, isNotNull);
+    }
+  });
+
   test(
     'uses web defaults and normalizes legacy layouts without losing unknown preferences',
     () {
@@ -358,6 +425,8 @@ class FakeDashboardRepository implements DashboardRepository {
 
 class DashboardAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
+  String? configResponseBody;
+  int configStatusCode = 200;
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -365,6 +434,17 @@ class DashboardAdapter implements HttpClientAdapter {
     Future<void>? cancel,
   ) async {
     requests.add(options);
+    if (options.path == 'dashboard/config' &&
+        options.method == 'GET' &&
+        configResponseBody != null) {
+      return ResponseBody.fromString(
+        configResponseBody!,
+        configStatusCode,
+        headers: {
+          Headers.contentTypeHeader: ['application/json'],
+        },
+      );
+    }
     final dynamic result;
     if (options.path == 'dashboard/config') {
       result = {

@@ -1,15 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/core/storage/workspace_selection_storage.dart';
-import 'package:jospar/features/projects/data/models/create_project_request.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
-import 'package:jospar/features/projects/domain/repositories/project_repository.dart';
-import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart';
 import 'package:jospar/features/shell/presentation/widgets/app_drawer.dart';
 import 'package:jospar/features/workspaces/data/models/create_workspace_request.dart';
 import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
@@ -21,15 +14,11 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'short drawer keeps workspace form and projects in one scroll',
+    'short drawer scrolls workspaces and form with settings fixed below',
     (tester) async {
-      final bytes = await File('/tmp/jospar-manrope.ttf').readAsBytes();
-      await (FontLoader(
-        'Manrope',
-      )..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)))).load();
       GoogleFonts.config.allowRuntimeFetching = false;
       FlutterSecureStorage.setMockInitialValues(<String, String>{});
-      tester.view.physicalSize = const Size(375, 667);
+      tester.view.physicalSize = const Size(375, 480);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -40,70 +29,51 @@ void main() {
           const FlutterSecureStorage(),
         ),
       );
-      final projectsCubit = ProjectsCubit(_ProjectRepo());
       await workspaceCubit.load();
-      await projectsCubit.loadForWorkspace('ws-digital');
       addTearDown(workspaceCubit.close);
-      addTearDown(projectsCubit.close);
 
       final scaffoldKey = GlobalKey<ScaffoldState>();
       await tester.pumpWidget(
         MultiBlocProvider(
           providers: <BlocProvider<dynamic>>[
             BlocProvider<WorkspaceCubit>.value(value: workspaceCubit),
-            BlocProvider<ProjectsCubit>.value(value: projectsCubit),
           ],
           child: MaterialApp(
             home: Scaffold(
               key: scaffoldKey,
-              drawer: AppDrawer(
-                onCreateProject: () async {},
-                onOpenSettings: () {},
-              ),
+              drawer: AppDrawer(onOpenSettings: () {}),
               body: const SizedBox.expand(),
             ),
           ),
         ),
       );
       scaffoldKey.currentState!.openDrawer();
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Цифровизация').first);
-      await tester.pump(const Duration(milliseconds: 300));
+      final settingsPosition = tester.getCenter(find.text('Настройки'));
+      expect(find.text('ВОРКСПЕЙСЫ'), findsOneWidget);
+      expect(find.text('Цифровизация'), findsOneWidget);
+      expect(find.text('ПРОЕКТЫ'), findsNothing);
       await tester.ensureVisible(find.byKey(const Key('add-workspace-row')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('add-workspace-row')));
       await tester.pump(const Duration(milliseconds: 300));
 
       final createButton = find.byKey(const Key('create-workspace-button'));
       final cancelButton = find.byKey(const Key('cancel-workspace-button'));
-      final projectsContent = find.byKey(const Key('drawer-projects-content'));
-      final projectPlus = find.byKey(const Key('create-project-button'));
+      final workspacesContent = find.byKey(
+        const Key('drawer-workspaces-content'),
+      );
       expect(createButton, findsOneWidget);
       expect(cancelButton, findsOneWidget);
-      expect(projectsContent, findsOneWidget);
-      expect(
-        tester.getBottomLeft(cancelButton).dy,
-        lessThanOrEqualTo(tester.getTopLeft(projectsContent).dy),
-      );
+      expect(workspacesContent, findsOneWidget);
 
       await tester.ensureVisible(cancelButton);
       await tester.pump(const Duration(milliseconds: 300));
       expect(cancelButton, findsOneWidget);
-      await expectLater(
-        find.byType(MaterialApp),
-        matchesGoldenFile('goldens/drawer_form_reachable.png'),
-      );
-
-      await tester.ensureVisible(projectPlus);
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(projectPlus, findsOneWidget);
-      await expectLater(
-        find.byType(MaterialApp),
-        matchesGoldenFile('goldens/drawer_projects_reachable.png'),
-      );
+      expect(tester.getCenter(find.text('Настройки')), settingsPosition);
+      expect(tester.takeException(), isNull);
     },
-    // This manual golden evaluation needs a font fixture outside the repo.
-    skip: !File('/tmp/jospar-manrope.ttf').existsSync(),
   );
 }
 
@@ -132,31 +102,4 @@ class _WorkspaceRepo implements WorkspaceRepository {
     CreateWorkspaceRequest request,
   ) async =>
       WorkspaceModel(id: 'created', name: request.name, color: request.color);
-}
-
-class _ProjectRepo implements ProjectRepository {
-  @override
-  Future<List<ProjectModel>> getProjects() async => <ProjectModel>[
-    ProjectModel(
-      id: 'pinned',
-      code: 'PIN',
-      name: 'Процессы отдела продаж',
-      workspaceId: 'ws-digital',
-      start: null,
-      end: null,
-      isPinned: true,
-    ),
-    ProjectModel(
-      id: 'project',
-      code: 'ORB',
-      name: 'Orbita Platform',
-      workspaceId: 'ws-digital',
-      start: null,
-      end: null,
-    ),
-  ];
-
-  @override
-  Future<ProjectModel> createProject(CreateProjectRequest request) =>
-      throw UnimplementedError();
 }

@@ -30,6 +30,10 @@ class ProjectsScreen extends StatelessWidget {
         final workspace = workspaceState is WorkspaceLoaded
             ? workspaceState.selected
             : null;
+        final workspaceName = workspace?.name.trim();
+        final title = workspaceName == null || workspaceName.isEmpty
+            ? 'Воркспейс'
+            : workspaceName;
         return Scaffold(
           backgroundColor: _surface,
           appBar: AppBar(
@@ -44,13 +48,18 @@ class ProjectsScreen extends StatelessWidget {
                 size: AppIconSizes.standard,
               ),
             ),
-            title: Text(
-              'Проекты',
-              style: GoogleFonts.manrope(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: _ink,
-                letterSpacing: -0.35,
+            title: Tooltip(
+              message: title,
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.manrope(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
+                  letterSpacing: -0.35,
+                ),
               ),
             ),
             actions: <Widget>[
@@ -150,39 +159,8 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
       builder: (context, state) {
         return Column(
           children: <Widget>[
-            Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              color: Colors.white,
-              child: Row(
-                children: <Widget>[
-                  const Icon(
-                    LucideIcons.folder,
-                    size: AppIconSizes.standard,
-                    color: _accent,
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      widget.workspace.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.manrope(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _ink,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    _projectCount(state.projects.length),
-                    style: GoogleFonts.manrope(fontSize: 12, color: _secondary),
-                  ),
-                ],
-              ),
-            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Row(
                 children: [
                   Expanded(
@@ -282,6 +260,16 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _projectCount(state.projects.length),
+                  style: GoogleFonts.manrope(fontSize: 12, color: _secondary),
+                ),
               ),
             ),
             if (state.errorMessage != null && state.projects.isNotEmpty)

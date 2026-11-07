@@ -21,6 +21,9 @@ import 'package:jospar/features/tasks/domain/repositories/my_tasks_repository.da
 import 'package:jospar/features/tasks/presentation/cubit/my_tasks_cubit.dart';
 import 'package:jospar/features/tasks/data/models/kanban_column_model.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
+import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
+import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';
 import 'dashboard_layout_test.dart' show FakeDashboardRepository;
 
 void main() {
@@ -49,14 +52,19 @@ void main() {
       final projects = ProjectsCubit(_Projects());
       await projects.loadForWorkspace('w');
       addTearDown(projects.close);
+      final workspace = _Workspace();
+      addTearDown(workspace.close);
       String? requestedWorkspace;
       final router = GoRouter(
         initialLocation: '/dashboard',
         routes: [
           GoRoute(
             path: '/dashboard',
-            builder: (_, _) => BlocProvider.value(
-              value: projects,
+            builder: (_, _) => MultiBlocProvider(
+              providers: [
+                BlocProvider<ProjectsCubit>.value(value: projects),
+                BlocProvider<WorkspaceCubit>.value(value: workspace),
+              ],
               child: const DashboardScreen(),
             ),
           ),
@@ -72,6 +80,20 @@ void main() {
       addTearDown(router.dispose);
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       await tester.pumpAndSettle();
+      expect(find.text('Цифровизация'), findsOneWidget);
+      expect(find.text('Дашборд'), findsNothing);
+      workspace.showWorkspace(
+        const WorkspaceModel(
+          id: 'w',
+          name: 'Цифровизация и развитие рабочих процессов',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Цифровизация'), findsNothing);
+      expect(
+        find.text('Цифровизация и развитие рабочих процессов'),
+        findsOneWidget,
+      );
       expect(
         find.text('Добавьте виджеты через кнопку редактирования'),
         findsOneWidget,
@@ -119,6 +141,18 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+}
+
+class _Workspace extends Cubit<WorkspaceState> implements WorkspaceCubit {
+  _Workspace() : super(const WorkspaceInitial()) {
+    showWorkspace(const WorkspaceModel(id: 'w', name: 'Цифровизация'));
+  }
+
+  void showWorkspace(WorkspaceModel workspace) =>
+      emit(WorkspaceLoaded(workspaces: [workspace], selected: workspace));
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _Profile implements ProfileRepository {

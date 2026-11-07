@@ -6,6 +6,9 @@ import 'package:jospar/features/chat/data/models/chat_message_model.dart';
 import 'package:jospar/features/chat/domain/repositories/chat_repository.dart';
 import 'package:jospar/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:jospar/features/chat/presentation/screens/chat_screen.dart';
+import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
+import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';
 
 void main() {
   testWidgets('renders Slack-style messenger and filters conversations', (
@@ -18,15 +21,20 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: BlocProvider(
-          create: (_) => ChatCubit(_FakeChatRepository())..load(),
+        home: MultiBlocProvider(
+          providers: [
+            BlocProvider<ChatCubit>(
+              create: (_) => ChatCubit(_FakeChatRepository())..load(),
+            ),
+            BlocProvider<WorkspaceCubit>(create: (_) => _Workspace()),
+          ],
           child: const ChatScreen(),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Мессенджер'), findsOneWidget);
+    expect(find.text('Цифровизация'), findsOneWidget);
     expect(find.text('JOSPAR.ME'), findsNothing);
     expect(find.byKey(const Key('messenger-search')), findsOneWidget);
     expect(find.text('Каналы'), findsOneWidget);
@@ -48,6 +56,19 @@ void main() {
     expect(find.text('Ничего не найдено'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+}
+
+class _Workspace extends Cubit<WorkspaceState> implements WorkspaceCubit {
+  _Workspace()
+    : super(
+        const WorkspaceLoaded(
+          workspaces: [WorkspaceModel(id: 'w', name: 'Цифровизация')],
+          selected: WorkspaceModel(id: 'w', name: 'Цифровизация'),
+        ),
+      );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeChatRepository implements ChatRepository {

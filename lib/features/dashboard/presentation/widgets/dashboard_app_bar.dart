@@ -9,6 +9,8 @@ import '../../../profile/presentation/cubit/profile_cubit.dart';
 import '../../../profile/presentation/cubit/profile_state.dart';
 import '../../../profile/presentation/widgets/profile_avatar.dart';
 import '../../../shell/presentation/screens/main_shell.dart';
+import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
+import '../../../workspaces/presentation/cubit/workspace_state.dart';
 
 class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
   const DashboardAppBar({super.key});
@@ -33,12 +35,25 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
         tooltip: 'Меню',
         icon: const Icon(LucideIcons.menu, size: _iconSize, color: _iconColor),
       ),
-      title: Text(
-        'Дашборд',
-        style: GoogleFonts.manrope(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: const Color(0xFF1A1A1A),
+      title: BlocSelector<WorkspaceCubit, WorkspaceState, String>(
+        selector: (state) {
+          final name = state is WorkspaceLoaded
+              ? state.selected?.name.trim()
+              : null;
+          return name == null || name.isEmpty ? 'Воркспейс' : name;
+        },
+        builder: (context, name) => Tooltip(
+          message: name,
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.manrope(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF1A1A1A),
+            ),
+          ),
         ),
       ),
       actions: [

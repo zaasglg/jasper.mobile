@@ -9,7 +9,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../projects/presentation/cubit/projects_cubit.dart';
-import '../../../projects/presentation/widgets/create_project_sheet.dart';
 import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
 import '../../../workspaces/presentation/cubit/workspace_state.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
@@ -317,7 +316,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             key: MainShell.scaffoldKey,
             onDrawerChanged: _onDrawerChanged,
             drawer: AppDrawer(
-              onCreateProject: () => showCreateProjectFlow(shellContext),
               onOpenSettings: () {
                 MainShell.scaffoldKey.currentState?.closeDrawer();
                 shellContext.push(

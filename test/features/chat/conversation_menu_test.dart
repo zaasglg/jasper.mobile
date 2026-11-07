@@ -8,6 +8,22 @@ import 'package:jospar/features/chat/domain/repositories/chat_repository.dart';
 import 'package:jospar/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:jospar/features/chat/presentation/screens/chat_screen.dart';
 import 'package:jospar/features/collaboration/data/collaboration_models.dart';
+import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
+import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';
+
+class _Workspace extends Cubit<WorkspaceState> implements WorkspaceCubit {
+  _Workspace()
+    : super(
+        const WorkspaceLoaded(
+          workspaces: [WorkspaceModel(id: 'w', name: 'Цифровизация')],
+          selected: WorkspaceModel(id: 'w', name: 'Цифровизация'),
+        ),
+      );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   setUp(() => GoogleFonts.config.allowRuntimeFetching = false);
@@ -18,7 +34,13 @@ void main() {
     await cubit.load();
     await t.pumpWidget(
       MaterialApp(
-        home: BlocProvider.value(value: cubit, child: const ChatScreen()),
+        home: MultiBlocProvider(
+          providers: [
+            BlocProvider<ChatCubit>.value(value: cubit),
+            BlocProvider<WorkspaceCubit>(create: (_) => _Workspace()),
+          ],
+          child: const ChatScreen(),
+        ),
       ),
     );
     await t.pumpAndSettle();

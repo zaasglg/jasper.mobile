@@ -193,8 +193,12 @@ class DashboardLayout extends Equatable {
   factory DashboardLayout.fromJson(Map<String, dynamic> json) =>
       DashboardLayout.parse(json);
   static DashboardLayout parse(dynamic value) {
+    if (value is String) {
+      // Workspaces without saved settings can return an empty HTTP 200 body.
+      if (value.trim().isEmpty) return defaults();
+      value = jsonDecode(value);
+    }
     if (value == null) return defaults();
-    if (value is String) value = jsonDecode(value);
     if (value is Map && value.containsKey('layout')) {
       return parse(value['layout']);
     }

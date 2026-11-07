@@ -11,21 +11,13 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/storage/auth_token_storage.dart';
-import '../../../projects/data/models/project_model.dart';
-import '../../../projects/presentation/cubit/projects_cubit.dart';
-import '../../../projects/presentation/cubit/projects_state.dart';
 import '../../../workspaces/data/models/workspace_model.dart';
 import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
 import '../../../workspaces/presentation/cubit/workspace_state.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({
-    super.key,
-    required this.onCreateProject,
-    required this.onOpenSettings,
-  });
+  const AppDrawer({super.key, required this.onOpenSettings});
 
-  final Future<void> Function() onCreateProject;
   final VoidCallback onOpenSettings;
 
   static const Color _bg = Color(0xFFF7F8FA);
@@ -45,13 +37,16 @@ class AppDrawer extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const _WorkspaceHeader(),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(21, 20, 21, 16),
+              child: _SectionLabel('ВОРКСПЕЙСЫ'),
+            ),
             Expanded(
               child: SingleChildScrollView(
                 key: const Key('drawer-scroll-view'),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                child: _DrawerProjects(onCreateProject: onCreateProject),
+                child: const _DrawerWorkspaces(),
               ),
             ),
             const Divider(height: 1, color: _border),
@@ -71,299 +66,32 @@ class AppDrawer extends StatelessWidget {
   }
 }
 
-class _DrawerProjects extends StatelessWidget {
-  const _DrawerProjects({required this.onCreateProject});
-
-  final Future<void> Function() onCreateProject;
+class _DrawerWorkspaces extends StatefulWidget {
+  const _DrawerWorkspaces();
 
   @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<ProjectsCubit, ProjectsState>(
-      builder: (context, state) {
-        if (state.isLoading && state.projects.isEmpty) {
-          return const SizedBox(
-            height: 160,
-            child: Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppDrawer._purple,
-              ),
-            ),
-          );
-        }
-
-        final pinned = state.projects
-            .where((project) => project.isPinned)
-            .toList(growable: false);
-        final regular = state.projects
-            .where((project) => !project.isPinned)
-            .toList(growable: false);
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
-          child: Column(
-            key: const Key('drawer-projects-content'),
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _SectionLabel('ЗАКРЕПЛЕНО'),
-              const SizedBox(height: 6),
-              if (pinned.isEmpty)
-                const _EmptyDrawerSection('Нет закреплённых проектов')
-              else
-                ...pinned.map(
-                  (project) => _ProjectDrawerItem(
-                    project: project,
-                    isActive: project.id == state.selectedProjectId,
-                    icon: LucideIcons.pin,
-                    iconColor: AppDrawer._purple,
-                  ),
-                ),
-              const SizedBox(height: 12),
-              const Divider(height: 1, color: AppDrawer._border),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  const Expanded(child: _SectionLabel('ПРОЕКТЫ')),
-                  InkWell(
-                    key: const Key('create-project-button'),
-                    onTap: () => _createProject(context),
-                    borderRadius: BorderRadius.circular(6),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(
-                        LucideIcons.plus,
-                        size: AppIconSizes.standard,
-                        color: AppDrawer._muted,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              if (state.errorMessage != null && state.projects.isEmpty)
-                _DrawerProjectsError(
-                  message: state.errorMessage!,
-                  onRetry: state.workspaceId == null
-                      ? null
-                      : () => context.read<ProjectsCubit>().loadForWorkspace(
-                          state.workspaceId!,
-                        ),
-                )
-              else if (regular.isEmpty)
-                const _EmptyDrawerSection('В этом workspace нет проектов')
-              else
-                ...regular.map(
-                  (project) => _ProjectDrawerItem(
-                    project: project,
-                    isActive: project.id == state.selectedProjectId,
-                    icon: LucideIcons.folder,
-                    iconColor: AppDrawer._muted,
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  static void _openProjects(BuildContext context) {
-    final router = GoRouter.of(context);
-    Navigator.of(context).pop();
-    router.go('/projects');
-  }
-
-  Future<void> _createProject(BuildContext context) async {
-    Navigator.of(context).pop();
-    await Future<void>.delayed(const Duration(milliseconds: 220));
-    await onCreateProject();
-  }
+  State<_DrawerWorkspaces> createState() => _DrawerWorkspacesState();
 }
 
-class _ProjectDrawerItem extends StatelessWidget {
-  const _ProjectDrawerItem({
-    required this.project,
-    required this.isActive,
-    required this.icon,
-    required this.iconColor,
-  });
-
-  final ProjectModel project;
-  final bool isActive;
-  final IconData icon;
-  final Color iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SidebarItem(
-      icon: icon,
-      iconColor: iconColor,
-      label: project.name.isEmpty ? project.code : project.name,
-      isActive: isActive,
-      onTap: () {
-        context.read<ProjectsCubit>().selectProject(project.id);
-        _DrawerProjects._openProjects(context);
-      },
-    );
-  }
-}
-
-class _EmptyDrawerSection extends StatelessWidget {
-  const _EmptyDrawerSection(this.message);
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
-      child: Text(
-        message,
-        style: GoogleFonts.manrope(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: AppDrawer._muted,
-        ),
-      ),
-    );
-  }
-}
-
-class _DrawerProjectsError extends StatelessWidget {
-  const _DrawerProjectsError({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            message,
-            style: GoogleFonts.manrope(
-              fontSize: 12,
-              color: const Color(0xFFA53C35),
-            ),
-          ),
-          if (onRetry != null)
-            TextButton(onPressed: onRetry, child: const Text('Повторить')),
-        ],
-      ),
-    );
-  }
-}
-
-class _WorkspaceHeader extends StatefulWidget {
-  const _WorkspaceHeader();
-
-  @override
-  State<_WorkspaceHeader> createState() => _WorkspaceHeaderState();
-}
-
-class _WorkspaceHeaderState extends State<_WorkspaceHeader> {
-  bool _isExpanded = false;
+class _DrawerWorkspacesState extends State<_DrawerWorkspaces> {
   bool _showCreateForm = false;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppDrawer._border)),
-      ),
-      child: BlocBuilder<WorkspaceCubit, WorkspaceState>(
-        builder: (context, state) {
-          final loaded = state is WorkspaceLoaded ? state : null;
-          final selected = loaded?.selected;
-
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              InkWell(
-                onTap: state is WorkspaceLoading
-                    ? null
-                    : () => setState(() {
-                        _isExpanded = !_isExpanded;
-                        if (!_isExpanded) _showCreateForm = false;
-                      }),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-                  child: Row(
-                    children: [
-                      if (state is WorkspaceLoading)
-                        const SizedBox.square(
-                          dimension: 28,
-                          child: Padding(
-                            padding: EdgeInsets.all(5),
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppDrawer._purple,
-                            ),
-                          ),
-                        )
-                      else
-                        _WorkspaceBadge(workspace: selected, size: 28),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _headerTitle(state),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.manrope(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppDrawer._text,
-                          ),
-                        ),
-                      ),
-                      AnimatedRotation(
-                        turns: _isExpanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 180),
-                        child: const Icon(
-                          LucideIcons.chevronDown,
-                          size: AppIconSizes.standard,
-                          color: AppDrawer._muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                child: _isExpanded
-                    ? _WorkspaceDropdown(
-                        state: state,
-                        showCreateForm: _showCreateForm,
-                        onAdd: () => setState(() => _showCreateForm = true),
-                        onCancel: () => setState(() => _showCreateForm = false),
-                        onCreated: () =>
-                            setState(() => _showCreateForm = false),
-                      )
-                    : const SizedBox(width: double.infinity),
-              ),
-            ],
-          );
-        },
+    return BlocBuilder<WorkspaceCubit, WorkspaceState>(
+      builder: (context, state) => _WorkspaceList(
+        state: state,
+        showCreateForm: _showCreateForm,
+        onAdd: () => setState(() => _showCreateForm = true),
+        onCancel: () => setState(() => _showCreateForm = false),
+        onCreated: () => setState(() => _showCreateForm = false),
       ),
     );
   }
-
-  String _headerTitle(WorkspaceState state) {
-    if (state is WorkspaceLoaded) {
-      return state.selected?.name ?? 'Нет workspace';
-    }
-    if (state is WorkspaceFailure) return 'Workspace';
-    return 'Загрузка...';
-  }
 }
 
-class _WorkspaceDropdown extends StatelessWidget {
-  const _WorkspaceDropdown({
+class _WorkspaceList extends StatelessWidget {
+  const _WorkspaceList({
     required this.state,
     required this.showCreateForm,
     required this.onAdd,
@@ -403,15 +131,23 @@ class _WorkspaceDropdown extends StatelessWidget {
       );
     }
 
-    if (state is! WorkspaceLoaded) return const SizedBox.shrink();
+    if (state is! WorkspaceLoaded) {
+      return const SizedBox(
+        height: 160,
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppDrawer._purple,
+          ),
+        ),
+      );
+    }
     final loaded = state as WorkspaceLoaded;
     return Material(
-      color: Colors.white,
-      child: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: AppDrawer._border)),
-        ),
+      color: AppDrawer._bg,
+      child: Padding(
+        key: const Key('drawer-workspaces-content'),
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
         child: Column(
           children: [
             if (loaded.isRefreshing)
@@ -462,41 +198,18 @@ class _WorkspaceDropdown extends StatelessWidget {
             else
               ...loaded.workspaces.map((workspace) {
                 final isSelected = workspace.id == loaded.selected?.id;
-                return InkWell(
+                return _SidebarItem(
+                  key: ValueKey('drawer-workspace-${workspace.id}'),
+                  icon: LucideIcons.layers,
+                  iconColor: AppDrawer._muted,
+                  leading: _WorkspaceBadge(workspace: workspace, size: 28),
+                  label: workspace.name.isEmpty
+                      ? 'Без названия'
+                      : workspace.name,
+                  isActive: isSelected,
                   onTap: loaded.isCreating
                       ? null
-                      : () => context.read<WorkspaceCubit>().select(workspace),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 9, 12, 9),
-                    child: Row(
-                      children: [
-                        _WorkspaceBadge(workspace: workspace, size: 32),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            workspace.name.isEmpty
-                                ? 'Без названия'
-                                : workspace.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.manrope(
-                              fontSize: 14,
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: AppDrawer._text,
-                            ),
-                          ),
-                        ),
-                        if (isSelected)
-                          const Icon(
-                            LucideIcons.check,
-                            size: AppIconSizes.standard,
-                            color: Color(0xFF6D5FE0),
-                          ),
-                      ],
-                    ),
-                  ),
+                      : () => _selectWorkspace(context, workspace),
                 );
               }),
             const Divider(height: 1, color: AppDrawer._border),
@@ -514,6 +227,30 @@ class _WorkspaceDropdown extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _selectWorkspace(
+    BuildContext context,
+    WorkspaceModel workspace,
+  ) async {
+    final cubit = context.read<WorkspaceCubit>();
+    final previous = cubit.state;
+    final changed =
+        previous is WorkspaceLoaded && previous.selected?.id != workspace.id;
+    await cubit.select(workspace);
+    if (!context.mounted) return;
+    final current = cubit.state;
+    if (current is! WorkspaceLoaded || current.selected?.id != workspace.id) {
+      return;
+    }
+    final router = GoRouter.of(context);
+    Scaffold.of(context).closeDrawer();
+    if (changed &&
+        router.routeInformationProvider.value.uri.path.startsWith(
+          '/projects/',
+        )) {
+      router.go('/projects');
+    }
   }
 }
 
@@ -1033,18 +770,21 @@ class _SectionLabel extends StatelessWidget {
 
 class _SidebarItem extends StatelessWidget {
   const _SidebarItem({
+    super.key,
     required this.icon,
     required this.iconColor,
     required this.label,
     required this.onTap,
     this.isActive = false,
+    this.leading,
   });
 
   final IconData icon;
   final Color iconColor;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool isActive;
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -1068,11 +808,12 @@ class _SidebarItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  size: AppIconSizes.standard,
-                  color: isActive ? AppDrawer._purple : iconColor,
-                ),
+                leading ??
+                    Icon(
+                      icon,
+                      size: AppIconSizes.standard,
+                      color: isActive ? AppDrawer._purple : iconColor,
+                    ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
