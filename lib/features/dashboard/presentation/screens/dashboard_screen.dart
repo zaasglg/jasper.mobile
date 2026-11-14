@@ -342,7 +342,9 @@ class _DashboardView extends StatelessWidget {
                               }
                               final slot = slots[index - 1];
                               return Padding(
-                                key: ValueKey(slot.instanceId),
+                                key: ValueKey(
+                                  '${state.userId}:${state.workspaceId}:${slot.instanceId}',
+                                ),
                                 padding: const EdgeInsets.only(bottom: 20),
                                 child: DashboardCollapsibleWidget(
                                   key: ValueKey('collapse-${slot.instanceId}'),

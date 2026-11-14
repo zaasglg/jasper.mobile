@@ -317,6 +317,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           builder: (shellContext) => Scaffold(
             key: MainShell.scaffoldKey,
             onDrawerChanged: _onDrawerChanged,
+            // Leave the leading edge to the navigator's native back gesture.
+            drawerEnableOpenDragGesture: false,
             drawer: AppDrawer(
               onOpenSettings: () {
                 MainShell.scaffoldKey.currentState?.closeDrawer();

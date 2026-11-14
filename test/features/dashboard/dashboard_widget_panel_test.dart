@@ -6,6 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/dashboard/data/dashboard_layout.dart';
 import 'package:jospar/features/dashboard/presentation/cubit/dashboard_layout_cubit.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_widget_panel.dart';
+import 'package:jospar/features/dashboard/presentation/widgets/dashboard_collapsible_widget.dart';
+import 'package:jospar/features/dashboard/presentation/widgets/dashboard_expandable_content.dart';
+import 'package:jospar/features/dashboard/presentation/widgets/dashboard_widget_skeleton.dart';
 import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'dashboard_layout_test.dart' show FakeDashboardRepository;
 
@@ -18,6 +21,90 @@ void main() {
     start: null,
     end: null,
   );
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+    testWidgets('scrolling back preserves loaded cards on ${platform.name}', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(390, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final cubit = DashboardLayoutCubit(_Data());
+      addTearDown(cubit.close);
+      await cubit.configure('u', 'w');
+      final scroll = ScrollController();
+      addTearDown(scroll.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: platform),
+          home: Scaffold(
+            body: BlocProvider.value(
+              value: cubit,
+              child: ListView.builder(
+                controller: scroll,
+                itemCount: 12,
+                itemBuilder: (context, index) => index == 0
+                    ? const DashboardCollapsibleWidget(
+                        title: 'Общие данные',
+                        icon: Icons.dashboard,
+                        child: DashboardExpandableContent(
+                          child: DashboardWidgetPanel(
+                            slot: DashboardWidgetSlot(
+                              id: 'kpi-group',
+                              instanceId: 'kpi',
+                            ),
+                            expandContent: true,
+                            projects: [project],
+                            workspaceId: 'w',
+                            userId: 'u',
+                          ),
+                        ),
+                      )
+                    : SizedBox(height: 400, child: Text('Card $index')),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final panel = find.byType(DashboardWidgetPanel);
+      final initialState = tester.state(panel);
+      final initialHeight = tester.getSize(panel).height;
+      for (var pass = 0; pass < 3; pass++) {
+        scroll.jumpTo(2800);
+        await tester.pumpAndSettle();
+        expect(find.text('Card 7').hitTestable(), findsOneWidget);
+        scroll.jumpTo(0);
+        // Inspect the first returning frame, before cached futures can settle.
+        await tester.pump();
+        expect(tester.state(panel), same(initialState));
+        expect(find.byType(DashboardWidgetSkeleton), findsNothing);
+        expect(tester.getSize(panel).height, initialHeight);
+        expect(scroll.offset, 0);
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.byKey(const Key('dashboard_widget_collapse')));
+      await tester.pumpAndSettle();
+      final collapsedHeight = tester
+          .getSize(find.byType(DashboardCollapsibleWidget))
+          .height;
+      scroll.jumpTo(2800);
+      await tester.pumpAndSettle();
+      scroll.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('dashboard_widget_expand')), findsOneWidget);
+      expect(
+        tester.getSize(find.byType(DashboardCollapsibleWidget)).height,
+        collapsedHeight,
+      );
+      await tester.tap(find.byKey(const Key('dashboard_widget_expand')));
+      await tester.pumpAndSettle();
+      expect(tester.state(panel), same(initialState));
+      expect(tester.getSize(panel).height, initialHeight);
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(initialState.mounted, isFalse);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   Future<void> panel(
     WidgetTester tester,
     DashboardWidgetSlot slot, {

@@ -219,6 +219,109 @@ class _PlannerScreenState extends State<PlannerScreen>
     return screen;
   }
 
+  Widget _dateToolbar(GoogleCalendarState? google) {
+    final dateSelector = InkWell(
+      key: const Key('planner-date-picker'),
+      onTap: _pickDate,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.calendar_month_rounded,
+              size: AppIconSizes.standard,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                '${_months[_selectedDate.month - 1]} ${_selectedDate.year}',
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.manrope(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: AppIconSizes.standard,
+            ),
+          ],
+        ),
+      ),
+    );
+    final navigation = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          key: const Key('planner-previous-day'),
+          constraints: const BoxConstraints.tightFor(width: 40, height: 48),
+          padding: EdgeInsets.zero,
+          tooltip: 'Назад',
+          onPressed: () => _move(-1),
+          icon: const Icon(
+            Icons.chevron_left_rounded,
+            size: AppIconSizes.standard,
+          ),
+        ),
+        TextButton(
+          style: TextButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            textStyle: GoogleFonts.manrope(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          onPressed: () => _selectDate(plannerNow()),
+          child: const Text('Сегодня'),
+        ),
+        IconButton(
+          key: const Key('planner-next-day'),
+          constraints: const BoxConstraints.tightFor(width: 40, height: 48),
+          padding: EdgeInsets.zero,
+          tooltip: 'Вперёд',
+          onPressed: () => _move(1),
+          icon: const Icon(
+            Icons.chevron_right_rounded,
+            size: AppIconSizes.standard,
+          ),
+        ),
+      ],
+    );
+    return Row(
+      children: [
+        if (_google != null) ...[
+          IconButton(
+            key: const Key('planner-calendar-sources'),
+            constraints: const BoxConstraints.tightFor(width: 40, height: 48),
+            padding: EdgeInsets.zero,
+            tooltip: 'Источники календаря',
+            onPressed: _calendarSettings,
+            icon: Icon(
+              LucideIcons.calendars,
+              size: AppIconSizes.standard,
+              color: google?.connection.connected == true
+                  ? AppColors.accent
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Flexible(child: dateSelector),
+              navigation,
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _scaffold(PlannerState state) {
     final google = _google?.state;
     final monthStart = DateTime(_selectedDate.year, _selectedDate.month, 1);
@@ -245,33 +348,7 @@ class _PlannerScreenState extends State<PlannerScreen>
         .toList();
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: DashboardAppBar(
-        accountTitle: 'Ежедневник',
-        pageActions: [
-          if (_google != null)
-            IconButton(
-              constraints: const BoxConstraints.tightFor(width: 36, height: 48),
-              padding: EdgeInsets.zero,
-              tooltip: 'Источники календаря',
-              onPressed: _calendarSettings,
-              icon: Icon(
-                LucideIcons.calendars,
-                size: AppIconSizes.standard,
-                color: google?.connection.connected == true
-                    ? AppColors.accent
-                    : null,
-              ),
-            ),
-          IconButton(
-            constraints: const BoxConstraints.tightFor(width: 36, height: 48),
-            padding: EdgeInsets.zero,
-            key: const Key('planner-today'),
-            tooltip: 'Выбрать дату',
-            onPressed: _pickDate,
-            icon: const Icon(LucideIcons.calendar, size: AppIconSizes.standard),
-          ),
-        ],
-      ),
+      appBar: const DashboardAppBar(accountTitle: 'Ежедневник'),
       floatingActionButton: _cubit == null
           ? null
           : FloatingActionButton.small(
@@ -324,69 +401,15 @@ class _PlannerScreenState extends State<PlannerScreen>
                 ),
               ),
               Container(
-                height: 52,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                constraints: const BoxConstraints(minHeight: 52),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: const BoxDecoration(
                   border: Border(
                     top: BorderSide(color: AppColors.border),
                     bottom: BorderSide(color: AppColors.border),
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        key: const Key('planner-date-picker'),
-                        onTap: _pickDate,
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.calendar_month_rounded,
-                              size: AppIconSizes.standard,
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                '${_months[_selectedDate.month - 1]} ${_selectedDate.year}',
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.manrope(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              size: AppIconSizes.standard,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      key: const Key('planner-previous-day'),
-                      tooltip: 'Назад',
-                      onPressed: () => _move(-1),
-                      icon: const Icon(
-                        Icons.chevron_left_rounded,
-                        size: AppIconSizes.standard,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => _selectDate(plannerNow()),
-                      child: const Text('Сегодня'),
-                    ),
-                    IconButton(
-                      key: const Key('planner-next-day'),
-                      tooltip: 'Вперёд',
-                      onPressed: () => _move(1),
-                      icon: const Icon(
-                        Icons.chevron_right_rounded,
-                        size: AppIconSizes.standard,
-                      ),
-                    ),
-                  ],
-                ),
+                child: _dateToolbar(google),
               ),
               if (state.status == PlannerStatus.loading ||
                   google?.loading == true)

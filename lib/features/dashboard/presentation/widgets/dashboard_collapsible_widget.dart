@@ -20,44 +20,53 @@ class DashboardCollapsibleWidget extends StatefulWidget {
       _DashboardCollapsibleWidgetState();
 }
 
-class _DashboardCollapsibleWidgetState
-    extends State<DashboardCollapsibleWidget> {
+class _DashboardCollapsibleWidgetState extends State<DashboardCollapsibleWidget>
+    with AutomaticKeepAliveClientMixin {
   bool _collapsed = false;
 
+  // Retain loaded content and disclosure state outside the list's cache.
+  // Recreating a card briefly restores its skeleton and changes its height,
+  // forcing scroll corrections when the user returns to it.
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      if (_collapsed)
-        Material(
-          color: Theme.of(context).colorScheme.surfaceContainerLowest,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            side: const BorderSide(color: DashboardSurface.border),
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_collapsed)
+          Material(
+            color: Theme.of(context).colorScheme.surfaceContainerLowest,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              side: const BorderSide(color: DashboardSurface.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              key: const Key('dashboard_widget_expand'),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              title: AppWidgetHeading(icon: widget.icon, title: widget.title),
+              trailing: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              onTap: () => setState(() => _collapsed = !_collapsed),
+            ),
           ),
-          clipBehavior: Clip.antiAlias,
-          child: ListTile(
-            key: const Key('dashboard_widget_expand'),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            title: AppWidgetHeading(icon: widget.icon, title: widget.title),
-            trailing: Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            onTap: () => setState(() => _collapsed = !_collapsed),
+        Offstage(
+          offstage: _collapsed,
+          child: WidgetCollapseScope(
+            onToggle: () => setState(() => _collapsed = true),
+            child: widget.child,
           ),
         ),
-      Offstage(
-        offstage: _collapsed,
-        child: WidgetCollapseScope(
-          onToggle: () => setState(() => _collapsed = true),
-          child: widget.child,
-        ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }

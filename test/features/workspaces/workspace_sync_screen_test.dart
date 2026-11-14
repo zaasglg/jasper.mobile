@@ -51,6 +51,104 @@ class _Projects implements ProjectRepository {
 }
 
 void main() {
+  testWidgets('left-edge swipe navigates back instead of opening the drawer', (
+    tester,
+  ) async {
+    GoogleFonts.config.allowRuntimeFetching = false;
+    FlutterSecureStorage.setMockInitialValues({});
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    sl.registerFactory<WorkspaceCubit>(
+      () => WorkspaceCubit(
+        repository: _Workspaces(),
+        selectionStorage: WorkspaceSelectionStorage(
+          const FlutterSecureStorage(),
+        ),
+      ),
+    );
+    sl.registerFactory<ProjectsCubit>(() => ProjectsCubit(_Projects()));
+    addTearDown(() async {
+      await sl.unregister<WorkspaceCubit>();
+      await sl.unregister<ProjectsCubit>();
+    });
+    final router = GoRouter(
+      initialLocation: '/projects',
+      routes: [
+        ShellRoute(
+          builder: (_, _, child) =>
+              MainShell(currentIndex: 1, onTap: (_) {}, child: child),
+          routes: [
+            GoRoute(
+              path: '/projects',
+              builder: (context, _) => Scaffold(
+                body: Column(
+                  children: [
+                    TextButton(
+                      onPressed: MainShell.openDrawer,
+                      child: const Text('Меню'),
+                    ),
+                    TextButton(
+                      onPressed: () => context.push('/projects/one'),
+                      child: const Text('Открыть проект'),
+                    ),
+                  ],
+                ),
+              ),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  builder: (_, _) => const Scaffold(
+                    body: Center(child: Text('Детали проекта')),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      MaterialApp.router(
+        theme: ThemeData(platform: TargetPlatform.iOS),
+        routerConfig: router,
+      ),
+    );
+    await tester.pumpAndSettle();
+    Future<void> swipeBack() async {
+      await tester.timedDragFrom(
+        const Offset(2, 300),
+        const Offset(320, 0),
+        const Duration(milliseconds: 500),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await swipeBack();
+    expect(MainShell.scaffoldKey.currentState!.isDrawerOpen, isFalse);
+    expect(router.routeInformationProvider.value.uri.path, '/projects');
+    await tester.tap(find.text('Открыть проект'));
+    await tester.pumpAndSettle();
+    expect(find.text('Детали проекта'), findsOneWidget);
+    await tester.timedDragFrom(
+      const Offset(2, 300),
+      const Offset(35, 0),
+      const Duration(milliseconds: 500),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Детали проекта'), findsOneWidget);
+    await swipeBack();
+    expect(router.routeInformationProvider.value.uri.path, '/projects');
+    expect(find.text('Детали проекта'), findsNothing);
+    expect(find.text('Открыть проект'), findsOneWidget);
+    expect(MainShell.scaffoldKey.currentState!.isDrawerOpen, isFalse);
+    await tester.tap(find.text('Меню'));
+    await tester.pumpAndSettle();
+    expect(MainShell.scaffoldKey.currentState!.isDrawerOpen, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'selecting workspace from drawer reloads projects and leaves old details',
     (tester) async {

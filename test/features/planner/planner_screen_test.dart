@@ -30,6 +30,12 @@ void main() {
 
     final nextDayText = tester.widget<Text>(selectedDate).data;
     expect(nextDayText, isNot(initialText));
+    expect(find.byKey(const Key('planner-today')), findsNothing);
+    await tester.tap(find.byKey(const Key('planner-date-picker')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 }

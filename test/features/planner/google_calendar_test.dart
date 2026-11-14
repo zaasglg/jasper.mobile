@@ -163,6 +163,52 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Google встреча'), findsOneWidget);
+      expect(find.byKey(const Key('planner-today')), findsNothing);
+      final sources = find.byKey(const Key('planner-calendar-sources'));
+      final datePicker = find.byKey(const Key('planner-date-picker'));
+      expect(sources, findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: sources),
+        findsNothing,
+      );
+      for (final size in [
+        const Size(320, 568),
+        const Size(360, 800),
+        const Size(390, 844),
+        const Size(800, 900),
+        const Size(400, 900),
+      ]) {
+        await tester.binding.setSurfaceSize(size);
+        await tester.pumpAndSettle();
+        expect(tester.getCenter(sources).dy, tester.getCenter(datePicker).dy);
+        for (final control in [
+          find.byKey(const Key('planner-previous-day')),
+          find.text('Сегодня'),
+          find.byKey(const Key('planner-next-day')),
+        ]) {
+          expect(tester.getCenter(control).dy, tester.getCenter(datePicker).dy);
+          expect(
+            tester.getTopLeft(control).dx,
+            greaterThanOrEqualTo(tester.getTopRight(sources).dx),
+          );
+        }
+        expect(
+          tester.getTopLeft(datePicker).dx - tester.getTopRight(sources).dx,
+          greaterThanOrEqualTo(8),
+        );
+        expect(
+          tester.getTopLeft(find.byKey(const Key('planner-previous-day'))).dx -
+              tester.getTopRight(datePicker).dx,
+          closeTo(0, 0.01),
+        );
+        if (size.width == 800) {
+          expect(
+            tester.getTopLeft(datePicker).dx - tester.getTopRight(sources).dx,
+            greaterThan(100),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      }
       expect(
         find.byKey(const ValueKey('planner-complete-current')),
         findsNothing,
