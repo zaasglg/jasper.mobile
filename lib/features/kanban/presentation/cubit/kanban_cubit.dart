@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../assistant/data/services/assistant_task_changes.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../data/models/task_translation.dart';
@@ -38,19 +40,78 @@ class KanbanCubit extends Cubit<KanbanState> {
   final KanbanRepository _repository;
   final KanbanBoardCache _cache;
   int _loadRevision = 0;
+  int _projectRevision = 0;
+  String? _loadingProject;
+  bool _refreshAfterOperations = false;
+
+  bool _canUpdateTask(ProjectTaskModel task) =>
+      !_sessionInvalidated &&
+      !isClosed &&
+      !state.movingTaskIds.contains(task.id) &&
+      state.tasks.any((item) => item.id == task.id);
+
+  int _beginTaskOperation() {
+    // A response started before this edit must never replace it.
+    if (_loadingProject == state.projectId) {
+      _loadRevision++;
+      _loadingProject = null;
+      _repository.cancelPendingLoads();
+      _refreshAfterOperations = true;
+    }
+    if (state.status == KanbanStatus.loading) {
+      emit(state.copyWith(status: KanbanStatus.success));
+    }
+    return _projectRevision;
+  }
+
+  bool _isCurrentOperation(int revision) =>
+      !isClosed && !_sessionInvalidated && revision == _projectRevision;
+
+  Set<String> _withoutTask(String id) => {...state.movingTaskIds}..remove(id);
+
+  void _finishTaskOperation() {
+    if (isClosed || _sessionInvalidated || state.movingTaskIds.isNotEmpty) {
+      return;
+    }
+    _cache.write(
+      state.projectId,
+      KanbanBoardData(columns: state.columns, tasks: state.tasks),
+    );
+    if (_refreshAfterOperations) {
+      _refreshAfterOperations = false;
+      unawaited(load(state.projectId, refresh: true));
+    }
+  }
 
   Future<void> load(String projectId, {bool refresh = false}) async {
     if (_sessionInvalidated || isClosed || projectId.isEmpty) return;
+    if (projectId == state.projectId && state.movingTaskIds.isNotEmpty) {
+      _refreshAfterOperations = true;
+      return;
+    }
+    if (projectId != state.projectId) {
+      _projectRevision++;
+      _refreshAfterOperations = false;
+    }
+    _loadingProject = projectId;
     final revision = ++_loadRevision;
+    final previous = state;
+    final keepContent =
+        previous.projectId == projectId &&
+        previous.status == KanbanStatus.success;
     final cached = _cache.read(projectId);
-    if (cached != null && !refresh) {
+    if (keepContent) {
+      emit(state.copyWith(clearError: true));
+    } else if (cached != null && !refresh) {
       emit(
-        state.copyWith(
+        KanbanState(
           status: KanbanStatus.success,
           projectId: projectId,
           columns: sortKanbanColumns(cached.columns),
           tasks: cached.tasks,
-          clearError: true,
+          epicFilterIds: previous.projectId == projectId
+              ? previous.epicFilterIds
+              : const <String>{},
         ),
       );
     } else {
@@ -60,6 +121,9 @@ class KanbanCubit extends Cubit<KanbanState> {
           projectId: projectId,
           columns: cached?.columns ?? const [],
           tasks: cached?.tasks ?? const [],
+          epicFilterIds: previous.projectId == projectId
+              ? previous.epicFilterIds
+              : const <String>{},
         ),
       );
     }
@@ -84,27 +148,37 @@ class KanbanCubit extends Cubit<KanbanState> {
       }
       emit(
         state.copyWith(
-          status: cached == null ? KanbanStatus.failure : KanbanStatus.success,
-          errorMessage: cached == null ? error.message : null,
-          actionErrorMessage: cached != null ? error.message : null,
-          actionRevision: cached != null
+          status: cached == null && !keepContent
+              ? KanbanStatus.failure
+              : KanbanStatus.success,
+          errorMessage: cached == null && !keepContent ? error.message : null,
+          actionErrorMessage: cached != null || keepContent
+              ? error.message
+              : null,
+          actionRevision: cached != null || keepContent
               ? state.actionRevision + 1
               : state.actionRevision,
         ),
       );
+    } finally {
+      if (revision == _loadRevision) _loadingProject = null;
     }
   }
 
   void setSearch(String value) => emit(state.copyWith(search: value));
+
+  void setEpicFilter(Set<String> ids) =>
+      emit(state.copyWith(epicFilterIds: Set<String>.unmodifiable(ids)));
 
   void setPriorityFilter(String? value) => emit(
     state.copyWith(priorityFilter: value, clearPriorityFilter: value == null),
   );
 
   Future<void> toggleCompleted(ProjectTaskModel task) async {
-    if (_sessionInvalidated || isClosed || state.movingTaskIds.isNotEmpty) {
+    if (!_canUpdateTask(task)) {
       return;
     }
+    final operationRevision = _beginTaskOperation();
     final projectId = state.projectId;
     final progress = task.isDone ? 0 : 100;
     final reopenedStatus = task.isDone && task.status.toUpperCase() == 'DONE'
@@ -123,7 +197,7 @@ class KanbanCubit extends Cubit<KanbanState> {
         tasks: state.tasks
             .map((item) => item.id == task.id ? updated : item)
             .toList(),
-        movingTaskIds: {task.id},
+        movingTaskIds: {...state.movingTaskIds, task.id},
         clearActionError: true,
       ),
     );
@@ -133,20 +207,20 @@ class KanbanCubit extends Cubit<KanbanState> {
         progress: progress,
         status: reopenedStatus,
       );
-      if (isClosed || state.projectId != projectId) return;
+      if (!_isCurrentOperation(operationRevision)) return;
       _cache.write(
         projectId,
         KanbanBoardData(columns: state.columns, tasks: state.tasks),
       );
-      emit(state.copyWith(movingTaskIds: {}));
+      emit(state.copyWith(movingTaskIds: _withoutTask(task.id)));
     } catch (error) {
-      if (isClosed || state.projectId != projectId) return;
+      if (!_isCurrentOperation(operationRevision)) return;
       emit(
         state.copyWith(
           tasks: state.tasks
               .map((item) => item.id == task.id ? task : item)
               .toList(),
-          movingTaskIds: {},
+          movingTaskIds: _withoutTask(task.id),
         ),
       );
       _actionError(
@@ -154,6 +228,8 @@ class KanbanCubit extends Cubit<KanbanState> {
             ? error.message
             : 'Не удалось обновить завершение задачи.',
       );
+    } finally {
+      if (_isCurrentOperation(operationRevision)) _finishTaskOperation();
     }
   }
 
@@ -162,15 +238,16 @@ class KanbanCubit extends Cubit<KanbanState> {
       _removeTask(task, delete: true);
 
   Future<void> _removeTask(ProjectTaskModel task, {bool delete = false}) async {
-    if (_sessionInvalidated || isClosed || state.movingTaskIds.isNotEmpty) {
+    if (!_canUpdateTask(task)) {
       return;
     }
+    final operationRevision = _beginTaskOperation();
     final projectId = state.projectId;
     final oldTasks = state.tasks;
     emit(
       state.copyWith(
         tasks: state.tasks.where((item) => item.id != task.id).toList(),
-        movingTaskIds: {task.id},
+        movingTaskIds: {...state.movingTaskIds, task.id},
         clearActionError: true,
       ),
     );
@@ -180,23 +257,23 @@ class KanbanCubit extends Cubit<KanbanState> {
       } else {
         await _repository.archiveTask(task.id);
       }
-      if (isClosed || state.projectId != projectId) return;
+      if (!_isCurrentOperation(operationRevision)) return;
       _cache.write(
         projectId,
         KanbanBoardData(columns: state.columns, tasks: state.tasks),
       );
-      emit(state.copyWith(movingTaskIds: {}));
+      emit(state.copyWith(movingTaskIds: _withoutTask(task.id)));
     } catch (error) {
-      if (isClosed || state.projectId != projectId) return;
+      if (!_isCurrentOperation(operationRevision)) return;
       // Restore only the archived card, preserving other edits made meanwhile.
       emit(
         state.copyWith(
           tasks: [
             for (final item in oldTasks)
               if (item.id == task.id) item,
-            ...state.tasks,
+            ...state.tasks.where((item) => item.id != task.id),
           ],
-          movingTaskIds: {},
+          movingTaskIds: _withoutTask(task.id),
         ),
       );
       _actionError(
@@ -206,6 +283,8 @@ class KanbanCubit extends Cubit<KanbanState> {
             ? 'Не удалось удалить задачу.'
             : 'Не удалось архивировать задачу.',
       );
+    } finally {
+      if (_isCurrentOperation(operationRevision)) _finishTaskOperation();
     }
   }
 
@@ -230,29 +309,36 @@ class KanbanCubit extends Cubit<KanbanState> {
     String workspaceId,
     String language,
   ) async {
-    if (_sessionInvalidated || isClosed || state.movingTaskIds.isNotEmpty) {
+    if (!_canUpdateTask(task)) {
       return null;
     }
-    final projectId = state.projectId;
-    emit(state.copyWith(movingTaskIds: {task.id}, clearActionError: true));
+    final operationRevision = _beginTaskOperation();
+    emit(
+      state.copyWith(
+        movingTaskIds: {...state.movingTaskIds, task.id},
+        clearActionError: true,
+      ),
+    );
     try {
       final result = await _repository.translateTask(
         task.id,
         workspaceId,
         language,
       );
-      if (isClosed || state.projectId != projectId) return null;
-      emit(state.copyWith(movingTaskIds: {}));
+      if (!_isCurrentOperation(operationRevision)) return null;
+      emit(state.copyWith(movingTaskIds: _withoutTask(task.id)));
       return result;
     } catch (error) {
-      if (isClosed || state.projectId != projectId) return null;
-      emit(state.copyWith(movingTaskIds: {}));
+      if (!_isCurrentOperation(operationRevision)) return null;
+      emit(state.copyWith(movingTaskIds: _withoutTask(task.id)));
       _actionError(
         error is KanbanException
             ? error.message
             : 'Не удалось перевести задачу.',
       );
       return null;
+    } finally {
+      if (_isCurrentOperation(operationRevision)) _finishTaskOperation();
     }
   }
 
@@ -261,14 +347,20 @@ class KanbanCubit extends Cubit<KanbanState> {
     Future<ProjectTaskModel> Function() operation, {
     bool insert = false,
   }) async {
-    if (_sessionInvalidated || isClosed || state.movingTaskIds.isNotEmpty) {
+    if (!_canUpdateTask(task)) {
       return false;
     }
+    final operationRevision = _beginTaskOperation();
     final projectId = state.projectId;
-    emit(state.copyWith(movingTaskIds: {task.id}, clearActionError: true));
+    emit(
+      state.copyWith(
+        movingTaskIds: {...state.movingTaskIds, task.id},
+        clearActionError: true,
+      ),
+    );
     try {
       final updated = await operation();
-      if (isClosed || state.projectId != projectId) return false;
+      if (!_isCurrentOperation(operationRevision)) return false;
       final tasks = insert
           ? [...state.tasks, updated]
           : [
@@ -279,17 +371,19 @@ class KanbanCubit extends Cubit<KanbanState> {
         projectId,
         KanbanBoardData(columns: state.columns, tasks: tasks),
       );
-      emit(state.copyWith(tasks: tasks, movingTaskIds: {}));
+      emit(state.copyWith(tasks: tasks, movingTaskIds: _withoutTask(task.id)));
       return true;
     } catch (error) {
-      if (isClosed || state.projectId != projectId) return false;
-      emit(state.copyWith(movingTaskIds: {}));
+      if (!_isCurrentOperation(operationRevision)) return false;
+      emit(state.copyWith(movingTaskIds: _withoutTask(task.id)));
       _actionError(
         error is KanbanException
             ? error.message
             : 'Не удалось сохранить изменения задачи.',
       );
       return false;
+    } finally {
+      if (_isCurrentOperation(operationRevision)) _finishTaskOperation();
     }
   }
 
@@ -298,17 +392,33 @@ class KanbanCubit extends Cubit<KanbanState> {
     String targetStatus,
     int position,
   ) async {
-    if (state.movingTaskIds.contains(task.id)) return;
+    if (!_canUpdateTask(task)) return;
+    final target = state.columns
+        .where(
+          (column) =>
+              !column.archived &&
+              column.statusMap.toUpperCase() == targetStatus.toUpperCase(),
+        )
+        .firstOrNull;
+    if (target == null) {
+      _actionError('Колонка больше недоступна. Выберите другую колонку.');
+      return;
+    }
+    targetStatus = target.statusMap;
+    final operationRevision = _beginTaskOperation();
+    final projectId = state.projectId;
     final oldTasks = state.tasks;
+    final originalTask = oldTasks.firstWhere((item) => item.id == task.id);
     final updated = moveKanbanTask(
       tasks: oldTasks,
       taskId: task.id,
-      projectId: state.projectId,
+      projectId: projectId,
       targetStatus: targetStatus,
       targetPosition: position,
     );
     emit(
       state.copyWith(
+        status: KanbanStatus.success,
         tasks: updated,
         movingTaskIds: <String>{...state.movingTaskIds, task.id},
         clearActionError: true,
@@ -317,13 +427,13 @@ class KanbanCubit extends Cubit<KanbanState> {
     try {
       await _repository.moveTask(
         taskId: task.id,
-        projectId: state.projectId,
+        projectId: projectId,
         status: targetStatus,
         position: position,
       );
-      if (isClosed) return;
+      if (!_isCurrentOperation(operationRevision)) return;
       _cache.write(
-        state.projectId,
+        projectId,
         KanbanBoardData(columns: state.columns, tasks: state.tasks),
       );
       emit(
@@ -331,40 +441,79 @@ class KanbanCubit extends Cubit<KanbanState> {
           movingTaskIds: {...state.movingTaskIds}..remove(task.id),
         ),
       );
-    } on KanbanException catch (error) {
-      if (isClosed) return;
+    } catch (error) {
+      if (!_isCurrentOperation(operationRevision)) return;
       final message =
-          error.statusCode == 403 && targetStatus.toUpperCase() == 'DONE'
+          error is KanbanException &&
+              error.statusCode == 403 &&
+              targetStatus.toUpperCase() == 'DONE'
           ? 'Недостаточно прав для переноса задачи в «Готово».'
-          : error.message;
+          : error is KanbanException
+          ? error.message
+          : 'Не удалось переместить задачу. Попробуйте ещё раз.';
       emit(
         state.copyWith(
-          tasks: oldTasks,
+          tasks: moveKanbanTask(
+            tasks: state.tasks,
+            taskId: task.id,
+            projectId: projectId,
+            targetStatus: originalTask.status,
+            targetPosition:
+                (oldTasks
+                        .where(
+                          (item) =>
+                              item.status.toUpperCase() ==
+                              originalTask.status.toUpperCase(),
+                        )
+                        .toList()
+                      ..sort((a, b) => a.order.compareTo(b.order)))
+                    .indexWhere((item) => item.id == task.id),
+          ),
           movingTaskIds: {...state.movingTaskIds}..remove(task.id),
           actionErrorMessage: message,
           actionRevision: state.actionRevision + 1,
         ),
       );
+    } finally {
+      if (_isCurrentOperation(operationRevision)) _finishTaskOperation();
     }
   }
 
-  Future<void> createTask(String status, String title, String priority) async {
+  Future<bool> createTask(String status, String title, String priority) async {
+    final projectId = state.projectId;
+    final revision = _projectRevision;
+    final epicIds = state.epicFilterIds.toList(growable: false);
     try {
       final task = await _repository.createTask(
-        projectId: state.projectId,
+        projectId: projectId,
         title: title,
         status: status,
         priority: priority,
+        epicIds: epicIds,
       );
-      if (isClosed) return;
+      if (isClosed ||
+          revision != _projectRevision ||
+          state.projectId != projectId) {
+        return true;
+      }
       final tasks = <ProjectTaskModel>[...state.tasks, task];
       _cache.write(
         state.projectId,
         KanbanBoardData(columns: state.columns, tasks: tasks),
       );
       emit(state.copyWith(tasks: tasks));
-    } on KanbanException catch (error) {
-      _actionError(error.message);
+      return true;
+    } catch (error) {
+      if (!isClosed &&
+          revision == _projectRevision &&
+          state.projectId == projectId) {
+        _actionError(
+          error is KanbanException
+              ? error.message
+              : 'Не удалось создать задачу. Повторите попытку.',
+        );
+      }
+      return false;
     }
   }
 
@@ -387,13 +536,15 @@ class KanbanCubit extends Cubit<KanbanState> {
   Future<void> updateColumn(
     KanbanColumnModel column,
     String name,
-    int? wip,
-  ) async {
+    int? wip, {
+    String? color,
+  }) async {
     try {
       final updated = await _repository.updateColumn(
         columnId: column.id,
         name: name,
         wip: wip,
+        color: color,
       );
       if (isClosed) return;
       emit(

@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "Project page matching supplied target with neutral text labels; target 852x1846",
+  "platform": "flutter-widget-test",
+  "comparison": "target",
+  "target": {
+    "path": "target.png",
+    "kind": "image",
+    "sha256": "f602be779594dc414f6a58fa9c042058e8cc4ec21f5724ae2e000f52a89b5c67"
+  },
+  "sources": [
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/projects/presentation/screens/project_details_screen.dart",
+      "sha256": "a52d68d7d29a49943694e05967373519ccd8c430f94285686b1141b9b9f355b8"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/kanban/presentation/widgets/board_style.dart",
+      "sha256": "af307e6432bea383506a0fb49c2b1b1c066da3f0508bf4f9176de452aaf08b97"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/kanban/presentation/widgets/kanban_board.dart",
+      "sha256": "304cb451c622d43db0c79bc4c27b3e1d982b0c72eb5be9beb55f1ca5fe6bb3e6"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/kanban/presentation/widgets/task_card.dart",
+      "sha256": "2da622d56d03162a3a0f368298645fe6dc41533e4e700db66071eca1fd781004"
+    }
+  ],
+  "checks": [
+    {
+      "id": "analysis",
+      "status": "pass",
+      "observed": "No analyzer issues in affected widgets and project screen."
+    },
+    {
+      "id": "interaction-tests",
+      "status": "pass",
+      "observed": "17 tests passed: board search, card field persistence/reset, reorder, task actions, shared chat card, projects screen."
+    },
+    {
+      "id": "visual-390",
+      "kind": "visual",
+      "status": "pass",
+      "state": "Project page with populated and empty columns",
+      "environment": {
+        "kind": "flutter-widget-test",
+        "width": 390,
+        "height": 844
+      },
+      "observed": "Inspected full project header and board. Neutral text labels, white cards and gray columns; next column peeks on mobile and both columns visible on desktop. Desktop tasks scroll within available height. Manual font loading used.",
+      "artifacts": [
+        {
+          "path": "390-board.png",
+          "kind": "image",
+          "sha256": "bb61444ba08120bee12a46084145460d6995ec5470d270de80659c586d64f5ec"
+        }
+      ]
+    },
+    {
+      "id": "visual-1280",
+      "kind": "visual",
+      "status": "pass",
+      "state": "Project page with populated and empty columns",
+      "environment": {
+        "kind": "flutter-widget-test",
+        "width": 1280,
+        "height": 800
+      },
+      "observed": "Inspected full project header and board. Neutral text labels, white cards and gray columns; next column peeks on mobile and both columns visible on desktop. Desktop tasks scroll within available height. Manual font loading used.",
+      "artifacts": [
+        {
+          "path": "1280-board.png",
+          "kind": "image",
+          "sha256": "72eb74f8c5ec6b72329e260c640d25c800bdd7304bc83574109f513f5c533819"
+        }
+      ]
+    }
+  ],
+  "unresolved": [
+    "Native simulator/device verification unavailable.",
+    "Widget captures use manually loaded Manrope; google_fonts asset lookup still emits warnings.",
+    "Target aspect and sample content differ; no pixel-perfect fidelity claim."
+  ]
+}

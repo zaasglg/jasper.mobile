@@ -1,16 +1,10 @@
-// Daily planner uses Kazakhstan time consistently, including API timestamps.
-DateTime plannerLocal(DateTime value) =>
-    value.toUtc().add(const Duration(hours: 5));
+// Display using the device zone; persist instants in UTC.
+DateTime plannerLocal(DateTime value) => value.toLocal();
 DateTime plannerNow() => plannerLocal(DateTime.now());
 DateTime plannerDate(DateTime value) =>
     DateTime(value.year, value.month, value.day);
-DateTime plannerInstant(DateTime day, int hour, int minute) => DateTime.utc(
-  day.year,
-  day.month,
-  day.day,
-  hour,
-  minute,
-).subtract(const Duration(hours: 5));
+DateTime plannerInstant(DateTime day, int hour, int minute) =>
+    DateTime(day.year, day.month, day.day, hour, minute).toUtc();
 bool samePlannerDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 String plannerClock(DateTime date) =>

@@ -70,6 +70,10 @@ import '../../features/tasks/presentation/cubit/task_details_cubit.dart';
 import '../../features/workspaces/data/repositories/workspace_repository_impl.dart';
 import '../../features/workspaces/domain/repositories/workspace_repository.dart';
 import '../../features/workspaces/presentation/cubit/workspace_cubit.dart';
+import '../../features/qr_login/data/qr_login_repository_impl.dart';
+import '../../features/qr_login/domain/qr_login_repository.dart';
+import '../../features/qr_login/presentation/cubit/qr_login_cubit.dart';
+import '../../features/qr_login/presentation/cubit/qr_sessions_cubit.dart';
 
 final sl = GetIt.instance;
 
@@ -122,6 +126,17 @@ Future<void> initServiceLocator() async {
     ),
   );
   sl.registerFactory<AuthCubit>(() => AuthCubit(sl()));
+  sl.registerLazySingleton<QrLoginRepositoryImpl>(
+    () => QrLoginRepositoryImpl(sl()),
+  );
+  sl.registerLazySingleton<QrLoginRepository>(
+    () => sl<QrLoginRepositoryImpl>(),
+  );
+  sl.registerLazySingleton<QrSessionsRepository>(
+    () => sl<QrLoginRepositoryImpl>(),
+  );
+  sl.registerFactory<QrLoginCubit>(() => QrLoginCubit(sl()));
+  sl.registerFactory<QrSessionsCubit>(() => QrSessionsCubit(sl()));
 
   // Inbox
   sl.registerLazySingleton<InboxRepository>(() => InboxRepositoryImpl(sl()));

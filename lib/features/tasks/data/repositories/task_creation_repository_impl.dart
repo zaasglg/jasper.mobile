@@ -67,6 +67,33 @@ class TaskCreationRepositoryImpl implements TaskCreationRepository {
   }
 
   @override
+  Future<List<TaskAssigneeModel>> members(String workspaceId) async {
+    final rows = _items(
+      (await dio.get<dynamic>(
+        'workspaces/${Uri.encodeComponent(workspaceId)}/members',
+        options: _options(workspaceId),
+      )).data,
+    );
+    final result = <String, TaskAssigneeModel>{};
+    for (final row in rows) {
+      final member = _member(row);
+      if (member.userId.isNotEmpty) result[member.userId] = member;
+    }
+    return result.values.toList();
+  }
+
+  TaskAssigneeModel _member(Map<String, dynamic> row) {
+    final user = row['user'] is Map
+        ? Map<String, dynamic>.from(row['user'] as Map)
+        : row;
+    return TaskAssigneeModel.fromJson({
+      'userId': user['id'] ?? row['userId'],
+      'name': user['name'] ?? row['name'],
+      'avatarUrl': user['avatarUrl'] ?? row['avatarUrl'],
+    });
+  }
+
+  @override
   Future<TaskCreationOptions> options(
     String workspaceId,
     String projectId,
@@ -82,10 +109,7 @@ class TaskCreationRepositoryImpl implements TaskCreationRepository {
         queryParameters: {'projectId': projectId},
         options: _options(workspaceId),
       ),
-      dio.get<dynamic>(
-        'workspaces/${Uri.encodeComponent(workspaceId)}/members',
-        options: _options(workspaceId),
-      ),
+      members(workspaceId),
     ]);
     final tasks = <Map<String, dynamic>>[];
     final seen = <String>{};
@@ -110,26 +134,19 @@ class TaskCreationRepositoryImpl implements TaskCreationRepository {
       }
     }
     final options = TaskCreationOptions.fromJson({
-      'columns': _items(result[0].data),
-      'epics': _items(result[1].data),
-      'members': _items(result[2].data).map((e) {
-        final user = e['user'] is Map
-            ? Map<String, dynamic>.from(e['user'] as Map)
-            : e;
-        return {
-          'userId': user['id'] ?? e['userId'],
-          'name': user['name'],
-          'avatarUrl': user['avatarUrl'],
-        };
-      }).toList(),
+      'columns': _items((result[0] as Response<dynamic>).data),
+      'epics': _items((result[1] as Response<dynamic>).data),
+      'members': (result[2] as List<TaskAssigneeModel>)
+          .map((e) => e.toJson())
+          .toList(),
       'tasks': tasks,
     });
-    final members = {
+    final memberMap = {
       for (final member in options.members.where((e) => e.userId.isNotEmpty))
         member.userId: member,
     };
     return options.copyWith(
-      members: members.values.toList(),
+      members: memberMap.values.toList(),
       columns:
           options.columns
               .where(

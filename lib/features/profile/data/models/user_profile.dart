@@ -1,3 +1,4 @@
+import '../../../../core/network/api_constants.dart';
 import 'package:equatable/equatable.dart';
 
 class UserProfile extends Equatable {
@@ -42,7 +43,7 @@ class UserProfile extends Equatable {
   static String _resolveAvatarUrl(String value) {
     final uri = Uri.tryParse(value);
     if (uri != null && uri.hasScheme) return value;
-    return Uri.parse('https://jospar.me').resolve(value).toString();
+    return ApiConstants.origin.resolve(value).toString();
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{

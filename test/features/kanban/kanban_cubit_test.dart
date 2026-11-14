@@ -23,6 +23,129 @@ void main() {
     status: 'TODO',
   );
 
+  test('late board response cannot undo a move or clear its lock', () async {
+    final repository = _RaceRepository();
+    final cubit = KanbanCubit(repository);
+    addTearDown(cubit.close);
+    await cubit.load('project');
+    final staleBoard = await repository.loadBoard('project');
+    final gate = Completer<KanbanBoardData>();
+    repository.nextLoad = gate;
+    final refresh = cubit.load('project', refresh: true);
+    final moving = cubit.moveTask(task, 'DONE', 0);
+    gate.complete(staleBoard);
+    await refresh;
+    expect(
+      cubit.state.tasks.firstWhere((task) => task.id == 'task').status,
+      'DONE',
+    );
+    expect(cubit.state.movingTaskIds, {'task'});
+    final loads = repository.loads;
+    await cubit.load('project', refresh: true);
+    expect(repository.loads, loads);
+    repository.moves['task']!.complete();
+    await moving;
+    await Future<void>.delayed(Duration.zero);
+    expect(cubit.state.tasks.firstWhere((t) => t.id == 'task').status, 'DONE');
+    expect(cubit.state.movingTaskIds, isEmpty);
+    expect(repository.loads, loads + 1);
+  });
+
+  test(
+    'translation does not block another task and preserves its lock',
+    () async {
+      final repository = _RaceRepository();
+      final cubit = KanbanCubit(repository);
+      addTearDown(cubit.close);
+      await cubit.load('project');
+      final translation = cubit.translateTask(task, 'w', 'ru');
+      final other = cubit.state.tasks.last;
+      final move = cubit.moveTask(other, 'DONE', 0);
+      expect(repository.moves.keys, contains('other'));
+      expect(cubit.state.movingTaskIds, {'task', 'other'});
+      repository.translation.complete(
+        const TaskTranslation(title: 'T', description: 'D'),
+      );
+      await translation;
+      expect(cubit.state.movingTaskIds, {'other'});
+      repository.moves['other']!.complete();
+      await move;
+      expect(cubit.state.movingTaskIds, isEmpty);
+    },
+  );
+
+  test('failed move preserves another successful move', () async {
+    final repository = _RaceRepository();
+    final cubit = KanbanCubit(repository);
+    addTearDown(cubit.close);
+    await cubit.load('project');
+    final first = cubit.moveTask(task, 'DONE', 0);
+    final second = cubit.moveTask(
+      cubit.state.tasks.firstWhere((t) => t.id == 'other'),
+      'DONE',
+      0,
+    );
+    repository.moves['other']!.complete();
+    await second;
+    repository.moves['task']!.completeError(
+      const KanbanException('Ошибка сети'),
+    );
+    await first;
+    expect(cubit.state.tasks.firstWhere((t) => t.id == 'task').status, 'TODO');
+    expect(cubit.state.tasks.firstWhere((t) => t.id == 'other').status, 'DONE');
+    expect(cubit.state.movingTaskIds, isEmpty);
+  });
+
+  test('deleted column and missing task are not sent to the server', () async {
+    final repository = _RaceRepository();
+    final cubit = KanbanCubit(repository);
+    addTearDown(cubit.close);
+    await cubit.load('project');
+    await cubit.deleteColumn(cubit.state.columns.last);
+    await cubit.moveTask(task, 'DONE', 0);
+    await cubit.moveTask(
+      const ProjectTaskModel(
+        id: 'missing',
+        projectId: 'project',
+        status: 'TODO',
+      ),
+      'TODO',
+      0,
+    );
+    expect(repository.moves, isEmpty);
+    expect(cubit.state.actionErrorMessage, contains('Колонка'));
+  });
+
+  test('unexpected move failure clears its task lock', () async {
+    final repository = _RaceRepository();
+    final cubit = KanbanCubit(repository);
+    addTearDown(cubit.close);
+    await cubit.load('project');
+    final pending = cubit.moveTask(task, 'DONE', 0);
+    repository.moves['task']!.completeError(StateError('interceptor failed'));
+    await pending;
+    expect(cubit.state.movingTaskIds, isEmpty);
+    expect(cubit.state.tasks.firstWhere((t) => t.id == 'task').status, 'TODO');
+    expect(cubit.state.actionErrorMessage, isNotNull);
+  });
+
+  test('late failed move cannot contaminate a different project', () async {
+    final repository = _RaceRepository();
+    final cubit = KanbanCubit(repository);
+    addTearDown(cubit.close);
+    await cubit.load('project');
+    final pending = cubit.moveTask(task, 'DONE', 0);
+    await cubit.load('next');
+    repository.moves['task']!.completeError(
+      const KanbanException('Ошибка сети'),
+    );
+    await pending;
+    expect(cubit.state.projectId, 'next');
+    expect(cubit.state.tasks.every((task) => task.projectId == 'next'), isTrue);
+    expect(cubit.state.movingTaskIds, isEmpty);
+    expect(cubit.state.actionErrorMessage, isNull);
+  });
+
   test('completion toggles immediately and rolls back after failure', () async {
     final completer = Completer<void>();
     final cubit = KanbanCubit(_Repository(moveCompleter: completer));
@@ -228,6 +351,7 @@ class _Repository implements KanbanRepository {
     required String title,
     required String status,
     required String priority,
+    List<String> epicIds = const [],
   }) => throw UnimplementedError();
 
   @override
@@ -249,5 +373,64 @@ class _Repository implements KanbanRepository {
     required String columnId,
     required String name,
     int? wip,
+    String? color,
   }) => throw UnimplementedError();
+}
+
+class _RaceRepository extends _Repository {
+  Completer<KanbanBoardData>? nextLoad;
+  final translation = Completer<TaskTranslation>();
+  final moves = <String, Completer<void>>{};
+  final statuses = <String, String>{};
+  int loads = 0;
+
+  @override
+  Future<KanbanBoardData> loadBoard(
+    String projectId, {
+    String? search,
+    int take = 100,
+    int skip = 0,
+  }) async {
+    loads++;
+    final gate = nextLoad;
+    nextLoad = null;
+    if (gate != null) return gate.future;
+    final original = await super.loadBoard(projectId);
+    return KanbanBoardData(
+      columns: original.columns,
+      tasks: [
+        ProjectTaskModel(
+          id: 'task',
+          projectId: projectId,
+          status: statuses['task'] ?? 'TODO',
+        ),
+        ProjectTaskModel(
+          id: 'other',
+          projectId: projectId,
+          status: statuses['other'] ?? 'TODO',
+          order: 1,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<TaskTranslation> translateTask(
+    String taskId,
+    String workspaceId,
+    String language,
+  ) => translation.future;
+
+  @override
+  Future<void> moveTask({
+    required String taskId,
+    required String projectId,
+    required String status,
+    required int position,
+  }) async {
+    final gate = Completer<void>();
+    moves[taskId] = gate;
+    await gate.future;
+    statuses[taskId] = status;
+  }
 }

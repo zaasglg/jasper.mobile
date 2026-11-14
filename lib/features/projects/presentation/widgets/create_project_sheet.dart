@@ -86,9 +86,6 @@ class _CreateProjectSheetState extends State<CreateProjectSheet> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   late WorkspaceModel _workspace;
-  DateTime? _start;
-  DateTime? _end;
-  bool _showDateErrors = false;
 
   @override
   void initState() {
@@ -103,36 +100,10 @@ class _CreateProjectSheetState extends State<CreateProjectSheet> {
     super.dispose();
   }
 
-  Future<void> _pickDate({required bool isStart}) async {
-    final today = DateUtils.dateOnly(DateTime.now());
-    final initial = isStart ? (_start ?? today) : (_end ?? _start ?? today);
-    final value = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-      helpText: isStart ? 'Дата начала' : 'Дата окончания',
-      cancelText: 'Отмена',
-      confirmText: 'Выбрать',
-    );
-    if (value == null || !mounted) return;
-    setState(() {
-      if (isStart) {
-        _start = value;
-        if (_end != null && _end!.isBefore(value)) _end = value;
-      } else {
-        _end = value;
-      }
-      _showDateErrors = false;
-    });
-  }
-
   Future<void> _submit() async {
     FocusManager.instance.primaryFocus?.unfocus();
     final validFields = _formKey.currentState?.validate() ?? false;
-    setState(() => _showDateErrors = true);
-    if (!validFields || _start == null || _end == null) return;
-    if (_end!.isBefore(_start!)) return;
+    if (!validFields) return;
 
     final success = await context.read<ProjectsCubit>().createProject(
       CreateProjectRequest(
@@ -140,8 +111,6 @@ class _CreateProjectSheetState extends State<CreateProjectSheet> {
         name: _nameController.text,
         description: _descriptionController.text,
         workspaceId: _workspace.id,
-        start: _start!,
-        end: _end!,
         progress: 0,
         isPinned: false,
       ),
@@ -195,7 +164,7 @@ class _CreateProjectSheetState extends State<CreateProjectSheet> {
                               controller: _nameController,
                               label: 'Название',
                               required: true,
-                              hint: 'Портал госуслуг 2.0',
+                              hint: 'Название проекта',
                               enabled: !disabled,
                               textInputAction: TextInputAction.next,
                               validator: _required('Укажите название'),
@@ -222,41 +191,6 @@ class _CreateProjectSheetState extends State<CreateProjectSheet> {
                               textInputAction: TextInputAction.newline,
                             ),
                             const SizedBox(height: 16),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Expanded(
-                                  child: _DateField(
-                                    key: const Key('project_start_field'),
-                                    label: 'Начало',
-                                    date: _start,
-                                    enabled: !disabled,
-                                    error: _showDateErrors && _start == null
-                                        ? 'Выберите дату'
-                                        : null,
-                                    onTap: () => _pickDate(isStart: true),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _DateField(
-                                    key: const Key('project_end_field'),
-                                    label: 'Окончание',
-                                    date: _end,
-                                    enabled: !disabled,
-                                    error: _showDateErrors && _end == null
-                                        ? 'Выберите дату'
-                                        : _showDateErrors &&
-                                              _start != null &&
-                                              _end != null &&
-                                              _end!.isBefore(_start!)
-                                        ? 'Раньше начала'
-                                        : null,
-                                    onTap: () => _pickDate(isStart: false),
-                                  ),
-                                ),
-                              ],
-                            ),
                             if (state.creationError
                                 case final error?) ...<Widget>[
                               const SizedBox(height: 16),
@@ -318,8 +252,8 @@ class _SheetHeader extends StatelessWidget {
             child: Text(
               'Новый проект',
               style: GoogleFonts.manrope(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
                 color: _ink,
               ),
             ),
@@ -413,7 +347,7 @@ class _FieldLabel extends StatelessWidget {
       style: GoogleFonts.manrope(
         fontSize: 13,
         height: 1.35,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w600,
         color: _secondary,
       ),
     );
@@ -441,7 +375,7 @@ class _WorkspaceField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const _FieldLabel(label: 'Workspace'),
+        const _FieldLabel(label: 'Рабочее пространство'),
         const SizedBox(height: 7),
         DropdownButtonFormField<WorkspaceModel>(
           key: const Key('project_workspace_dropdown'),
@@ -516,77 +450,10 @@ class _WorkspaceMark extends StatelessWidget {
         name.isEmpty ? 'W' : name.characters.first.toUpperCase(),
         style: GoogleFonts.manrope(
           fontSize: 13,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
           color: Colors.white,
         ),
       ),
-    );
-  }
-}
-
-class _DateField extends StatelessWidget {
-  const _DateField({
-    super.key,
-    required this.label,
-    required this.date,
-    required this.enabled,
-    required this.onTap,
-    this.error,
-  });
-
-  final String label;
-  final DateTime? date;
-  final bool enabled;
-  final VoidCallback onTap;
-  final String? error;
-
-  @override
-  Widget build(BuildContext context) {
-    final value = date == null ? 'ДД.ММ.ГГГГ' : _formatDate(date!);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        _FieldLabel(label: label, required: true),
-        const SizedBox(height: 7),
-        InkWell(
-          onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 13),
-            decoration: BoxDecoration(
-              color: enabled ? _surface : const Color(0xFFF1F2F4),
-              border: Border.all(color: error == null ? _border : _danger),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    value,
-                    style: GoogleFonts.manrope(
-                      fontSize: 13,
-                      color: date == null ? _muted : _ink,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  LucideIcons.calendarDays,
-                  size: AppIconSizes.standard,
-                  color: _secondary,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (error != null) ...<Widget>[
-          const SizedBox(height: 5),
-          Text(
-            error!,
-            style: GoogleFonts.manrope(fontSize: 11, color: _danger),
-          ),
-        ],
-      ],
     );
   }
 }
@@ -641,7 +508,7 @@ class _FooterActions extends StatelessWidget {
             ),
             textStyle: GoogleFonts.manrope(
               fontSize: 15,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
           child: const Text('Отмена'),
@@ -659,7 +526,7 @@ class _FooterActions extends StatelessWidget {
             ),
             textStyle: GoogleFonts.manrope(
               fontSize: 15,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           child: isCreating
@@ -728,8 +595,4 @@ Color _parseWorkspaceColor(String? value) {
   final parsed = int.tryParse(hex, radix: 16);
   if (parsed == null) return _accent;
   return Color(hex.length == 6 ? 0xFF000000 | parsed : parsed);
-}
-
-String _formatDate(DateTime date) {
-  return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
 }

@@ -108,9 +108,27 @@ class MobilePushRegistration {
         _registeredKey = key;
         cubit.registrationStatus(true);
       }
+    } on DioException catch (error) {
+      if (revision == _revision && !CancelToken.isCancel(error)) {
+        if (kDebugMode) {
+          debugPrint(
+            'Push registration failed: '
+            'status=${error.response?.statusCode}, '
+            'type=${error.type.name}, '
+            'response=${error.response?.data}',
+          );
+        }
+        cubit.registrationStatus(
+          false,
+          error:
+              'Подключение уведомлений не завершено. Повторите проверку позже.',
+        );
+      }
     } catch (error) {
-      if (revision == _revision &&
-          !(error is DioException && CancelToken.isCancel(error))) {
+      if (revision == _revision) {
+        if (kDebugMode) {
+          debugPrint('Push registration failed: $error');
+        }
         cubit.registrationStatus(
           false,
           error:

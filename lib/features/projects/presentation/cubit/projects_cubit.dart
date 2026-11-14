@@ -275,7 +275,9 @@ class ProjectsCubit extends Cubit<ProjectsState> {
     if (request.workspaceId.trim().isEmpty) return 'Выберите workspace.';
     if (request.code.trim().isEmpty) return 'Введите код проекта.';
     if (request.name.trim().isEmpty) return 'Введите название проекта.';
-    if (request.end.isBefore(request.start)) {
+    if (request.end != null &&
+        request.start != null &&
+        request.end!.isBefore(request.start!)) {
       return 'Дата окончания не может быть раньше даты начала.';
     }
     if (request.progress < 0 || request.progress > 100) {

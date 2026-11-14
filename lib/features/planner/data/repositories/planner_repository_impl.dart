@@ -12,7 +12,7 @@ class PlannerRepositoryImpl implements PlannerRepository {
     } on DioException catch (e) {
       throw PlannerException(
         e.response?.statusCode == 403
-            ? 'Недостаточно прав для изменения ежедневника.'
+            ? 'Нет доступа к этой записи ежедневника.'
             : e.type == DioExceptionType.connectionError
             ? 'Нет подключения к интернету.'
             : 'Не удалось обновить ежедневник. Попробуйте ещё раз.',
@@ -21,37 +21,41 @@ class PlannerRepositoryImpl implements PlannerRepository {
   }
 
   @override
-  Future<List<PlannerItemModel>> load(String workspaceId) => _request(() async {
-    final response = await _dio.get<dynamic>(
-      'project-planner/workspace/$workspaceId',
-    );
-    final data = response.data;
-    final items = data is List
-        ? data
-        : data is Map
-        ? data['items'] ?? data['data']
-        : null;
-    if (items is! List) {
-      throw const PlannerException(
-        'Сервер вернул некорректные данные ежедневника.',
+  Future<List<PlannerItemModel>> load() => _request(() async {
+    const pageSize = 250;
+    final result = <String, PlannerItemModel>{};
+    for (var skip = 0; ; skip += pageSize) {
+      final response = await _dio.get<dynamic>(
+        'project-planner/account',
+        queryParameters: {'skip': skip, 'take': pageSize},
       );
+      final data = response.data;
+      final items = data is List
+          ? data
+          : data is Map
+          ? data['items'] ?? data['data']
+          : null;
+      if (items is! List) {
+        throw const PlannerException(
+          'Сервер вернул некорректные данные ежедневника.',
+        );
+      }
+      for (final json in items.whereType<Map>()) {
+        final item = PlannerItemModel.fromJson(Map<String, dynamic>.from(json));
+        if (item.id.isNotEmpty && !item.archived) result[item.id] = item;
+      }
+      if (items.length < pageSize) return result.values.toList();
     }
-    return items
-        .whereType<Map>()
-        .map((e) => PlannerItemModel.fromJson(Map<String, dynamic>.from(e)))
-        .where((e) => e.id.isNotEmpty && !e.archived)
-        .toList();
   });
 
   @override
-  Future<PlannerItemModel> create(
-    String workspaceId, {
+  Future<PlannerItemModel> create({
     required String title,
     required DateTime scheduledAt,
     required int durationMinutes,
   }) => _request(() async {
     final response = await _dio.post<dynamic>(
-      'project-planner/workspace/$workspaceId/tasks',
+      'project-planner/account/tasks',
       data: {
         'title': title.trim(),
         'scheduledAt': scheduledAt.toUtc().toIso8601String(),
@@ -102,8 +106,7 @@ class PlannerRepositoryImpl implements PlannerRepository {
   });
 
   @override
-  Future<void> addTask(
-    String workspaceId, {
+  Future<void> addTask({
     String? projectId,
     String? taskId,
     String? inboxTaskId,
@@ -112,7 +115,7 @@ class PlannerRepositoryImpl implements PlannerRepository {
   }) => _request(() async {
     await _dio.post<dynamic>(
       inboxTaskId != null
-          ? 'project-planner/workspace/$workspaceId/inbox-tasks'
+          ? 'project-planner/account/inbox-tasks'
           : 'project-planner/$projectId/tasks',
       data: {
         'taskId': ?taskId,

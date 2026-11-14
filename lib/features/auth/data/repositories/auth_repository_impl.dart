@@ -4,19 +4,25 @@ import '../../../../core/auth/auth_session.dart';
 import '../../../../core/storage/auth_token_storage.dart';
 import '../../../../core/storage/workspace_selection_storage.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../apple_auth_provider.dart';
 import '../models/login_request.dart';
 import '../google_auth_browser.dart';
 
-class AuthRepositoryImpl implements AuthRepository, GoogleLoginRepository {
+class AuthRepositoryImpl
+    implements AuthRepository, GoogleLoginRepository, AppleLoginRepository {
   AuthRepositoryImpl({
     required Dio dio,
     required AuthTokenStorage storage,
     required WorkspaceSelectionStorage workspaceSelectionStorage,
     GoogleAuthBrowser googleBrowser = const GoogleAuthBrowser(),
+    AppleAuthProvider appleAuthProvider = const NativeAppleAuthProvider(),
   }) : _dio = dio,
        _storage = storage,
        _workspaceSelectionStorage = workspaceSelectionStorage,
-       _googleBrowser = googleBrowser;
+       _googleBrowser = googleBrowser,
+       _appleAuthProvider = appleAuthProvider;
+
+  final AppleAuthProvider _appleAuthProvider;
 
   final GoogleAuthBrowser _googleBrowser;
   int _revision = 0;
@@ -85,6 +91,37 @@ class AuthRepositoryImpl implements AuthRepository, GoogleLoginRepository {
     } catch (_) {
       throw const AuthException(
         'Не удалось войти через Google. Повторите попытку.',
+      );
+    }
+  }
+
+  @override
+  Future<String?> loginWithApple() async {
+    final operation = _begin();
+    try {
+      final credential = await _appleAuthProvider.authorize();
+      _ensureCurrent(operation);
+      if (credential == null) return null;
+      final response = await _dio.post<dynamic>(
+        'auth/apple/mobile/exchange',
+        data: credential.toJson(),
+      );
+      final token = _extractToken(response.data);
+      return await _commit(operation, () async {
+        await _workspaceSelectionStorage.clear();
+        return _saveToken(operation, token);
+      });
+    } on DioException catch (error) {
+      throw AuthException(
+        error.response?.statusCode == 404
+            ? 'Вход через Apple пока недоступен на сервере. Попробуйте позже.'
+            : 'Не удалось завершить вход через Apple. Повторите попытку.',
+      );
+    } on AuthException {
+      rethrow;
+    } catch (_) {
+      throw const AuthException(
+        'Не удалось войти через Apple. Повторите попытку.',
       );
     }
   }

@@ -1,0 +1,312 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "Participants UI redesign only. Native screen layout and focused form plus headless visual states. Generated target 850x1850; comparison follows existing app tokens, not a claim of pixel-identical artwork.",
+  "platform": "ios",
+  "comparison": "existing-system",
+  "designTarget": {
+    "path": "target.png",
+    "kind": "image",
+    "sha256": "b612d3b4c4db9287fac29e49a6c3bebae868ed6ecef3a6d8337b1ed6b47132ac",
+    "dimensions": [
+      850,
+      1850
+    ]
+  },
+  "sources": [
+    {
+      "path": "../../../lib/features/collaboration/presentation/project_participants_screen.dart",
+      "sha256": "0da5288daff8c7a920dcfa2def8e57f1b4499b189037eed8c60570f670ae2e98"
+    },
+    {
+      "path": "../../../lib/features/collaboration/presentation/project_participants_widgets.dart",
+      "sha256": "8d3e639c3c77649fdb06b1d45a1f08340f34ebd777b9049e4c68b077453db273"
+    },
+    {
+      "path": "../../../lib/features/collaboration/presentation/project_participants_cubit.dart",
+      "sha256": "7d3ff771fefa7fddbc7279ce76fa87ccd6c546c75eaa114c2870641e6582dcf1"
+    },
+    {
+      "path": "../../../lib/features/collaboration/data/project_participants_repository.dart",
+      "sha256": "6e1211054839b5af7c2f7aca3498a402e5a25e52c39a064780c06a8bb04787ca"
+    },
+    {
+      "path": "../../../lib/core/theme/app_theme.dart",
+      "sha256": "d8811f3aebf563c42e530d506c1cf6250a92e5e85854c7784c6a81f5a3f9e308"
+    },
+    {
+      "path": "../../../lib/core/theme/app_ui_tokens.dart",
+      "sha256": "d3303995e363aee133827696db8353867694c693526ee1d0cfb5a1c75d235ee2"
+    },
+    {
+      "path": "../../../lib/core/theme/app_icon_sizes.dart",
+      "sha256": "bf0c9ec5e678541898892a403d7e629ea1aab4f8b30306d93c9f530ec2a75e3a"
+    },
+    {
+      "path": "../../../lib/core/widgets/user_avatar.dart",
+      "sha256": "b05c48f6edd667b7242b3b0756d7a2c687a8ee803c1a6ddc748ce9c8b68ae0c4"
+    },
+    {
+      "path": "../../../lib/core/widgets/app_action_menu.dart",
+      "sha256": "bffbe5de00a982ccc436a7a3e50a823362b9c4bc0dfde6fadb05cce900b80ca7"
+    },
+    {
+      "path": "../../../lib/core/widgets/app_dialog.dart",
+      "sha256": "e003d7fc92836e66f299b6d9ab02b6043dab203088de9d5fcaf10c2f7a2cb4a5"
+    },
+    {
+      "path": "../project-board/Manrope.ttf",
+      "sha256": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6"
+    },
+    {
+      "path": "../../../test/features/collaboration/project_participants_test.dart",
+      "sha256": "ffff41e99dade8fb5e96e8712a936e6dced395e638cda64a63efc49017e59c2d"
+    },
+    {
+      "path": "capture_test.dart",
+      "sha256": "bc3490fb907f925e9427c5bc50297603a6485b4800affe0d45986578fb8d2f91"
+    }
+  ],
+  "requiredChecks": [
+    {
+      "id": "native-main",
+      "kind": "visual"
+    },
+    {
+      "id": "native-invite",
+      "kind": "interaction"
+    },
+    {
+      "id": "live-link-success",
+      "kind": "interaction"
+    }
+  ],
+  "checks": [
+    {
+      "id": "native-main",
+      "kind": "visual",
+      "status": "pass",
+      "state": "Real project test, one participant, server link permission error",
+      "environment": {
+        "kind": "simulator",
+        "name": "iPhone 17 Pro Max",
+        "os": "iOS 26.2",
+        "width": 440,
+        "height": 956,
+        "scale": 3
+      },
+      "observed": "Project context, count, member role badge and error panel visible. Floating action has clear space below scroll content. Actual API returns 403; success was not simulated on device.",
+      "artifacts": [
+        {
+          "path": "native-final.png",
+          "kind": "image",
+          "sha256": "7561e0e66c496b1611b8fa69edf8ae1848532ee706ce6794b0e9d9a58a054904",
+          "dimensions": [
+            1320,
+            2868
+          ]
+        }
+      ]
+    },
+    {
+      "id": "native-invite",
+      "kind": "interaction",
+      "status": "pass",
+      "state": "Invite form, existing member disabled, email focus",
+      "environment": {
+        "kind": "simulator",
+        "name": "iPhone 17 Pro Max",
+        "width": 440,
+        "height": 956,
+        "scale": 3
+      },
+      "steps": [
+        "Opened the real participant route through the Flutter VM service",
+        "Invoked the visible add action callback through VM service; no invitation submitted",
+        "Focused the email EditableText using requestKeyboard; simulator hardware keyboard suppressed the software keyboard",
+        "Dismissed form with router pop"
+      ],
+      "observed": "Modal title, close action, search, existing-access state, role and submit action remain visible. VM callback exercise does not verify physical gestures.",
+      "artifacts": [
+        {
+          "path": "native-invite.png",
+          "kind": "image",
+          "sha256": "8d97be57fed85b51a9bacb7af7f093a031ec8201dd04547c4cfcf210743b4237",
+          "dimensions": [
+            1320,
+            2868
+          ]
+        },
+        {
+          "path": "native-keyboard.png",
+          "kind": "image",
+          "sha256": "1a6ca2762c2959ecd52e6ab859668b49ebd8846866d2cd2e95807a0fe40f6d8e",
+          "dimensions": [
+            1320,
+            2868
+          ]
+        }
+      ]
+    },
+    {
+      "id": "live-link-success",
+      "kind": "interaction",
+      "status": "blocked",
+      "state": "Actual invite-link GET",
+      "environment": {
+        "kind": "simulator",
+        "name": "iPhone 17 Pro Max",
+        "width": 440,
+        "height": 956
+      },
+      "steps": [
+        "Loaded actual project participants",
+        "Read current invite-link endpoint"
+      ],
+      "observed": "Live server returned 403. Backend authorization patch from the preceding task is local and not deployed. Widget/API-adapter tests cover success and retry, but do not establish live success.",
+      "artifacts": [
+        {
+          "path": "native-final.png",
+          "kind": "image",
+          "sha256": "7561e0e66c496b1611b8fa69edf8ae1848532ee706ce6794b0e9d9a58a054904",
+          "dimensions": [
+            1320,
+            2868
+          ]
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "flutterAnalyze": "No issues found",
+    "flutterTests": "18 passed including visual capture harness",
+    "notes": [
+      "Headless captures manually load the existing Manrope font. GoogleFonts emits resolver warnings because the font is not a bundled production asset; native font rendering was inspected.",
+      "Native software keyboard visibility and physical touch gestures were not verified; keyboard insets are covered by widget tests."
+    ]
+  },
+  "unresolved": [
+    "Live invite-link success remains blocked by server 403; requires deployment of the previously prepared backend correction."
+  ],
+  "supportingWidgetRenders": [
+    {
+      "id": "widget-main",
+      "kind": "visual",
+      "status": "pass",
+      "state": "widget-main",
+      "environment": {
+        "kind": "flutter-test",
+        "name": "Flutter widget renderer, illustrative repository adapter",
+        "width": 440,
+        "height": 956
+      },
+      "observed": "Representative fixtures. Role and guest badges, aligned role selector, one-line URL, two link actions, reserved FAB padding. Compared with generated target; no gradient, app tokens retained.",
+      "artifacts": [
+        {
+          "path": "mobile.png",
+          "kind": "image",
+          "sha256": "b6b7f3ce1feebc29de0fc55d5c1faf423d22ea6fec7a4caa01c133df2a6f7d1f",
+          "dimensions": [
+            440,
+            956
+          ]
+        }
+      ]
+    },
+    {
+      "id": "widget-small-text",
+      "kind": "visual",
+      "status": "pass",
+      "state": "widget-small-text",
+      "environment": {
+        "kind": "flutter-test",
+        "name": "Flutter widget renderer, illustrative repository adapter",
+        "width": 320,
+        "height": 640
+      },
+      "observed": "Text scale 2. Body scrolls, header wraps, initials remain contained; decorative avatar text capped only inside avatar.",
+      "artifacts": [
+        {
+          "path": "small-large-text.png",
+          "kind": "image",
+          "sha256": "25afda9967de96a1449b8f86c01b776df942149dee87972b903e1212c36462a8",
+          "dimensions": [
+            320,
+            640
+          ]
+        }
+      ]
+    },
+    {
+      "id": "widget-invalid",
+      "kind": "visual",
+      "status": "pass",
+      "state": "widget-invalid",
+      "environment": {
+        "kind": "flutter-test",
+        "name": "Flutter widget renderer, illustrative repository adapter",
+        "width": 440,
+        "height": 956
+      },
+      "observed": "Invalid email yields red field outline and associated error; no POST sent.",
+      "artifacts": [
+        {
+          "path": "invite-invalid.png",
+          "kind": "image",
+          "sha256": "b5753ae206f5eb5dc9540aa8b4af4a7e123be8fcfefbb8e52239a2973b9be81e",
+          "dimensions": [
+            440,
+            956
+          ]
+        }
+      ]
+    },
+    {
+      "id": "widget-keyboard",
+      "kind": "visual",
+      "status": "pass",
+      "state": "widget-keyboard",
+      "environment": {
+        "kind": "flutter-test",
+        "name": "Flutter widget renderer, illustrative repository adapter",
+        "width": 440,
+        "height": 956
+      },
+      "observed": "Invalid email corrected; error clears. 300px keyboard inset applied in widget renderer; software keyboard itself is not drawn.",
+      "artifacts": [
+        {
+          "path": "invite-keyboard.png",
+          "kind": "image",
+          "sha256": "96c592f1de4bcc9f2c189dbaa2d5aa283f4486f5a4ef93a06c372ff84dca9790",
+          "dimensions": [
+            440,
+            956
+          ]
+        }
+      ]
+    },
+    {
+      "id": "widget-link-error",
+      "kind": "visual",
+      "status": "pass",
+      "state": "widget-link-error",
+      "environment": {
+        "kind": "flutter-test",
+        "name": "Flutter widget renderer, illustrative repository adapter",
+        "width": 440,
+        "height": 956
+      },
+      "observed": "Server-error fixture renders retry and disables role editing; no false active link.",
+      "artifacts": [
+        {
+          "path": "link-error.png",
+          "kind": "image",
+          "sha256": "f577145cbd4cdad94952e31f55ba30bb3549e334f232b9dd696bfa85df5e4abe",
+          "dimensions": [
+            440,
+            956
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -39,6 +39,14 @@ class InboxWidgetProvider : HomeWidgetProvider() {
                     Uri.parse("jospar://inbox?homeWidget"),
                 )
                 setOnClickPendingIntent(R.id.inbox_widget_root, openInbox)
+                setOnClickPendingIntent(
+                    R.id.inbox_widget_add,
+                    HomeWidgetLaunchIntent.getActivity(
+                        context,
+                        MainActivity::class.java,
+                        Uri.parse("jospar://inbox?homeWidget&action=add"),
+                    ),
+                )
             }
             appWidgetManager.updateAppWidget(widgetId, views)
         }

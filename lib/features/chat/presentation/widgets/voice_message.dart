@@ -209,6 +209,7 @@ class _VoiceMessageState extends State<VoiceMessage> {
                       )
                     : Icon(
                         playing ? LucideIcons.pause : LucideIcons.play,
+                        color: Colors.white,
                         size: AppIconSizes.standard,
                       ),
               ),
@@ -227,9 +228,17 @@ class _VoiceMessageState extends State<VoiceMessage> {
                       children: [
                         SliderTheme(
                           data: SliderTheme.of(context).copyWith(
-                            trackHeight: 3,
+                            trackHeight: 28,
+                            trackShape: const _VoiceWaveformTrack(),
+                            inactiveTrackColor: AppColors.accent.withValues(
+                              alpha: 0.22,
+                            ),
+                            disabledInactiveTrackColor: AppColors.accent
+                                .withValues(alpha: 0.22),
+                            disabledActiveTrackColor: AppColors.accent,
                             thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 5,
+                              enabledThumbRadius: 4,
+                              disabledThumbRadius: 4,
                             ),
                             overlayShape: SliderComponentShape.noOverlay,
                           ),
@@ -269,5 +278,122 @@ class _VoiceMessageState extends State<VoiceMessage> {
         },
       ),
     );
+  }
+}
+
+/// Decorative waveform; playback progress and seeking use the audio duration.
+class _VoiceWaveformTrack extends SliderTrackShape {
+  const _VoiceWaveformTrack();
+
+  static const _heights = [
+    .18,
+    .32,
+    .55,
+    .28,
+    .72,
+    .92,
+    .48,
+    .65,
+    .36,
+    .22,
+    .52,
+    .78,
+    1.0,
+    .62,
+    .42,
+    .7,
+    .9,
+    .54,
+    .3,
+    .46,
+    .68,
+    .38,
+    .24,
+    .56,
+    .84,
+    .64,
+    .4,
+    .76,
+    .5,
+    .26,
+    .44,
+    .6,
+    .34,
+    .2,
+    .48,
+    .7,
+    .46,
+    .3,
+    .18,
+    .36,
+  ];
+
+  @override
+  Rect getPreferredRect({
+    required RenderBox parentBox,
+    Offset offset = Offset.zero,
+    required SliderThemeData sliderTheme,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+  }) {
+    const inset = 8.0;
+    final height = sliderTheme.trackHeight ?? 28;
+    return Rect.fromLTWH(
+      offset.dx + inset,
+      offset.dy + (parentBox.size.height - height) / 2,
+      (parentBox.size.width - inset * 2).clamp(0.0, double.infinity),
+      height,
+    );
+  }
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset offset, {
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required Animation<double> enableAnimation,
+    required TextDirection textDirection,
+    required Offset thumbCenter,
+    Offset? secondaryOffset,
+    bool isDiscrete = false,
+    bool isEnabled = false,
+  }) {
+    final rect = getPreferredRect(
+      parentBox: parentBox,
+      offset: offset,
+      sliderTheme: sliderTheme,
+    );
+    if (rect.width <= 0) return;
+    final active = ColorTween(
+      begin: sliderTheme.disabledActiveTrackColor,
+      end: sliderTheme.activeTrackColor,
+    ).evaluate(enableAnimation)!;
+    final inactive = ColorTween(
+      begin: sliderTheme.disabledInactiveTrackColor,
+      end: sliderTheme.inactiveTrackColor,
+    ).evaluate(enableAnimation)!;
+    final count = (rect.width / 5).floor().clamp(1, _heights.length);
+    final spacing = rect.width / count;
+    final paint = Paint();
+    for (var i = 0; i < count; i++) {
+      final x = rect.left + (i + .5) * spacing;
+      final height = rect.height * _heights[i * _heights.length ~/ count];
+      final played = textDirection == TextDirection.ltr
+          ? x < thumbCenter.dx
+          : x > thumbCenter.dx;
+      paint.color = played ? active : inactive;
+      context.canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(x, rect.center.dy),
+            width: 2.5,
+            height: height,
+          ),
+          const Radius.circular(2),
+        ),
+        paint,
+      );
+    }
   }
 }

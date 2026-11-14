@@ -1,3 +1,4 @@
+import '../../data/models/task_label_catalog.dart';
 import '../../../assistant/data/services/assistant_task_changes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -23,6 +24,7 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
     return super.close();
   }
 
+  int _loadRevision = 0;
   final TaskDetailsRepository _repository;
   final ProfileRepository _profileRepository;
 
@@ -114,6 +116,7 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
   }
 
   Future<void> load(String taskId, {ProjectTaskModel? initialTask}) async {
+    final revision = ++_loadRevision;
     emit(
       state.copyWith(
         status: TaskDetailsStatus.loading,
@@ -123,7 +126,7 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
     );
     try {
       final payload = await _repository.getTask(taskId);
-      if (isClosed) return;
+      if (isClosed || revision != _loadRevision) return;
       emit(
         state.copyWith(
           status: TaskDetailsStatus.success,
@@ -133,9 +136,9 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
           clearError: true,
         ),
       );
-      await _loadSecondaryData(taskId, payload.task.projectId);
+      await _loadSecondaryData(taskId, payload.task.projectId, revision);
     } on TaskDetailsException catch (error) {
-      if (isClosed) return;
+      if (isClosed || revision != _loadRevision) return;
       emit(
         state.copyWith(
           status: TaskDetailsStatus.failure,
@@ -169,6 +172,74 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
     } on TaskDetailsException catch (error) {
       _rollback(error.message, task: oldTask);
     }
+  }
+
+  Future<TaskLabelCatalog> getLabelCatalog() async {
+    final repository = _repository;
+    final task = state.task;
+    if (task == null || repository is! TaskLabelCatalogRepository) {
+      throw const TaskDetailsException('Каталог меток недоступен.');
+    }
+    return (repository as TaskLabelCatalogRepository).getLabelCatalog(task.id);
+  }
+
+  List<TaskLabelModel> labelsForScope(bool personal) {
+    if (!personal) {
+      return state.detail.labels.where((e) => !e.isPersonal).toList();
+    }
+    final raw = state.detail.raw['personalLabels'];
+    final values = raw is Map ? raw[state.currentUser?.id] : null;
+    return values is List
+        ? values
+              .whereType<Map>()
+              .map((e) => TaskLabelModel.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+        : [];
+  }
+
+  Future<bool> saveScopedLabels(
+    List<TaskLabelModel> labels, {
+    required bool personal,
+    required List<TaskLabelModel> catalog,
+  }) async {
+    final userId = state.currentUser?.id;
+    if (personal && (userId == null || userId.isEmpty)) return false;
+    final raw = Map<String, Object?>.from(state.detail.raw);
+    if (personal) {
+      for (final entry in {
+        'personalLabels': labels,
+        'personalLabelCatalog': catalog,
+      }.entries) {
+        final old = raw[entry.key];
+        final map = old is Map
+            ? Map<String, dynamic>.from(old)
+            : <String, dynamic>{};
+        map[userId!] = uniqueTaskLabels(
+          entry.value,
+        ).map((e) => e.toJson()).toList();
+        raw[entry.key] = map;
+      }
+    } else {
+      raw['labelCatalog'] = uniqueTaskLabels(
+        catalog,
+      ).map((e) => e.toJson()).toList();
+    }
+    final saved = await _saveDetail(
+      state.detail.copyWith(
+        raw: raw,
+        labels: personal ? null : uniqueTaskLabels(labels),
+      ),
+    );
+    if (saved) _notifyRelatedTasks();
+    return saved;
+  }
+
+  void _notifyRelatedTasks() {
+    // Other task consumers already subscribe to this invalidation signal.
+    // Avoid reloading this editor while its acknowledged save is completing.
+    assistantTaskChanges.removeListener(_onAiTasksChanged);
+    notifyAssistantTaskChanges();
+    if (!isClosed) assistantTaskChanges.addListener(_onAiTasksChanged);
   }
 
   Future<bool> updatePersonalLabels(List<TaskLabelModel> labels) {
@@ -210,19 +281,39 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
   Future<List<TaskEpicModel>> getEpics() async {
     final repository = _repository;
     final task = state.task;
-    if (repository is! TaskExtrasRepository || task == null) return [];
+    if (repository is! TaskExtrasRepository ||
+        task == null ||
+        task.projectId.trim().isEmpty) {
+      throw const TaskDetailsException('Загрузка эпиков недоступна.');
+    }
     return (repository as TaskExtrasRepository).getEpics(task.projectId);
   }
 
-  Future<bool> updateEpics(List<String> ids) =>
-      _extras((repository, task) async {
-        final payload = await repository.updateEpics(task.id, ids);
-        _applyPayload(payload);
-      });
+  Future<bool> updateEpics(List<String> ids) async {
+    final saved = await _extras((repository, task) async {
+      final payload = await repository.updateEpics(
+        task.id,
+        ids.toSet().toList(),
+      );
+      _applyPayload(payload);
+    });
+    if (saved) _notifyRelatedTasks();
+    return saved;
+  }
+
   Future<bool> saveResource(
     TaskResourceModel resource, {
     required bool create,
   }) => _extras((repository, task) async {
+    if (resource.name.trim().isEmpty ||
+        resource.planValue < 0 ||
+        resource.factValue < 0 ||
+        !resource.planValue.isFinite ||
+        !resource.factValue.isFinite) {
+      throw const TaskDetailsException(
+        'Укажите название и неотрицательные значения ресурса.',
+      );
+    }
     await repository.saveResource(task.id, resource, create: create);
     _applyPayload(await _repository.getTask(task.id));
   });
@@ -230,6 +321,73 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
     await repository.deleteResource(id);
     _applyPayload(await _repository.getTask(task.id));
   });
+
+  Future<bool> createResourcePair() => _extras((repository, task) async {
+    final creator = _repository;
+    if (creator is! TaskResourceCreationRepository) {
+      throw const TaskDetailsException('Создание пары ресурсов недоступно.');
+    }
+    final plan = await (creator as TaskResourceCreationRepository)
+        .createResource(task.id, const TaskResourceModel(id: '', name: 'План'));
+    TaskResourceModel? fact;
+    try {
+      fact = await (creator as TaskResourceCreationRepository).createResource(
+        task.id,
+        const TaskResourceModel(id: '', name: 'Факт'),
+      );
+    } catch (_) {
+      await repository.deleteResource(plan.id);
+      rethrow;
+    } finally {
+      try {
+        _applyPayload(await _repository.getTask(task.id));
+      } on TaskDetailsException {
+        // An acknowledged creation must not become a failed create on GET failure.
+        if (!isClosed && fact != null) {
+          emit(state.copyWith(resources: [...state.resources, plan, fact]));
+        }
+      }
+    }
+  });
+
+  Future<bool> deleteResourcePair(List<TaskResourceModel> pair) =>
+      _extras((repository, task) async {
+        try {
+          for (final resource in pair) {
+            await repository.deleteResource(resource.id);
+          }
+        } finally {
+          _applyPayload(await _repository.getTask(task.id));
+        }
+      });
+
+  Future<bool> patchResource(String id, Map<String, Object?> changes) =>
+      _extras((_, task) async {
+        final repository = _repository;
+        if (repository is! TaskResourceOperationsRepository) {
+          throw const TaskDetailsException('Изменение ресурса недоступно.');
+        }
+        await (repository as TaskResourceOperationsRepository).patchResource(
+          id,
+          changes,
+        );
+        _applyPayload(await _repository.getTask(task.id));
+      });
+
+  Future<Map<String, Object?>> resourceHistory(
+    String id, {
+    String? cursor,
+  }) async {
+    final repository = _repository;
+    if (repository is! TaskResourceOperationsRepository) {
+      throw const TaskDetailsException('История ресурса недоступна.');
+    }
+    return (repository as TaskResourceOperationsRepository).resourceHistory(
+      id,
+      cursor: cursor,
+    );
+  }
+
   Future<bool> _extras(
     Future<void> Function(TaskExtrasRepository, ProjectTaskModel) action,
   ) async {
@@ -285,6 +443,24 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
 
   Future<bool> updateStart(DateTime? start) =>
       _advancedUpdate((r, task) => r.updateStart(task.id, start));
+
+  Future<bool> updateDates(DateTime? start, DateTime? end) =>
+      _extras((_, task) async {
+        if (start != null && end != null && start.isAfter(end)) {
+          throw const TaskDetailsException('Начало не может быть позже срока.');
+        }
+        final repository = _repository;
+        if (repository is! TaskDatesRepository) {
+          throw const TaskDetailsException('Редактирование дат недоступно.');
+        }
+        _applyPayload(
+          await (repository as TaskDatesRepository).updateDates(
+            task.id,
+            start,
+            end,
+          ),
+        );
+      });
   Future<bool> updateDependencies(List<String> ids) =>
       _advancedUpdate((r, task) => r.updateDependencies(task.id, ids));
   Future<bool> _advancedUpdate(
@@ -486,16 +662,24 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
     );
   }
 
-  Future<void> _loadSecondaryData(String taskId, String projectId) async {
+  Future<void> _loadSecondaryData(
+    String taskId,
+    String projectId,
+    int revision,
+  ) async {
     try {
       final columns = await _repository.getColumns(projectId);
-      if (!isClosed) emit(state.copyWith(columns: columns));
+      if (!isClosed && revision == _loadRevision) {
+        emit(state.copyWith(columns: columns));
+      }
     } on TaskDetailsException {
       // Built-in status labels remain available when columns cannot be loaded.
     }
     try {
       final history = await _repository.getHistory(taskId);
-      if (!isClosed) emit(state.copyWith(history: history));
+      if (!isClosed && revision == _loadRevision) {
+        emit(state.copyWith(history: history));
+      }
     } on TaskDetailsException {
       // History is supplementary; the task stays usable when it is unavailable.
     }
@@ -531,7 +715,9 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
   Future<void> _reloadHistory(String taskId) async {
     try {
       final history = await _repository.getHistory(taskId);
-      if (!isClosed) emit(state.copyWith(history: history));
+      if (!isClosed && state.task?.id == taskId) {
+        emit(state.copyWith(history: history));
+      }
     } on TaskDetailsException {
       // A failed history refresh must not roll back a successfully saved task.
     }

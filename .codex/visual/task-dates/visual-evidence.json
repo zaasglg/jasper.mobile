@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "Task dates sheet based on supplied references: optional start, active date cards, calendar, optional quarter-hour time list, clear/save footer; mobile time controls below calendar",
+  "platform": "ios",
+  "sources": [{"path": "../../../lib/features/tasks/presentation/widgets/task_dates_sheet.dart", "sha256": "ab9559a438f36d47513acce6600abbdb5b868dd3e11aaec623d3920e72d9bf69"}],
+  "comparison": "existing-system",
+  "requiredChecks": [{"id": "native-dates", "kind": "visual"}],
+  "checks": [{"id": "native-dates", "status": "blocked", "observed": "Widget tests exercised 320x700 layout, required-start validation, recovery after choosing a date, retained draft after save rejection and successful clearing. No native screenshot captured; visual fidelity to supplied references remains unverified.", "artifacts": []}],
+  "unresolved": ["Native device visual inspection remains outstanding."]
+}

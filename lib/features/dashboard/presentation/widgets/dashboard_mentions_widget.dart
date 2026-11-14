@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../../core/utils/html_text.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import 'dashboard_widget_panel.dart' show dashboardObject;
@@ -178,19 +179,19 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
     return InkWell(
       onTap: _saving ? null : () => _open(entry),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 13),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.smMd),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             UserAvatar(
-              size: 26,
+              size: 36,
               userId: user['id']?.toString(),
               name: name,
               avatarUrl: (user['avatarUrl'] ?? user['avatar']) as String?,
               backgroundColor: const Color(0xFFF1EFFB),
               foregroundColor: AppColors.accent,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.smMd),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,13 +200,11 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
                     _message(text.isEmpty ? 'Упоминание' : text),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      height: 1.45,
-                      color: Color(0xFF484854),
-                    ),
+                    style: AppTypography.body(
+                      context,
+                    )?.copyWith(height: 1.4, color: AppColors.ink),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.sm),
                   Wrap(
                     spacing: 5,
                     runSpacing: 4,
@@ -213,18 +212,16 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: AppColors.muted,
-                        ),
+                        style: AppTypography.caption(
+                          context,
+                        )?.copyWith(color: AppColors.muted),
                       ),
                       if (date.isNotEmpty)
                         Text(
                           '· $date',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.muted,
-                          ),
+                          style: AppTypography.caption(
+                            context,
+                          )?.copyWith(color: AppColors.muted),
                         ),
                       Icon(
                         source == 'task'
@@ -236,10 +233,9 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
                       if (contextLabel != null)
                         Text(
                           contextLabel,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.muted,
-                          ),
+                          style: AppTypography.caption(
+                            context,
+                          )?.copyWith(color: AppColors.muted),
                         ),
                     ],
                   ),
@@ -316,9 +312,7 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
                   ? null
                   : () => _mark(_filtered.map(_id).toSet()),
               style: IconButton.styleFrom(
-                padding: const EdgeInsets.all(5),
-                minimumSize: const Size(28, 36),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: const Size.square(AppSpacing.touchTarget),
               ),
               icon: const Icon(
                 LucideIcons.checkCheck,
@@ -329,6 +323,7 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
             ?widget.trailing,
           ],
         ),
+        const Divider(height: AppSpacing.xxs, color: AppColors.border),
         if (_loading)
           const DashboardWidgetSkeleton(showHeading: false)
         else if (visible.isEmpty)

@@ -247,6 +247,9 @@ class CreationFakeRepository implements TaskCreationRepository {
     ),
   ];
   @override
+  Future<List<TaskAssigneeModel>> members(String workspaceId) async =>
+      defaultOptions.members;
+  @override
   Future<TaskCreationOptions> options(
     String workspaceId,
     String projectId,

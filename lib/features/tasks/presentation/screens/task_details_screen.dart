@@ -1,4 +1,10 @@
+import '../widgets/task_detail_style.dart';
+import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
+import '../../../../core/theme/task_label_color.dart';
+import '../widgets/task_comment_attachment.dart';
 import '../widgets/task_relationships.dart';
+import '../widgets/task_dates_sheet.dart';
+import '../widgets/task_resource_pairs.dart';
 import '../widgets/task_location_section.dart';
 import '../widgets/task_rich_description.dart';
 import '../../data/models/task_location_model.dart';
@@ -16,6 +22,7 @@ import '../../../../core/theme/app_icon_sizes.dart';
 import '../widgets/task_details_skeleton.dart';
 import '../../../../core/utils/html_text.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -173,64 +180,70 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       builder: (context, state) {
         final task = state.task ?? widget.task;
         return Scaffold(
-          backgroundColor: Colors.white,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.transparent,
-            titleSpacing: 0,
-            title: Text(
-              task?.displayId.trim().isNotEmpty == true
-                  ? task!.displayId
-                  : 'Задача',
-              style: GoogleFonts.manrope(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          appBar: DashboardAppBar(
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(kToolbarHeight),
+              child: AppBar(
+                primary: false,
+                backgroundColor: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                titleSpacing: 0,
+                title: Text(
+                  task?.displayId.trim().isNotEmpty == true
+                      ? task!.displayId
+                      : 'Задача',
+                  style: GoogleFonts.manrope(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                actions: <Widget>[
+                  AppActionMenuButton<TaskExtraTab>(
+                    enabled:
+                        task != null &&
+                        !state.isSaving &&
+                        state.status == TaskDetailsStatus.success,
+                    title: 'Действия задачи',
+                    tooltip: 'Действия задачи',
+                    groups: const [
+                      [
+                        AppMenuAction(
+                          value: TaskExtraTab.labels,
+                          label: 'Метки и личные метки',
+                          icon: LucideIcons.tag,
+                        ),
+                        AppMenuAction(
+                          value: TaskExtraTab.epics,
+                          label: 'Эпики',
+                          icon: LucideIcons.layers3,
+                        ),
+                        AppMenuAction(
+                          value: TaskExtraTab.resources,
+                          label: 'Ресурсы',
+                          icon: LucideIcons.chartNoAxesCombined,
+                        ),
+                        AppMenuAction(
+                          value: TaskExtraTab.files,
+                          label: 'Файлы',
+                          icon: LucideIcons.paperclip,
+                        ),
+                      ],
+                    ],
+                    onSelected: (tab) => showTaskExtras(context, tab),
+                  ),
+
+                  IconButton(
+                    tooltip: 'Обновить',
+                    onPressed: context.read<TaskDetailsCubit>().refresh,
+                    icon: const Icon(
+                      LucideIcons.refreshCw,
+                      size: AppIconSizes.standard,
+                    ),
+                  ),
+                ],
               ),
             ),
-            actions: <Widget>[
-              AppActionMenuButton<TaskExtraTab>(
-                enabled:
-                    task != null &&
-                    !state.isSaving &&
-                    state.status == TaskDetailsStatus.success,
-                title: 'Действия задачи',
-                tooltip: 'Действия задачи',
-                groups: const [
-                  [
-                    AppMenuAction(
-                      value: TaskExtraTab.labels,
-                      label: 'Метки и личные метки',
-                      icon: LucideIcons.tag,
-                    ),
-                    AppMenuAction(
-                      value: TaskExtraTab.epics,
-                      label: 'Эпики',
-                      icon: LucideIcons.layers3,
-                    ),
-                    AppMenuAction(
-                      value: TaskExtraTab.resources,
-                      label: 'Ресурсы',
-                      icon: LucideIcons.chartNoAxesCombined,
-                    ),
-                    AppMenuAction(
-                      value: TaskExtraTab.files,
-                      label: 'Файлы',
-                      icon: LucideIcons.paperclip,
-                    ),
-                  ],
-                ],
-                onSelected: (tab) => showTaskExtras(context, tab),
-              ),
-
-              IconButton(
-                tooltip: 'Обновить',
-                onPressed: context.read<TaskDetailsCubit>().refresh,
-                icon: const Icon(
-                  LucideIcons.refreshCw,
-                  size: AppIconSizes.standard,
-                ),
-              ),
-            ],
           ),
           body: _body(context, state, task),
         );
@@ -262,7 +275,12 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.xl + MediaQuery.paddingOf(context).bottom,
+            ),
             children: <Widget>[
               if (state.status == TaskDetailsStatus.failure)
                 _InlineError(message: state.errorMessage ?? 'Ошибка загрузки'),
@@ -305,54 +323,6 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                         ),
                       ),
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                leading: const Icon(
-                  LucideIcons.calendarDays,
-                  size: AppIconSizes.standard,
-                  color: AppColors.muted,
-                ),
-                title: const Text(
-                  'Дата начала',
-                  style: TextStyle(fontSize: 12, color: AppColors.muted),
-                ),
-                subtitle: Text(
-                  task.start == null
-                      ? 'Не указана'
-                      : '${task.start!.day.toString().padLeft(2, '0')}.${task.start!.month.toString().padLeft(2, '0')}.${task.start!.year}',
-                  style: const TextStyle(fontSize: 13),
-                ),
-                onTap: state.isSaving ? null : () => _selectStart(task),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (task.start != null)
-                      IconButton(
-                        tooltip: 'Убрать дату начала',
-                        onPressed: state.isSaving
-                            ? null
-                            : () => context
-                                  .read<TaskDetailsCubit>()
-                                  .updateStart(null),
-                        icon: const Icon(
-                          LucideIcons.x,
-                          size: AppIconSizes.standard,
-                        ),
-                      ),
-                    IconButton(
-                      tooltip: 'Изменить дату начала',
-                      onPressed: state.isSaving
-                          ? null
-                          : () => _selectStart(task),
-                      icon: const Icon(
-                        LucideIcons.pencil,
-                        size: AppIconSizes.standard,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               TaskLocationSection(
                 location: TaskLocationModel.parse(state.detail.raw['location']),
                 cubit: context.read<TaskDetailsCubit>(),
@@ -368,9 +338,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               _ExpandableSection(
                 icon: LucideIcons.chartNoAxesCombined,
                 title: 'Ресурс',
-                count: state.resources.length,
+                count: (state.resources.length / 2).ceil(),
+                onAdd: state.isSaving
+                    ? null
+                    : () =>
+                          context.read<TaskDetailsCubit>().createResourcePair(),
                 initiallyExpanded: state.resources.isNotEmpty,
-                child: _Resources(resources: state.resources),
+                child: TaskResourcePairs(resources: state.resources),
               ),
               _ExpandableSection(
                 icon: LucideIcons.listChecks,
@@ -461,49 +435,17 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     );
   }
 
-  Future<void> _selectStart(ProjectTaskModel task) async {
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: task.start ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-      helpText: 'Дата начала',
-      cancelText: 'Отмена',
-      confirmText: 'Готово',
-    );
-    if (selected == null || !mounted) return;
-    if (task.end != null &&
-        DateTime(
-          selected.year,
-          selected.month,
-          selected.day,
-        ).isAfter(DateTime(task.end!.year, task.end!.month, task.end!.day))) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Дата начала не может быть позже срока задачи.'),
-        ),
-      );
-      return;
-    }
-    await context.read<TaskDetailsCubit>().updateStart(
-      DateTime.utc(selected.year, selected.month, selected.day),
-    );
-  }
+  Future<void> _selectDeadline(DateTime? current) => _selectDates();
 
-  Future<void> _selectDeadline(DateTime? current) async {
-    final now = DateTime.now();
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: current?.toLocal() ?? now,
-      firstDate: DateTime(now.year - 5),
-      lastDate: DateTime(now.year + 10),
-      helpText: 'Выберите срок',
-      cancelText: 'Отмена',
-      confirmText: 'Готово',
+  Future<void> _selectDates({bool selectStart = false}) {
+    final cubit = context.read<TaskDetailsCubit>();
+    return showTaskDatesSheet(
+      context,
+      start: cubit.state.task?.start,
+      end: cubit.state.task?.end,
+      selectStart: selectStart,
+      onSave: cubit.updateDates,
     );
-    if (selected != null && mounted) {
-      await context.read<TaskDetailsCubit>().updateDeadline(selected);
-    }
   }
 
   Future<void> _editTiming(int currentMinutes) async {
@@ -568,29 +510,40 @@ class _TaskHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
             InkWell(
-              onTap: onToggleCompleted,
+              key: const Key('task-complete-toggle'),
+              onTap: isSaving ? null : onToggleCompleted,
               customBorder: const CircleBorder(),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: task.isDone ? AppColors.accent : Colors.transparent,
-                  shape: BoxShape.circle,
-                  border: task.isDone
-                      ? null
-                      : Border.all(color: colors.outlineVariant, width: 1.5),
+              child: SizedBox.square(
+                dimension: AppSpacing.touchTarget,
+                child: Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: task.isDone
+                          ? AppColors.accent
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                      border: task.isDone
+                          ? null
+                          : Border.all(
+                              color: colors.outlineVariant,
+                              width: 1.5,
+                            ),
+                    ),
+                    child: task.isDone
+                        ? const Icon(
+                            LucideIcons.check,
+                            size: 12,
+                            color: Colors.white,
+                          )
+                        : null,
+                  ),
                 ),
-                child: task.isDone
-                    ? const Icon(
-                        LucideIcons.check,
-                        size: 12,
-                        color: Colors.white,
-                      )
-                    : null,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.xs),
             Expanded(
               child: _TaskTitleEditor(
                 title: task.title,
@@ -600,6 +553,25 @@ class _TaskHeader extends StatelessWidget {
             ),
           ],
         ),
+        if (task.epics.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.smMd),
+          Text('Эпики', style: AppTypography.caption(context)),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final epic in task.epics)
+                _LabelChip(
+                  label: TaskLabelModel(
+                    id: epic.id,
+                    text: epic.name,
+                    color: epic.color,
+                  ),
+                ),
+            ],
+          ),
+        ],
         if (labels.isNotEmpty) ...<Widget>[
           const SizedBox(height: 14),
           Wrap(
@@ -636,25 +608,18 @@ class _Description extends StatelessWidget {
               color: AppColors.ink,
             ),
             const SizedBox(width: 9),
-            Text(
-              'Описание',
-              style: GoogleFonts.manrope(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: AppColors.ink,
-              ),
-            ),
+            Text('Описание', style: TaskDetailStyle.heading(context)),
           ],
         ),
         const SizedBox(height: 10),
         Material(
-          color: const Color(0xFFF5F5F4),
-          borderRadius: BorderRadius.circular(10),
+          color: TaskDetailStyle.field(context),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(13, 12, 11, 12),
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
@@ -704,10 +669,10 @@ class _MetadataStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final itemWidth = (constraints.maxWidth - 10) / 2;
+        final itemWidth = (constraints.maxWidth - AppSpacing.smMd) / 2;
         return Wrap(
-          spacing: 10,
-          runSpacing: 10,
+          spacing: AppSpacing.smMd,
+          runSpacing: AppSpacing.smMd,
           children: <Widget>[
             _MetadataCard(
               width: itemWidth,
@@ -771,15 +736,17 @@ class _MetadataCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return SizedBox(
       width: width,
-      height: 76,
+      height:
+          TaskDetailStyle.metadataMinHeight *
+          MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
       child: Material(
-        color: const Color(0xFFF5F5F4),
-        borderRadius: BorderRadius.circular(10),
+        color: TaskDetailStyle.field(context),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(11, 10, 10, 9),
+            padding: const EdgeInsets.all(AppSpacing.smMd),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -796,11 +763,7 @@ class _MetadataCard extends StatelessWidget {
                         label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.manrope(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.muted,
-                        ),
+                        style: TaskDetailStyle.label(context),
                       ),
                     ),
                     if (onTap != null) ...<Widget>[
@@ -815,9 +778,9 @@ class _MetadataCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 DefaultTextStyle(
-                  style: GoogleFonts.manrope(
-                    fontSize: 13,
+                  style: AppTypography.body(context)!.copyWith(
                     color: colors.onSurface,
+                    fontWeight: FontWeight.w600,
                   ),
                   child: child,
                 ),
@@ -925,14 +888,11 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
                                   Flexible(
                                     child: Text(
                                       widget.title,
-                                      style: GoogleFonts.manrope(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.ink,
-                                      ),
+                                      style: TaskDetailStyle.heading(context),
                                     ),
                                   ),
-                                  if (widget.count > 0) ...[
+                                  if (widget.count > 0 ||
+                                      widget.title == 'РЕСУРС') ...[
                                     const SizedBox(width: 6),
                                     _CountBadge(count: widget.count),
                                   ],
@@ -945,10 +905,17 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
                               const SizedBox(width: 8),
                               SizedBox(width: 64, child: _progressBar()),
                             ],
-                            if (widget.progress != null) ...[
+                            if (widget.onAdd != null ||
+                                widget.progress != null ||
+                                widget.title == 'РЕСУРС') ...[
                               const SizedBox(width: 4),
                               IconButton(
-                                tooltip: 'Добавить чек-лист',
+                                key: ValueKey(
+                                  'task-section-add-${widget.title}',
+                                ),
+                                tooltip: widget.title == 'РЕСУРС'
+                                    ? 'Добавить ресурс'
+                                    : 'Добавить чек-лист',
                                 onPressed: widget.onAdd == null
                                     ? null
                                     : () {
@@ -961,8 +928,8 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
                                 ),
                                 color: AppColors.accent,
                                 constraints: const BoxConstraints.tightFor(
-                                  width: 44,
-                                  height: 44,
+                                  width: 48,
+                                  height: 48,
                                 ),
                                 padding: EdgeInsets.zero,
                               ),
@@ -1005,137 +972,6 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
         Divider(
           height: 1,
           color: colors.outlineVariant.withValues(alpha: 0.38),
-        ),
-      ],
-    );
-  }
-}
-
-class _Resources extends StatelessWidget {
-  const _Resources({required this.resources});
-
-  final List<TaskResourceModel> resources;
-
-  @override
-  Widget build(BuildContext context) {
-    if (resources.isEmpty) return const _EmptyText('Нет ресурсов.');
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 10.0;
-        final itemWidth = (constraints.maxWidth - spacing) / 2;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: resources
-              .map(
-                (resource) => SizedBox(
-                  width: itemWidth,
-                  child: _ResourceRow(resource: resource),
-                ),
-              )
-              .toList(growable: false),
-        );
-      },
-    );
-  }
-}
-
-class _ResourceRow extends StatelessWidget {
-  const _ResourceRow({required this.resource});
-
-  final TaskResourceModel resource;
-
-  @override
-  Widget build(BuildContext context) {
-    final ratio = resource.ratio;
-    return Container(
-      height: 132,
-      padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F7F6),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  resource.name.isEmpty ? 'Ресурс' : resource.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    height: 1.25,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '${(ratio * 100).round()}%',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: _Metric(
-                  label: 'План',
-                  value: _number(resource.planValue),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _Metric(
-                  label: 'Факт',
-                  value: _number(resource.factValue),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 9),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              value: ratio.clamp(0, 1),
-              minHeight: 5,
-              backgroundColor: AppColors.skeletonTrack,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10, color: AppColors.muted),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ],
     );
@@ -1197,9 +1033,10 @@ class _Discussion extends StatelessWidget {
             ],
           ),
         Container(
-          padding: const EdgeInsets.fromLTRB(12, 8, 7, 7),
+          padding: const EdgeInsets.all(AppSpacing.xs),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
               color: Theme.of(context).colorScheme.outlineVariant,
             ),
@@ -1208,6 +1045,11 @@ class _Discussion extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: <Widget>[
               IconButton(
+                key: const Key('discussion_attach'),
+                constraints: const BoxConstraints.tightFor(
+                  width: AppSpacing.touchTarget,
+                  height: AppSpacing.touchTarget,
+                ),
                 tooltip: 'Прикрепить файлы к комментарию',
                 onPressed: isSending ? null : onAttach,
                 icon: const Icon(
@@ -1217,24 +1059,41 @@ class _Discussion extends StatelessWidget {
               ),
               Expanded(
                 child: TextField(
+                  key: const Key('discussion_input'),
                   controller: controller,
                   enabled: !isSending,
                   minLines: 1,
                   maxLines: 4,
+                  style: AppTypography.body(context),
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     hintText: 'Написать комментарий…',
+                    filled: false,
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 9),
+                    disabledBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.smMd,
+                    ),
                   ),
                 ),
               ),
+              const SizedBox(width: AppSpacing.xs),
               IconButton.filled(
+                key: const Key('discussion_send'),
+                constraints: const BoxConstraints.tightFor(
+                  width: AppSpacing.touchTarget,
+                  height: AppSpacing.touchTarget,
+                ),
                 tooltip: 'Отправить',
                 onPressed: isSending ? null : onSend,
-                icon: const Icon(LucideIcons.send, size: AppIconSizes.standard),
+                icon: const Icon(
+                  LucideIcons.send,
+                  size: AppIconSizes.standard,
+                  color: AppColors.onAccent,
+                ),
               ),
             ],
           ),
@@ -1310,36 +1169,15 @@ class _CommentBubble extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        htmlToPlainText(comment.text),
-                        style: const TextStyle(fontSize: 13, height: 1.4),
-                      ),
+                      if (htmlToPlainText(comment.text).trim().isNotEmpty)
+                        Text(
+                          htmlToPlainText(comment.text),
+                          style: const TextStyle(fontSize: 13, height: 1.4),
+                        ),
                       for (final file in comment.files)
-                        InkWell(
-                          onTap: () => onOpenFile(file),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  LucideIcons.paperclip,
-                                  size: AppIconSizes.standard,
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    file.name,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.accent,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        TaskCommentAttachment(
+                          file: file,
+                          onOpen: () => onOpenFile(file),
                         ),
                       if (_commentTime(comment.time).isNotEmpty) ...[
                         const SizedBox(height: 5),
@@ -1940,21 +1778,7 @@ String _dateTime(DateTime value) {
   return '${formatRussianTaskDate(local)}, $hours:$minutes';
 }
 
-String _number(double value) {
-  return value == value.roundToDouble()
-      ? value.round().toString()
-      : value.toStringAsFixed(2);
-}
-
-Color _parseColor(String value) {
-  var hex = value.trim().replaceFirst('#', '');
-  if (hex.length == 3) {
-    hex = hex.split('').map((character) => '$character$character').join();
-  }
-  if (hex.length == 6) hex = 'FF$hex';
-  final parsed = hex.length == 8 ? int.tryParse(hex, radix: 16) : null;
-  return parsed == null ? AppColors.accent : Color(parsed);
-}
+Color _parseColor(String value) => taskLabelColor(value);
 
 class _TaskTitleEditor extends StatefulWidget {
   const _TaskTitleEditor({
@@ -2008,12 +1832,9 @@ class _TaskTitleEditorState extends State<_TaskTitleEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final style = GoogleFonts.manrope(
-      fontSize: 25,
-      height: 1.18,
-      fontWeight: FontWeight.w700,
-      color: Theme.of(context).colorScheme.onSurface,
-    );
+    final style = AppTypography.pageTitle(
+      context,
+    )?.copyWith(height: 1.3, color: Theme.of(context).colorScheme.onSurface);
     if (!_editing) {
       return InkWell(
         key: const Key('task-title-edit'),

@@ -57,7 +57,7 @@ void main() {
       await tester.tap(find.byTooltip('Микрофон'));
       await tester.pumpAndSettle();
       expect(media.microphone, isFalse);
-      await tester.tap(find.text('Завершить звонок'));
+      await tester.tap(find.byTooltip('Завершить звонок'));
       await tester.pumpAndSettle();
       expect(repo.ends, 1);
       expect(find.text('Звонок завершён'), findsOneWidget);

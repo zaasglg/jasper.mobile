@@ -23,14 +23,17 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
   int _selectionRevision = 0;
 
   Future<void> _writeSelection(String? id) {
-    final result = _selectionWrites.then((_) async {
-      if (isClosed) return;
-      if (id == null) {
-        await _selectionStorage.clear();
-      } else {
-        await _selectionStorage.save(id);
-      }
-    });
+    final selection = _selectionStorage.stageSelection(id);
+    final result = _selectionWrites
+        .then((_) async {
+          if (isClosed) return;
+          if (id == null) {
+            await _selectionStorage.clear();
+          } else {
+            await _selectionStorage.save(id);
+          }
+        })
+        .whenComplete(() => _selectionStorage.finishSelection(selection));
     _selectionWrites = result.then<void>(
       (_) {},
       onError: (Object _, StackTrace _) {},
@@ -158,9 +161,10 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
       (item) => item.id == workspace.id,
     );
     final revision = ++_selectionRevision;
+    final write = _writeSelection(workspace.id);
     emit(current.copyWith(selected: selected, creationError: null));
     try {
-      await _writeSelection(workspace.id);
+      await write;
       final latest = state;
       if (!isClosed &&
           revision == _selectionRevision &&

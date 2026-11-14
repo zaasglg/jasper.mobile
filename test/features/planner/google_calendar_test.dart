@@ -1,3 +1,4 @@
+import 'planner_test_app.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -70,7 +71,7 @@ void main() {
       throwsA(isA<PlannerException>()),
     );
   });
-  test('all-day dates use Kazakhstan midnight and exclusive end', () {
+  test('all-day dates use device midnight and exclusive end', () {
     final items = event(
       'day',
       start: '2026-10-10',
@@ -78,8 +79,8 @@ void main() {
       allDay: true,
     ).entries(DateTime(2026, 10, 1), DateTime(2026, 11, 1));
     expect(items.length, 2);
-    expect(items.first.scheduledAt, DateTime.utc(2026, 10, 9, 19));
-    expect(items.last.scheduledAt, DateTime.utc(2026, 10, 10, 19));
+    expect(items.first.scheduledAt, DateTime(2026, 10, 10).toUtc());
+    expect(items.last.scheduledAt, DateTime(2026, 10, 11).toUtc());
     expect(
       items.every((e) => e.external && e.allDay && e.durationMinutes == 1440),
       isTrue,
@@ -88,8 +89,8 @@ void main() {
   test('timed events spanning midnight split into read-only day slices', () {
     final items = event(
       'night',
-      start: '2026-10-10T18:30:00Z',
-      end: '2026-10-10T20:00:00Z',
+      start: DateTime(2026, 10, 10, 23, 30).toUtc().toIso8601String(),
+      end: DateTime(2026, 10, 11, 1).toUtc().toIso8601String(),
     ).entries(DateTime(2026, 10, 10), DateTime(2026, 10, 12));
     expect(items.map((e) => e.durationMinutes), [30, 60]);
     expect(items.every((e) => e.external), isTrue);
@@ -157,7 +158,9 @@ void main() {
         ];
       sl.registerSingleton<GoogleCalendarRepository>(repo);
       addTearDown(() => sl.unregister<GoogleCalendarRepository>());
-      await tester.pumpWidget(const MaterialApp(home: PlannerScreen()));
+      await tester.pumpWidget(
+        PlannerTestApp(child: const MaterialApp(home: PlannerScreen())),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Google встреча'), findsOneWidget);
       expect(
@@ -177,7 +180,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Подключено'), findsOneWidget);
       expect(find.text('Показывать события Google'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(PlannerTestApp(child: const SizedBox()));
     },
   );
 }

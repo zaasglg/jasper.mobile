@@ -1,0 +1,26 @@
+{
+  "scope": "One-to-one fullscreen remote video with local picture-in-picture; group grid and ended screen; draggable local preview constrained above controls",
+  "comparison": "supplied WhatsApp-style screenshots and existing app theme",
+  "sources": [
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/calls/presentation/call_screen.dart",
+      "sha256": "3048b7aa65f8f52215d4b8e3d7a45e2e14995269382197b089576a2f76a89f8a"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/test/features/calls/call_participant_layout_test.dart",
+      "sha256": "d029fdda5cbf890990c24df15ac65ade92a04f66606720ce785c3d8e1230a111"
+    }
+  ],
+  "checks": [
+    {
+      "id": "layout",
+      "status": "pass",
+      "observed": "Widget tests cover drag movement, bounds on extreme drags and position retention after parent rebuild, as well as fullscreen remote and group tiles."
+    },
+    {
+      "id": "native-visual",
+      "status": "blocked",
+      "observed": "No native capture of an active two-participant call or ended screen was produced; visual match remains unverified."
+    }
+  ]
+}

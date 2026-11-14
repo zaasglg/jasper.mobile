@@ -32,6 +32,7 @@ import '../widgets/shared_task_message.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../data/models/chat_conversation_model.dart';
@@ -265,9 +266,9 @@ class _ConversationScreenState extends State<ConversationScreen>
   Widget build(BuildContext context) {
     final chat = widget.conversation;
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F6),
+      backgroundColor: AppColors.chatCanvas,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.canvas,
         foregroundColor: AppColors.ink,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -277,7 +278,7 @@ class _ConversationScreenState extends State<ConversationScreen>
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(LucideIcons.arrowLeft, size: AppIconSizes.standard),
         ),
-        titleSpacing: 2,
+        titleSpacing: AppSpacing.xs,
         title: _searching
             ? TextField(
                 key: const Key('conversation-search'),
@@ -291,8 +292,8 @@ class _ConversationScreenState extends State<ConversationScreen>
               )
             : Row(
                 children: [
-                  _Avatar(conversation: chat, size: 34),
-                  const SizedBox(width: 10),
+                  _Avatar(conversation: chat, size: AppSpacing.xl),
+                  const SizedBox(width: AppSpacing.smMd),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,11 +304,9 @@ class _ConversationScreenState extends State<ConversationScreen>
                               : chat.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.manrope(
-                            color: AppColors.ink,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: AppTypography.title(
+                            context,
+                          )?.copyWith(color: AppColors.ink),
                         ),
                         Text(
                           chat.isChannel
@@ -315,11 +314,10 @@ class _ConversationScreenState extends State<ConversationScreen>
                               : chat.isOnline
                               ? 'в сети'
                               : 'Личная переписка',
-                          style: GoogleFonts.manrope(
+                          style: AppTypography.caption(context)?.copyWith(
                             color: !chat.isChannel && chat.isOnline
                                 ? AppColors.accent
                                 : AppColors.muted,
-                            fontSize: 11,
                           ),
                         ),
                       ],
@@ -392,45 +390,7 @@ class _ConversationScreenState extends State<ConversationScreen>
           },
           builder: (context, state) => Column(
             children: [
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Container(
-                      constraints: const BoxConstraints(minHeight: 44),
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: AppColors.accent, width: 2),
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: const Text(
-                        'Переписка',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed: _openStorage,
-                      icon: const Icon(LucideIcons.archive, size: 16),
-                      label: const Text(
-                        'Кладовка',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.muted,
-                        minimumSize: const Size(44, 44),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ConversationSections(onStoragePressed: _openStorage),
               PinnedMessagesBar(
                 messages: state.messages,
                 onSelect: (id) => setState(() => _storageMessageId = id),
@@ -617,6 +577,100 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 }
 
+class ConversationSections extends StatelessWidget {
+  const ConversationSections({super.key, required this.onStoragePressed});
+
+  final VoidCallback onStoragePressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: AppColors.canvas,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: SizedBox(
+        height: AppSpacing.touchTarget,
+        child: Row(
+          children: <Widget>[
+            const Expanded(
+              child: ConversationSectionButton(
+                label: 'Переписка',
+                icon: LucideIcons.messageCircle,
+                selected: true,
+              ),
+            ),
+            Expanded(
+              child: ConversationSectionButton(
+                key: const Key('conversation-storage'),
+                label: 'Кладовка',
+                icon: LucideIcons.archive,
+                onPressed: onStoragePressed,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ConversationSectionButton extends StatelessWidget {
+  const ConversationSectionButton({
+    super.key,
+    required this.label,
+    required this.icon,
+    this.selected = false,
+    this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.accent : AppColors.muted;
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: selected ? null : onPressed,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: selected
+                ? const Border(
+                    bottom: BorderSide(
+                      color: AppColors.accent,
+                      width: AppSpacing.xxs,
+                    ),
+                  )
+                : null,
+          ),
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(icon, size: AppIconSizes.standard, color: color),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  label,
+                  style: AppTypography.body(context)?.copyWith(
+                    color: color,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MessageList extends StatelessWidget {
   const _MessageList({
     required this.scrollController,
@@ -730,7 +784,12 @@ class _MessageList extends StatelessWidget {
         reverse: true,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.smMd,
+        ),
         itemCount: messages.length,
         findChildIndexCallback: (key) {
           if (key is! ValueKey<String>) return null;
@@ -751,29 +810,7 @@ class _MessageList extends StatelessWidget {
             key: ValueKey(message.id),
             children: [
               if (older == null || !sameDay(message.createdAt, older.createdAt))
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0E4EC),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 11,
-                        vertical: 4,
-                      ),
-                      child: Text(
-                        dateLabel(message.createdAt),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF626B7D),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                ConversationDateDivider(label: dateLabel(message.createdAt)),
               _MessageRow(
                 message: messages[index],
                 people: people,
@@ -791,6 +828,34 @@ class _MessageList extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class ConversationDateDivider extends StatelessWidget {
+  const ConversationDateDivider({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.mdLg),
+      child: Row(
+        children: <Widget>[
+          const Expanded(child: Divider(color: AppColors.border)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smMd),
+            child: Text(
+              label,
+              style: AppTypography.caption(
+                context,
+              )?.copyWith(color: AppColors.muted, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const Expanded(child: Divider(color: AppColors.border)),
+        ],
       ),
     );
   }
@@ -818,8 +883,8 @@ class _MessageRow extends StatelessWidget {
     return Padding(
       key: Key('message-row-${message.id}'),
       padding: EdgeInsets.only(
-        top: groupStart ? 6 : 1,
-        bottom: groupEnd ? 4 : 1,
+        top: groupStart ? AppSpacing.sm : AppSpacing.xxs,
+        bottom: groupEnd ? AppSpacing.xs : AppSpacing.xxs,
       ),
       child: GestureDetector(
         onLongPress: () => showMessageActions(context, message, isMine),
@@ -833,35 +898,48 @@ class _MessageRow extends StatelessWidget {
               if (showAvatar)
                 _MessageAvatar(message: message)
               else
-                const SizedBox(width: 28),
-              const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.xl),
+              const SizedBox(width: AppSpacing.sm),
             ],
             Flexible(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.76,
                 ),
                 child: Container(
                   key: Key('message-bubble-${message.id}'),
                   constraints: const BoxConstraints(minWidth: 60),
-                  padding: const EdgeInsets.fromLTRB(11, 7, 11, 5),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.smMd,
+                    AppSpacing.sm,
+                    AppSpacing.smMd,
+                    AppSpacing.sm,
+                  ),
                   decoration: BoxDecoration(
                     color: message.kind == ChatMessageKind.videoMessage
                         ? Colors.transparent
                         : isMine
-                        ? const Color(0xFFE7E1FA)
-                        : Colors.white,
+                        ? AppColors.outgoingMessage
+                        : AppColors.canvas,
                     borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(!isMine && !groupStart ? 5 : 15),
-                      topRight: Radius.circular(isMine && !groupStart ? 5 : 15),
-                      bottomLeft: Radius.circular(!isMine && groupEnd ? 4 : 15),
-                      bottomRight: Radius.circular(isMine && groupEnd ? 4 : 15),
+                      topLeft: Radius.circular(
+                        !isMine && !groupStart ? AppRadius.xs : AppRadius.lg,
+                      ),
+                      topRight: Radius.circular(
+                        isMine && !groupStart ? AppRadius.xs : AppRadius.lg,
+                      ),
+                      bottomLeft: Radius.circular(
+                        !isMine && groupEnd ? AppRadius.xs : AppRadius.lg,
+                      ),
+                      bottomRight: Radius.circular(
+                        isMine && groupEnd ? AppRadius.xs : AppRadius.lg,
+                      ),
                     ),
                   ),
                   child: Stack(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.only(bottom: AppSpacing.mdLg),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
@@ -877,7 +955,7 @@ class _MessageRow extends StatelessWidget {
                                   color: AppColors.accent,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: AppSpacing.xs),
                             ],
                             _MessageBody(
                               message: message,
@@ -885,7 +963,7 @@ class _MessageRow extends StatelessWidget {
                               isMine: isMine,
                             ),
                             if (message.reactions.isNotEmpty) ...[
-                              const SizedBox(height: 6),
+                              const SizedBox(height: AppSpacing.sm),
                               MessageReactionBar(message: message),
                             ],
                           ],
@@ -977,11 +1055,15 @@ class _MessageBody extends StatelessWidget {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.smMd,
+              vertical: AppSpacing.sm,
+            ),
             decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: .06),
+              color: AppColors.quoteSurface,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               border: const Border(
-                left: BorderSide(color: AppColors.accent, width: 2),
+                left: BorderSide(color: AppColors.accent, width: AppSpacing.xs),
               ),
             ),
             child: Column(
@@ -1004,7 +1086,7 @@ class _MessageBody extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 7),
+          const SizedBox(height: AppSpacing.sm),
           _MessageBody(
             message: message.copyWith(text: quote.body),
             people: people,
@@ -1055,11 +1137,9 @@ class _MessageBody extends StatelessWidget {
         );
       }
     }
-    final style = GoogleFonts.manrope(
-      fontSize: 14,
-      height: 1.35,
-      color: const Color(0xFF3F3B42),
-    );
+    final style = AppTypography.body(
+      context,
+    )!.copyWith(height: 1.4, color: AppColors.ink);
     final matches = RegExp(r'@\[([^\]]+)\]').allMatches(message.text);
     final spans = <InlineSpan>[];
     var position = 0;
@@ -1361,22 +1441,22 @@ class _FileCard extends StatelessWidget {
     return Container(
       key: Key('file-attachment-${message.id}'),
       constraints: const BoxConstraints(maxWidth: 320),
-      padding: const EdgeInsets.all(11),
+      padding: const EdgeInsets.all(AppSpacing.smMd),
       decoration: BoxDecoration(
-        color: AppColors.subtleSurface,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.quoteSurface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: AppSpacing.touchTarget,
+            height: AppSpacing.touchTarget,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: AppColors.accent.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(9),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: Icon(
               failedPreview ? LucideIcons.imageOff : LucideIcons.file,
@@ -1384,7 +1464,7 @@ class _FileCard extends StatelessWidget {
               size: AppIconSizes.standard,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.smMd),
           Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1393,20 +1473,18 @@ class _FileCard extends StatelessWidget {
                   message.fileName ?? message.attachmentLabel,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.manrope(
+                  style: AppTypography.body(context)?.copyWith(
                     color: AppColors.ink,
-                    fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 if (message.text.contains(' · ')) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.xxs),
                   Text(
                     message.text.split(' · ').skip(1).join(' · '),
-                    style: GoogleFonts.manrope(
-                      color: AppColors.muted,
-                      fontSize: 10.5,
-                    ),
+                    style: AppTypography.caption(
+                      context,
+                    )?.copyWith(color: AppColors.muted),
                   ),
                 ],
               ],
@@ -1502,7 +1580,7 @@ class _CallMessage extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                video ? Icons.videocam_rounded : Icons.call_rounded,
+                video ? LucideIcons.video : LucideIcons.phone,
                 color: color,
                 size: AppIconSizes.standard,
               ),
@@ -1527,8 +1605,8 @@ class _CallMessage extends StatelessWidget {
                     children: [
                       Icon(
                         isMine
-                            ? Icons.north_east_rounded
-                            : Icons.south_west_rounded,
+                            ? LucideIcons.arrowUpRight
+                            : LucideIcons.arrowDownLeft,
                         size: AppIconSizes.standard,
                         color: color,
                       ),
@@ -1560,7 +1638,7 @@ class _MessageAvatar extends StatelessWidget {
   final ChatMessageModel message;
   @override
   Widget build(BuildContext context) => UserAvatar(
-    size: 28,
+    size: AppSpacing.xl,
     userId: message.authorId,
     name: message.authorName,
     avatarUrl: message.authorAvatarUrl,
@@ -1655,10 +1733,15 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(6, 6, 8, 7),
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.sm,
+      AppSpacing.sm,
+      AppSpacing.smMd,
+      AppSpacing.smMd,
+    ),
     decoration: const BoxDecoration(
-      color: Colors.white,
-      border: Border(top: BorderSide(color: Color(0xFFEBEDF2))),
+      color: AppColors.canvas,
+      border: Border(top: BorderSide(color: AppColors.border)),
     ),
     child: VoiceComposer(
       hasText: hasText,
@@ -1681,16 +1764,20 @@ class _Composer extends StatelessWidget {
           fillColor: AppColors.subtleSurface,
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 13,
-            vertical: 11,
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.smMd,
           ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(22),
-            borderSide: BorderSide.none,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            borderSide: const BorderSide(color: AppColors.border),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(22),
-            borderSide: BorderSide.none,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            borderSide: const BorderSide(color: AppColors.accent),
           ),
         ),
       ),

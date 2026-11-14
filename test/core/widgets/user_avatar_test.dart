@@ -44,11 +44,11 @@ void main() {
     () {
       expect(
         resolveUserAvatarUrl('/uploads/avatar.png'),
-        'https://jospar.me/uploads/avatar.png',
+        'https://josparbee.kz/uploads/avatar.png',
       );
       expect(
         resolveUserAvatarUrl('uploads/avatar.png'),
-        'https://jospar.me/uploads/avatar.png',
+        'https://josparbee.kz/uploads/avatar.png',
       );
       expect(
         resolveUserAvatarUrl('https://example.test/photo.png'),

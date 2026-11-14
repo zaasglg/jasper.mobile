@@ -1,6 +1,7 @@
 import '../widgets/conversation_menu.dart';
 import '../widgets/messenger_refresh_lifecycle.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../../core/widgets/app_form_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,9 +13,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../data/models/chat_conversation_model.dart';
 import '../cubit/chat_cubit.dart';
-import '../../../shell/presentation/screens/main_shell.dart';
-import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
-import '../../../workspaces/presentation/cubit/workspace_state.dart';
+import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -52,11 +51,12 @@ class _ChatScreenState extends State<ChatScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFDFCFD),
+      backgroundColor: Colors.white,
+      appBar: const DashboardAppBar(),
       body: SafeArea(
+        top: false,
         child: Column(
           children: [
-            const _Header(),
             _Search(
               controller: _searchController,
               onChanged: (value) => setState(() => _query = value.trim()),
@@ -79,7 +79,11 @@ class _ChatScreenState extends State<ChatScreen>
                       .where((item) => item.isChannel)
                       .toList();
                   final people = filtered
-                      .where((item) => !item.isChannel)
+                      .where(
+                        (item) =>
+                            !item.isChannel &&
+                            (_query.isNotEmpty || item.hasThread),
+                      )
                       .toList();
                   if (channels.isEmpty && people.isEmpty && _query.isNotEmpty) {
                     return const _NoResults(isSearch: true);
@@ -138,7 +142,11 @@ class _ChatScreenState extends State<ChatScreen>
                             onToggle: () => setState(
                               () => _peopleExpanded = !_peopleExpanded,
                             ),
-                            onAdd: () => _showPeople(people),
+                            onAdd: () => _showPeople(
+                              conversations
+                                  .where((item) => !item.isChannel)
+                                  .toList(),
+                            ),
                             onTap: _openConversation,
                           ),
                         ],
@@ -254,57 +262,6 @@ class _ChatScreenState extends State<ChatScreen>
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.accent,
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: 'Открыть меню',
-            onPressed: MainShell.openDrawer,
-            icon: const Icon(
-              LucideIcons.menu,
-              color: Colors.white,
-              size: AppIconSizes.standard,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: BlocSelector<WorkspaceCubit, WorkspaceState, String>(
-              selector: (state) {
-                final name = state is WorkspaceLoaded
-                    ? state.selected?.name.trim()
-                    : null;
-                return name == null || name.isEmpty ? 'Воркспейс' : name;
-              },
-              builder: (context, name) => Tooltip(
-                message: name,
-                child: Text(
-                  name,
-                  textAlign: TextAlign.left,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.manrope(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.35,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _Search extends StatelessWidget {
   const _Search({required this.controller, required this.onChanged});
   final TextEditingController controller;
@@ -313,24 +270,30 @@ class _Search extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.accent,
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 13),
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
       child: TextField(
         key: const Key('messenger-search'),
         controller: controller,
         onChanged: onChanged,
         textInputAction: TextInputAction.search,
-        style: GoogleFonts.manrope(fontSize: 14, color: AppColors.ink),
+        onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+        onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+        style: AppTypography.body(context),
         decoration: InputDecoration(
-          hintText: 'Поиск',
-          hintStyle: GoogleFonts.manrope(
-            fontSize: 14,
-            color: const Color(0xFF6E5B70),
-          ),
+          hintText: 'Поиск чатов и каналов',
+          hintStyle: AppTypography.body(
+            context,
+          )?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
           prefixIcon: const Icon(
             LucideIcons.search,
-            size: AppIconSizes.standard,
-            color: Color(0xFF6E5B70),
+            size: AppSpacing.md + AppSpacing.xs,
+            color: AppColors.muted,
           ),
           suffixIcon: controller.text.isEmpty
               ? null
@@ -343,15 +306,22 @@ class _Search extends StatelessWidget {
                   icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
                 ),
           filled: true,
-          fillColor: const Color(0xFFF7F3F7),
+          fillColor: AppColors.subtleSurface,
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 11),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.sm + AppSpacing.xs,
+          ),
+          constraints: const BoxConstraints(minHeight: AppSpacing.touchTarget),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderSide: const BorderSide(color: AppColors.border),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             borderSide: const BorderSide(color: AppColors.accent),
           ),
         ),

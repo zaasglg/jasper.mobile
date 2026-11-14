@@ -1,6 +1,11 @@
+import '../../data/models/task_label_catalog.dart';
 import '../../data/models/task_detail_model.dart';
 import '../../data/models/kanban_column_model.dart';
 import '../../../projects/data/models/project_task_model.dart';
+
+abstract interface class TaskLabelCatalogRepository {
+  Future<TaskLabelCatalog> getLabelCatalog(String taskId);
+}
 
 abstract interface class TaskExtrasRepository {
   Future<List<TaskEpicModel>> getEpics(String projectId);
@@ -11,6 +16,27 @@ abstract interface class TaskExtrasRepository {
     required bool create,
   });
   Future<void> deleteResource(String resourceId);
+}
+
+abstract interface class ProjectEpicCreationRepository {
+  Future<void> createEpic({
+    required String projectId,
+    required String name,
+    required String color,
+  });
+}
+
+abstract interface class TaskResourceOperationsRepository {
+  Future<void> patchResource(String id, Map<String, Object?> changes);
+  Future<Map<String, Object?>> resourceHistory(String id, {String? cursor});
+}
+
+abstract interface class TaskDatesRepository {
+  Future<TaskDetailsPayload> updateDates(
+    String taskId,
+    DateTime? start,
+    DateTime? end,
+  );
 }
 
 abstract interface class TaskTitleRepository {
@@ -73,5 +99,12 @@ abstract interface class TaskAdvancedRepository {
     String taskId,
     String text,
     List<TaskFileModel> files,
+  );
+}
+
+abstract interface class TaskResourceCreationRepository {
+  Future<TaskResourceModel> createResource(
+    String taskId,
+    TaskResourceModel resource,
   );
 }

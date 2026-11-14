@@ -1,3 +1,6 @@
+import '../../features/projects/presentation/screens/project_epics_screen.dart';
+import '../../features/collaboration/presentation/project_participants_screen.dart';
+import '../../features/profile/presentation/cubit/profile_cubit.dart';
 import '../../features/calls/presentation/call_screen.dart';
 import 'package:flutter/widgets.dart';
 import '../../features/tasks/presentation/screens/task_creation_screen.dart';
@@ -48,6 +51,10 @@ import '../../features/projects/data/models/project_model.dart';
 import '../../features/kanban/presentation/cubit/kanban_cubit.dart';
 import '../../features/tasks/presentation/screens/task_details_screen.dart';
 import '../../features/tasks/presentation/cubit/task_details_cubit.dart';
+import '../../features/qr_login/presentation/cubit/qr_login_cubit.dart';
+import '../../features/qr_login/presentation/cubit/qr_sessions_cubit.dart';
+import '../../features/qr_login/presentation/screens/qr_login_screen.dart';
+import '../../features/qr_login/presentation/screens/qr_sessions_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/splash',
@@ -106,6 +113,20 @@ final appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/projects/:id/participants',
+      builder: (context, state) =>
+          ProjectParticipantsScreen(id: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/projects/:id/epics',
+      builder: (context, state) => ProjectEpicsScreen(
+        projectId: state.pathParameters['id']!,
+        boardCubit: state.extra is KanbanCubit
+            ? state.extra! as KanbanCubit
+            : null,
+      ),
+    ),
+    GoRoute(
       path: '/manage/:kind/:id',
       builder: (context, state) => SpaceManagementScreen(
         kind: state.pathParameters['kind'] == 'projects'
@@ -147,6 +168,33 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/profile',
       builder: (context, state) => const ProfileScreen(),
+    ),
+    GoRoute(
+      path: '/qr-sessions',
+      redirect: (context, state) =>
+          state.extra is ({String name, String email}) ? null : '/profile',
+      builder: (context, state) {
+        final account = state.extra! as ({String name, String email});
+        return BlocProvider<QrSessionsCubit>(
+          create: (_) => sl<QrSessionsCubit>()..load(),
+          child: QrSessionsScreen(
+            accountName: account.name,
+            email: account.email,
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/qr-login',
+      redirect: (context, state) =>
+          state.extra is ({String name, String email}) ? null : '/profile',
+      builder: (context, state) {
+        final account = state.extra! as ({String name, String email});
+        return BlocProvider<QrLoginCubit>(
+          create: (_) => sl<QrLoginCubit>(),
+          child: QrLoginScreen(accountName: account.name, email: account.email),
+        );
+      },
     ),
     GoRoute(
       path: '/settings',
@@ -191,9 +239,21 @@ final appRouter = GoRouter(
         final task = state.extra is ProjectTaskModel
             ? state.extra! as ProjectTaskModel
             : null;
-        return BlocProvider<TaskDetailsCubit>(
-          create: (_) =>
-              sl<TaskDetailsCubit>()..load(taskId, initialTask: task),
+        // Task details is a root route outside MainShell, so its shared
+        // dashboard header needs its own workspace and profile providers.
+        return MultiBlocProvider(
+          providers: [
+            BlocProvider<WorkspaceCubit>(
+              create: (_) => sl<WorkspaceCubit>()..load(),
+            ),
+            BlocProvider<ProfileCubit>(
+              create: (_) => sl<ProfileCubit>()..load(),
+            ),
+            BlocProvider<TaskDetailsCubit>(
+              create: (_) =>
+                  sl<TaskDetailsCubit>()..load(taskId, initialTask: task),
+            ),
+          ],
           child: TaskDetailsScreen(taskId: taskId, task: task),
         );
       },
@@ -313,7 +373,9 @@ final appRouter = GoRouter(
               path: '/inbox',
               builder: (context, state) => BlocProvider<InboxCubit>(
                 create: (_) => sl<InboxCubit>()..load(),
-                child: const InboxScreen(),
+                child: InboxScreen(
+                  composeRequest: state.uri.queryParameters['compose'],
+                ),
               ),
             ),
           ],

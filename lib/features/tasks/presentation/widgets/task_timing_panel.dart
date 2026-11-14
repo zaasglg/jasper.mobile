@@ -1,3 +1,5 @@
+import '../../../../core/theme/app_ui_tokens.dart';
+import 'task_detail_style.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -69,21 +71,12 @@ class _TaskTimingPanelState extends State<TaskTimingPanel> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: Text(
-            'ТАЙМИНГ',
-            style: GoogleFonts.manrope(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: AppColors.muted,
-            ),
-          ),
+          child: Text('ТАЙМИНГ', style: TaskDetailStyle.label(context)),
         ),
         Material(
-          color: Colors.white,
+          color: TaskDetailStyle.field(context),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: Color(0xFFE5E4E2)),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -97,7 +90,7 @@ class _TaskTimingPanelState extends State<TaskTimingPanel> {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
-                            vertical: 10,
+                            vertical: AppSpacing.md,
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -121,7 +114,7 @@ class _TaskTimingPanelState extends State<TaskTimingPanel> {
                         ),
                       ),
                     ),
-                    const VerticalDivider(width: 1),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Tooltip(
                         message: overtime ? 'Переработка' : 'Затраченное время',
@@ -139,7 +132,7 @@ class _TaskTimingPanelState extends State<TaskTimingPanel> {
                   ],
                 ),
               ),
-              const Divider(height: 1),
+              const SizedBox(height: AppSpacing.xs),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(

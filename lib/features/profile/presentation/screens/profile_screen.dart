@@ -48,8 +48,18 @@ class _ProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FB),
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 20),
+            child: Center(child: Text('Jospar')),
+          ),
+        ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -172,60 +182,54 @@ class _ProfileContentState extends State<_ProfileContent> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
         children: [
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(5),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFFECE9FC),
+          Row(
+            children: [
+              ProfileAvatar(size: 52, avatarUrl: user.avatarUrl),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (user.email.isNotEmpty)
+                      Text(
+                        user.email,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
               ),
-              child: ProfileAvatar(size: 88, avatarUrl: user.avatarUrl),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: TextButton.icon(
-              key: const Key('profile_change_photo_button'),
-              onPressed: busy ? null : _pickPhoto,
-              icon: busy
-                  ? const SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(LucideIcons.camera, size: AppIconSizes.standard),
-              label: Text(
-                busy
-                    ? 'Сохраняем…'
-                    : user.avatarUrl == null
-                    ? 'Добавить фото'
-                    : 'Изменить фото',
+              TextButton(
+                key: const Key('profile_change_photo_button'),
+                onPressed: busy ? null : _pickPhoto,
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant,
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerLeft,
+                ),
+                child: Text(
+                  busy
+                      ? 'Сохраняем…'
+                      : user.avatarUrl == null
+                      ? 'Добавить фото'
+                      : 'Изменить фото',
+                ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            displayName,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.manrope(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF292735),
-            ),
-          ),
-          if (user.email.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              user.email,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
-                fontSize: 14,
-                color: const Color(0xFF858297),
-              ),
-            ),
-          ],
+          const SizedBox(height: 16),
+          const Divider(),
           const SizedBox(height: 32),
           Text(
-            'Данные аккаунта',
+            'УЧЁТНАЯ ЗАПИСЬ',
             style: GoogleFonts.manrope(
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -234,20 +238,11 @@ class _ProfileContentState extends State<_ProfileContent> {
           ),
           const SizedBox(height: 12),
           Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                _ProfileDataRow(
-                  icon: LucideIcons.shield,
-                  label: 'Роль',
-                  value: user.roleLabel,
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Divider(height: 1, color: Color(0xFFF0EEF5)),
-                ),
                 _ProfileDataRow(
                   icon: LucideIcons.userRound,
                   label: 'Имя',
@@ -277,9 +272,54 @@ class _ProfileContentState extends State<_ProfileContent> {
                             );
                         },
                 ),
+                const Divider(height: 1),
+                _ProfileDataRow(
+                  icon: LucideIcons.shield,
+                  label: 'Роль',
+                  value: user.roleLabel,
+                ),
+                const Divider(height: 1),
               ],
             ),
           ),
+          const SizedBox(height: 28),
+          Text('БЕЗОПАСНОСТЬ', style: Theme.of(context).textTheme.labelMedium),
+          const SizedBox(height: 12),
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            child: ListTile(
+              key: const Key('profile_qr_login_button'),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 0,
+                vertical: 6,
+              ),
+              leading: const Icon(
+                LucideIcons.monitor,
+                color: Color(0xFF55565C),
+              ),
+              title: Text(
+                Localizations.localeOf(context).languageCode == 'kk'
+                    ? 'QR сеанстары'
+                    : 'Активные сеансы',
+                style: GoogleFonts.manrope(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                Localizations.localeOf(context).languageCode == 'kk'
+                    ? 'Қосылған құрылғыларды басқару'
+                    : 'Подключённые устройства',
+              ),
+              trailing: const Icon(
+                LucideIcons.chevronRight,
+                size: AppIconSizes.standard,
+              ),
+              onTap: () => context.push(
+                '/qr-sessions',
+                extra: (name: displayName, email: user.email),
+              ),
+            ),
+          ),
+          const Divider(height: 1),
           const SizedBox(height: 28),
           BlocBuilder<AuthCubit, AuthState>(
             builder: (context, state) {
@@ -307,8 +347,10 @@ class _ProfileContentState extends State<_ProfileContent> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFC44E58),
                     disabledForegroundColor: const Color(0xFFC44E58),
-                    backgroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFFEEDDE0)),
+                    backgroundColor: Colors.transparent,
+                    alignment: Alignment.centerLeft,
+                    padding: EdgeInsets.zero,
+                    side: BorderSide.none,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -343,44 +385,28 @@ class _ProfileDataRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 12, 18),
+      padding: const EdgeInsets.symmetric(vertical: 18),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1EEFD),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              icon,
-              size: AppIconSizes.standard,
-              color: const Color(0xFF6D5FE0),
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+              ),
             ),
           ),
-          const SizedBox(width: 14),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.manrope(
-                    fontSize: 12,
-                    color: const Color(0xFF858297),
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  value,
-                  style: GoogleFonts.manrope(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF292735),
-                  ),
-                ),
-              ],
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: GoogleFonts.manrope(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF292735),
+              ),
             ),
           ),
           if (onCopy != null)

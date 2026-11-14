@@ -5,6 +5,7 @@ import '../../data/models/task_creation_models.dart';
 abstract interface class TaskCreationRepository {
   Future<TaskCreationCatalog> catalog();
   Future<List<ProjectModel>> projects(String workspaceId);
+  Future<List<TaskAssigneeModel>> members(String workspaceId);
   Future<TaskCreationOptions> options(String workspaceId, String projectId);
   Future<TaskCreationResult> create(
     TaskCreationRequest request,

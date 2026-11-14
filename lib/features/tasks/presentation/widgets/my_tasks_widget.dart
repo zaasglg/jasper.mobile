@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../projects/data/models/project_model.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../domain/entities/task_extra_field.dart';
@@ -494,30 +495,71 @@ class _ProjectGroupHeader extends StatelessWidget {
   final int count;
   @override
   Widget build(BuildContext context) => Container(
-    height: 32,
-    padding: const EdgeInsets.symmetric(horizontal: 16),
+    constraints: const BoxConstraints(minHeight: 52),
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
     decoration: const BoxDecoration(
-      color: AppColors.subtleSurface,
+      color: AppColors.canvas,
       border: Border(bottom: BorderSide(color: MyTasksWidget._border)),
     ),
     child: Row(
       children: [
+        Container(
+          width: AppSpacing.xl,
+          height: AppSpacing.xl,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.accent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: const Icon(
+            LucideIcons.folderKanban,
+            size: AppIconSizes.standard,
+            color: AppColors.accent,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.smMd),
         Expanded(
           child: Text(
             name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.manrope(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: MyTasksWidget._muted,
-            ),
+            style: AppTypography.body(
+              context,
+            )?.copyWith(fontWeight: FontWeight.w700, color: MyTasksWidget._ink),
           ),
         ),
-        _CountBadge(count),
+        TaskCountBadge(count: count),
       ],
     ),
   );
+}
+
+class TaskCountBadge extends StatelessWidget {
+  const TaskCountBadge({super.key, required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(
+        minWidth: AppSpacing.xl,
+        minHeight: AppSpacing.xl,
+      ),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Text(
+        '$count',
+        style: AppTypography.body(
+          context,
+        )?.copyWith(color: AppColors.accent, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
 }
 
 class _TaskRow extends StatelessWidget {
@@ -547,13 +589,18 @@ class _TaskRow extends StatelessWidget {
         key: Key('my-task-${task.id}'),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 11, 16, 12),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.sm,
+            AppSpacing.smMd,
+            AppSpacing.md,
+            AppSpacing.smMd,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 32,
-                height: 32,
+                width: AppSpacing.touchTarget,
+                height: AppSpacing.touchTarget,
                 child: IconButton(
                   key: Key('my-task-checkbox-${task.id}'),
                   tooltip: task.isDone
@@ -567,66 +614,53 @@ class _TaskRow extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        if (visibleFields.contains(TaskExtraField.id))
-                          Expanded(
-                            child: Text(
-                              task.displayId.isEmpty ? task.id : task.displayId,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.manrope(
-                                fontSize: 10,
-                                color: MyTasksWidget._muted,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          )
-                        else
-                          const Spacer(),
-                        const SizedBox(width: 6),
-                        _DeadlineBadge(task: task, overdue: overdue),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
+                    if (visibleFields.contains(TaskExtraField.id)) ...[
+                      Text(
+                        task.displayId.isEmpty ? task.id : task.displayId,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.caption(context)?.copyWith(
+                          color: MyTasksWidget._muted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                    ],
                     Text(
                       task.title.isEmpty ? 'Без названия' : task.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.manrope(
-                        fontSize: 13,
-                        height: 1.35,
+                      style: AppTypography.body(context)?.copyWith(
+                        height: 1.4,
                         fontWeight: FontWeight.w600,
                         color: task.isDone
                             ? MyTasksWidget._muted
                             : MyTasksWidget._ink,
+                        decoration: task.isDone
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
                       ),
                     ),
-                    if ((visibleFields.contains(TaskExtraField.column) &&
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        _DeadlineBadge(task: task, overdue: overdue),
+                        if (visibleFields.contains(TaskExtraField.column) &&
                             columnName.trim().isNotEmpty &&
-                            columnName != '—') ||
-                        (visibleFields.contains(TaskExtraField.epics) &&
-                            epics.isNotEmpty)) ...[
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 5,
-                        runSpacing: 5,
-                        children: [
-                          if (visibleFields.contains(TaskExtraField.column) &&
-                              columnName.trim().isNotEmpty &&
-                              columnName != '—')
-                            _ColumnBadge(value: columnName),
-                          if (visibleFields.contains(TaskExtraField.epics) &&
-                              epics.isNotEmpty)
-                            _EpicBadge(value: epics.join(', ')),
-                        ],
-                      ),
-                    ],
+                            columnName != '—')
+                          _ColumnBadge(value: columnName),
+                        if (visibleFields.contains(TaskExtraField.epics) &&
+                            epics.isNotEmpty)
+                          _EpicBadge(value: epics.join(', ')),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -681,26 +715,28 @@ class _DeadlineBadge extends StatelessWidget {
   final bool overdue;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppSpacing.sm,
+      vertical: AppSpacing.xs,
+    ),
     decoration: BoxDecoration(
       color: overdue
           ? MyTasksWidget._error.withValues(alpha: .07)
           : AppColors.subtleSurface,
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           LucideIcons.calendar,
-          size: 12,
+          size: AppIconSizes.standard,
           color: overdue ? MyTasksWidget._error : MyTasksWidget._muted,
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: AppSpacing.xs),
         Text(
           task.end == null ? 'Без срока' : formatRussianTaskDate(task.end!),
-          style: GoogleFonts.manrope(
-            fontSize: 9.5,
+          style: AppTypography.caption(context)?.copyWith(
             fontWeight: FontWeight.w500,
             color: overdue ? MyTasksWidget._error : MyTasksWidget._muted,
           ),

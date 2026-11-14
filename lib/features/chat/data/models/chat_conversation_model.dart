@@ -10,6 +10,7 @@ class ChatConversationModel extends Equatable {
     this.parentId,
     this.isOnline = false,
     this.unreadCount = 0,
+    this.hasThread = false,
   });
 
   factory ChatConversationModel.fromChannelJson(Map<String, dynamic> json) {
@@ -39,6 +40,7 @@ class ChatConversationModel extends Equatable {
           _string(json, const ['name', 'fullName', 'full_name', 'email']) ??
           'Пользователь',
       isChannel: false,
+      hasThread: thread != null,
       avatarUrl: _string(json, const ['avatarUrl', 'avatar_url', 'avatar']),
       isOnline: json['online'] == true || json['isOnline'] == true,
       unreadCount: _integer(thread ?? json, const [
@@ -61,6 +63,7 @@ class ChatConversationModel extends Equatable {
   final String? parentId;
   final bool isOnline;
   final int unreadCount;
+  final bool hasThread;
 
   String get initials {
     final words = title.trim().split(RegExp(r'\s+'));
@@ -81,6 +84,7 @@ class ChatConversationModel extends Equatable {
     'parentId': parentId,
     'isOnline': isOnline,
     'unreadCount': unreadCount,
+    'hasThread': hasThread,
   };
 
   ChatConversationModel copyWith({String? threadId, int? unreadCount}) {
@@ -93,6 +97,7 @@ class ChatConversationModel extends Equatable {
       parentId: parentId,
       isOnline: isOnline,
       unreadCount: unreadCount ?? this.unreadCount,
+      hasThread: hasThread,
     );
   }
 
@@ -126,5 +131,6 @@ class ChatConversationModel extends Equatable {
     parentId,
     isOnline,
     unreadCount,
+    hasThread,
   ];
 }

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "Assignees sheet refinement from supplied screenshot: compact header, selection count, aligned clear action, themed search and selected rows, keyboard-aware footer",
+  "platform": "ios",
+  "sources": [{"path": "../../../lib/features/tasks/presentation/widgets/task_assignees_editor.dart", "sha256": "de1eaa97fa417503288e7f81c44d4f3e8e89a11f7b1528b5c1fab0d9c2d23273"}],
+  "comparison": "existing-system",
+  "requiredChecks": [{"id": "native-assignees", "kind": "visual"}],
+  "checks": [{"id": "native-assignees", "status": "blocked", "observed": "No native device capture obtained. Widget tests cover selection, clear, save, 320x700 viewport and 250px keyboard inset with hit-testable save button. These checks do not establish visual fidelity.", "artifacts": []}],
+  "unresolved": ["Native visual inspection remains outstanding."]
+}

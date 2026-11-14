@@ -1,5 +1,9 @@
+import '../../../../core/widgets/app_color_picker.dart';
+import 'board_style.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import 'dart:async';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_form_surface.dart';
 import '../../../../core/widgets/app_action_menu.dart';
@@ -327,7 +331,7 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
         if (!mounted || widget.project.id != task.projectId) return;
         final cubit = context.read<KanbanCubit>();
         if (action == _TaskDropAction.move) {
-          _showMoveTask(context, task, cubit.state);
+          _showMoveTask(context, task);
         } else {
           cubit.archiveTask(task);
         }
@@ -386,8 +390,14 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              SizedBox(
-                height: 48,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                constraints: const BoxConstraints(
+                  minHeight: BoardStyle.toolbarHeight,
+                ),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.surface
+                    : AppColors.canvas,
                 child: _draggedTask == null
                     ? _BoardToolbar(
                         onAddColumn: () => _showCreateColumn(context),
@@ -415,8 +425,20 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
                         ],
                       ),
               ),
-              const SizedBox(height: 18),
-              Expanded(child: _boardContent(context, state)),
+              Expanded(
+                child: ColoredBox(
+                  color: BoardStyle.background(context),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.sm,
+                      AppSpacing.lg,
+                      AppSpacing.sm,
+                      AppSpacing.md,
+                    ),
+                    child: _boardContent(context, state),
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -444,61 +466,71 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
         action: () => _showCreateColumn(context),
       );
     }
-    return PageView.builder(
-      key: PageStorageKey<String>('kanban-${widget.project.id}'),
-      controller: _horizontalController,
-      scrollDirection: Axis.horizontal,
-      padEnds: false,
-      pageSnapping: true,
-      physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
-      itemCount: state.columns.length,
-      itemBuilder: (context, index) {
-        final column = state.columns[index];
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(
-            _columnHorizontalInset,
-            0,
-            _columnHorizontalInset,
-            2,
+    Widget columnBuilder(BuildContext context, int index) {
+      final column = state.columns[index];
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(
+          _columnHorizontalInset,
+          0,
+          _columnHorizontalInset,
+          2,
+        ),
+        child: _KanbanColumn(
+          key: ValueKey('${widget.project.id}-${column.id}'),
+          column: column,
+          onMoveTask: (task) => _showMoveTask(context, task),
+          onTaskAction: (task, action) => handleTaskCardAction(
+            context,
+            task,
+            action,
+            widget.project.workspaceId,
           ),
-          child: _KanbanColumn(
-            key: ValueKey('${widget.project.id}-${column.id}'),
-            column: column,
-            onMoveTask: (task) => _showMoveTask(context, task, state),
-            onTaskAction: (task, action) => handleTaskCardAction(
-              context,
-              task,
-              action,
-              widget.project.workspaceId,
-            ),
-            canReorder:
-                _cardView.shows(CardField.completed) &&
-                state.movingTaskIds.isEmpty &&
-                state.search.trim().isEmpty &&
-                state.priorityFilter == null,
-            cardView: _cardView,
-            currentUserId: _currentUserId,
-            tasks: state
-                .tasksFor(column)
-                .where(
-                  (task) =>
-                      _cardView.shows(CardField.completed) || !task.isDone,
-                )
-                .toList(),
-            onAddTask: (title) => context.read<KanbanCubit>().createTask(
-              column.statusMap,
-              title,
-              'MED',
-            ),
-            onMove: (task, position) => context.read<KanbanCubit>().moveTask(
-              task,
-              column.statusMap,
-              position,
-            ),
-            onDragStart: _startTaskDrag,
-            onDragEnd: _endTaskDrag,
-            onManage: (action) => _manageColumn(context, column, action),
+          canReorder:
+              _cardView.shows(CardField.completed) &&
+              state.search.trim().isEmpty &&
+              state.priorityFilter == null,
+          cardView: _cardView,
+          currentUserId: _currentUserId,
+          tasks: state
+              .tasksFor(column)
+              .where(
+                (task) => _cardView.shows(CardField.completed) || !task.isDone,
+              )
+              .toList(),
+          onAddTask: (title) => context.read<KanbanCubit>().createTask(
+            column.statusMap,
+            title,
+            'MED',
           ),
+          onMove: (task, position) => context.read<KanbanCubit>().moveTask(
+            task,
+            column.statusMap,
+            position,
+          ),
+          onDragStart: _startTaskDrag,
+          onDragEnd: _endTaskDrag,
+          onManage: (action) => _manageColumn(context, column, action),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 600) {
+          return ListView.builder(
+            key: PageStorageKey<String>('kanban-wide-${widget.project.id}'),
+            scrollDirection: Axis.horizontal,
+            itemExtent: BoardStyle.columnWidth,
+            itemCount: state.columns.length,
+            itemBuilder: columnBuilder,
+          );
+        }
+        return PageView.builder(
+          key: PageStorageKey<String>('kanban-${widget.project.id}'),
+          controller: _horizontalController,
+          padEnds: false,
+          itemCount: state.columns.length,
+          itemBuilder: columnBuilder,
         );
       },
     );
@@ -519,16 +551,26 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
   Future<void> _showMoveTask(
     BuildContext context,
     ProjectTaskModel task,
-    KanbanState state,
   ) async {
+    final cubit = context.read<KanbanCubit>();
+    final projectId = cubit.state.projectId;
     final result = await showModalBottomSheet<(String, int)>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (_) => _MoveTaskSheet(state: state, task: task),
+      builder: (_) => BlocProvider.value(
+        value: cubit,
+        child: BlocBuilder<KanbanCubit, KanbanState>(
+          builder: (_, state) =>
+              _MoveTaskSheet(state: state, task: task, projectId: projectId),
+        ),
+      ),
     );
-    if (result != null && context.mounted) {
-      await context.read<KanbanCubit>().moveTask(task, result.$1, result.$2);
+    if (result != null &&
+        context.mounted &&
+        !cubit.isClosed &&
+        cubit.state.projectId == projectId) {
+      await cubit.moveTask(task, result.$1, result.$2);
     }
   }
 
@@ -552,6 +594,22 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
         );
         if (result != null && context.mounted) {
           await cubit.updateColumn(column, result, column.wip);
+        }
+      case _ColumnAction.color:
+        final result = await showModalBottomSheet<String>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          showDragHandle: true,
+          builder: (_) => _ColumnColorSheet(column: column),
+        );
+        if (result != null && context.mounted) {
+          await cubit.updateColumn(
+            column,
+            column.name,
+            column.wip,
+            color: result,
+          );
         }
       case _ColumnAction.archive:
         await cubit.archiveColumn(column);
@@ -621,79 +679,115 @@ class _TaskDropZone extends StatelessWidget {
   );
 }
 
-class _BoardToolbar extends StatelessWidget {
+class _BoardToolbar extends StatefulWidget {
   const _BoardToolbar({required this.onAddColumn, required this.onCardView});
 
   final VoidCallback onAddColumn;
   final VoidCallback onCardView;
 
   @override
+  State<_BoardToolbar> createState() => _BoardToolbarState();
+}
+
+class _BoardToolbarState extends State<_BoardToolbar> {
+  bool _searching = false;
+
+  @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final dark = Theme.of(context).brightness == Brightness.dark;
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Expanded(
-          child: SizedBox(
-            height: 44,
-            child: TextField(
+        if (_searching)
+          Expanded(
+            child: TextFormField(
+              key: const Key('board-search-field'),
+              initialValue: context.read<KanbanCubit>().state.search,
+              autofocus: true,
               onChanged: context.read<KanbanCubit>().setSearch,
-              style: GoogleFonts.manrope(fontSize: 13, color: colors.onSurface),
-              textAlignVertical: TextAlignVertical.center,
-              decoration: InputDecoration(
-                hintText: 'Поиск задач',
-                hintStyle: GoogleFonts.manrope(
-                  fontSize: 13,
-                  color: colors.onSurfaceVariant,
-                ),
-                prefixIcon: Icon(
-                  LucideIcons.search,
-                  size: AppIconSizes.standard,
-                  color: colors.onSurfaceVariant,
-                ),
-                prefixIconConstraints: const BoxConstraints(minWidth: 40),
-                filled: true,
-                fillColor: dark
-                    ? colors.surfaceContainerHigh
-                    : const Color(0xFFF5F4F7),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
+              decoration: const InputDecoration(
+                hintText: 'Поиск на доске',
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+              ),
+            ),
+          )
+        else ...[
+          Semantics(
+            selected: true,
+            label: 'Доска проекта',
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.smMd,
+                vertical: AppSpacing.smMd,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    LucideIcons.columns2,
                     color: AppColors.accent,
-                    width: 1.5,
+                    size: BoardStyle.iconSize,
                   ),
-                ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    'Доска',
+                    style: AppTypography.title(
+                      context,
+                    )?.copyWith(color: AppColors.accent),
+                  ),
+                ],
               ),
             ),
           ),
+          const Spacer(),
+          IconButton(
+            key: const Key('project-epics-button'),
+            tooltip: 'Эпики',
+            onPressed: () => context.push(
+              '/projects/${context.read<KanbanCubit>().state.projectId}/epics',
+              extra: context.read<KanbanCubit>(),
+            ),
+            icon: Badge(
+              isLabelVisible: context
+                  .watch<KanbanCubit>()
+                  .state
+                  .epicFilterIds
+                  .isNotEmpty,
+              label: Text(
+                '${context.watch<KanbanCubit>().state.epicFilterIds.length}',
+              ),
+              child: const Icon(LucideIcons.layers, size: BoardStyle.iconSize),
+            ),
+          ),
+        ],
+        IconButton(
+          key: const Key('board-search-toggle'),
+          tooltip: _searching ? 'Закрыть поиск' : 'Поиск на доске',
+          onPressed: () {
+            if (_searching) context.read<KanbanCubit>().setSearch('');
+            setState(() => _searching = !_searching);
+          },
+          icon: Icon(
+            _searching ? LucideIcons.x : LucideIcons.search,
+            color: colors.onSurface,
+            size: BoardStyle.iconSize,
+          ),
         ),
-        const SizedBox(width: 4),
         _BoardToolbarButton(
           key: const ValueKey('card-view-button'),
           tooltip: 'Вид карточек',
-          icon: LucideIcons.slidersHorizontal,
-          onPressed: onCardView,
+          icon: LucideIcons.panelsTopLeft,
+          onPressed: widget.onCardView,
         ),
-        const SizedBox(width: 4),
         _BoardToolbarButton(
+          key: const Key('board-add-column'),
           tooltip: 'Добавить колонку',
           icon: LucideIcons.plus,
-          onPressed: onAddColumn,
-          filled: true,
+          onPressed: widget.onAddColumn,
         ),
       ],
     );
@@ -706,12 +800,10 @@ class _BoardToolbarButton extends StatefulWidget {
     required this.tooltip,
     required this.icon,
     required this.onPressed,
-    this.filled = false,
   });
   final String tooltip;
   final IconData icon;
   final VoidCallback onPressed;
-  final bool filled;
   @override
   State<_BoardToolbarButton> createState() => _BoardToolbarButtonState();
 }
@@ -737,22 +829,7 @@ class _BoardToolbarButtonState extends State<_BoardToolbarButton> {
         child: IconButton(
           tooltip: widget.tooltip,
           onPressed: widget.onPressed,
-          icon: widget.filled
-              ? Container(
-                  width: 36,
-                  height: 36,
-                  decoration: const BoxDecoration(
-                    color: AppColors.accent,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    widget.icon,
-                    size: AppIconSizes.standard,
-                    color: Colors.white,
-                  ),
-                )
-              : Icon(widget.icon, size: AppIconSizes.standard),
+          icon: Icon(widget.icon, size: BoardStyle.iconSize),
           style: IconButton.styleFrom(
             fixedSize: const Size.square(48),
             minimumSize: const Size.square(48),
@@ -760,9 +837,7 @@ class _BoardToolbarButtonState extends State<_BoardToolbarButton> {
             padding: EdgeInsets.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             shape: const CircleBorder(),
-            foregroundColor: widget.filled
-                ? Colors.white
-                : colors.onSurfaceVariant,
+            foregroundColor: colors.onSurface,
             backgroundColor: Colors.transparent,
             side: BorderSide.none,
           ),
@@ -796,7 +871,7 @@ class _KanbanColumn extends StatefulWidget {
   final ValueChanged<ProjectTaskModel> onMoveTask;
   final void Function(ProjectTaskModel, TaskCardAction) onTaskAction;
   final List<ProjectTaskModel> tasks;
-  final Future<void> Function(String title) onAddTask;
+  final Future<bool> Function(String title) onAddTask;
   final void Function(ProjectTaskModel task, int position) onMove;
   final ValueChanged<ProjectTaskModel> onDragStart;
   final bool Function() onDragEnd;
@@ -868,8 +943,13 @@ class _KanbanColumnState extends State<_KanbanColumn> {
     }
 
     setState(() => _isSubmittingTask = true);
-    await widget.onAddTask(title);
+    final created = await widget.onAddTask(title);
     if (!mounted) return;
+    if (!created) {
+      setState(() => _isSubmittingTask = false);
+      _taskTitleFocusNode.requestFocus();
+      return;
+    }
 
     _taskTitleController.clear();
     _taskTitleFocusNode.unfocus();
@@ -905,6 +985,14 @@ class _KanbanColumnState extends State<_KanbanColumn> {
         ],
         const [
           AppMenuAction(
+            value: _ColumnAction.color,
+            label: 'Цвет колонки',
+            icon: LucideIcons.palette,
+            opensSubmenu: true,
+          ),
+        ],
+        const [
+          AppMenuAction(
             value: _ColumnAction.archive,
             label: 'Архивировать',
             icon: LucideIcons.archive,
@@ -926,13 +1014,18 @@ class _KanbanColumnState extends State<_KanbanColumn> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final columnColor = _parseColumnColor(widget.column.color);
-    final columnBackground = Color.alphaBlend(
-      columnColor.withValues(alpha: isDark ? 0.22 : 0.15),
-      colors.surface,
-    );
-    final headerColor = Color.lerp(columnColor, colors.onSurface, 0.58)!;
+    final baseBackground = BoardStyle.listBackground(context);
+    final columnBackground = widget.column.color == null
+        ? baseBackground
+        : Color.alphaBlend(
+            _parseColumnColor(widget.column.color).withValues(
+              alpha: Theme.of(context).brightness == Brightness.dark
+                  ? 0.22
+                  : 0.18,
+            ),
+            baseBackground,
+          );
+    final headerColor = colors.onSurface;
     return Listener(
       onPointerDown: (event) => _pointerStartX = event.position.dx,
       onPointerMove: _trackDrag,
@@ -940,221 +1033,253 @@ class _KanbanColumnState extends State<_KanbanColumn> {
         _isDragging = false;
         _dragVisual.value = (0, false);
       },
-      child: AnimatedContainer(
-        key: _columnBounds,
-        duration: const Duration(milliseconds: 180),
-        decoration: BoxDecoration(
-          color: columnBackground,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 15, 8, 13),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      widget.column.name.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.manrope(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.25,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: AnimatedContainer(
+          key: _columnBounds,
+          duration: const Duration(milliseconds: 180),
+          decoration: BoxDecoration(
+            color: columnBackground,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                  AppSpacing.sm,
+                  AppSpacing.xs,
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        widget.column.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.manrope(
+                          fontSize: BoardStyle.columnTitleSize,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0,
+                          color: headerColor,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: BoardStyle.badgeBackground(context),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        '${widget.tasks.length}',
+                        style: GoogleFonts.manrope(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: headerColor,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Действия колонки',
+                      onPressed: _showColumnMenu,
+                      icon: Icon(
+                        LucideIcons.ellipsis,
+                        size: AppIconSizes.standard,
                         color: headerColor,
                       ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: columnColor.withValues(alpha: 0.88),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: Text(
-                      '${widget.tasks.length}',
-                      style: GoogleFonts.manrope(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Действия колонки',
-                    onPressed: _showColumnMenu,
-                    icon: Icon(
-                      LucideIcons.ellipsis,
-                      size: AppIconSizes.standard,
-                      color: headerColor,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: widget.tasks.isEmpty
-                  ? const _EmptyColumn()
-                  : ReorderableListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      buildDefaultDragHandles: false,
-                      autoScrollerVelocityScalar: 45,
-                      itemCount: widget.tasks.length,
-                      proxyDecorator: (child, index, animation) =>
-                          AnimatedBuilder(
-                            animation: Listenable.merge([
-                              animation,
-                              _dragVisual,
-                            ]),
-                            child: child,
-                            builder: (context, child) => Transform.translate(
-                              offset: Offset(
-                                _dragVisual.value.$1 *
-                                    (_isDragging ? 1 : animation.value),
-                                0,
-                              ),
-                              child: Opacity(
-                                opacity: _dragVisual.value.$2 ? 0.65 : 1,
-                                child: Material(
-                                  color: Colors.transparent,
-                                  elevation:
-                                      6 *
-                                      Curves.easeOutCubic.transform(
-                                        animation.value,
-                                      ),
-                                  shadowColor: AppColors.ink.withValues(
-                                    alpha: 0.2,
+              Flexible(
+                child: widget.tasks.isEmpty
+                    ? const _EmptyColumn()
+                    : ReorderableListView.builder(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        buildDefaultDragHandles: false,
+                        autoScrollerVelocityScalar: 45,
+                        itemCount: widget.tasks.length,
+                        proxyDecorator: (child, index, animation) =>
+                            AnimatedBuilder(
+                              animation: Listenable.merge([
+                                animation,
+                                _dragVisual,
+                              ]),
+                              child: child,
+                              builder: (context, child) => Transform.translate(
+                                offset: Offset(
+                                  _dragVisual.value.$1 *
+                                      (_isDragging ? 1 : animation.value),
+                                  0,
+                                ),
+                                child: Opacity(
+                                  opacity: _dragVisual.value.$2 ? 0.65 : 1,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    elevation:
+                                        6 *
+                                        Curves.easeOutCubic.transform(
+                                          animation.value,
+                                        ),
+                                    shadowColor: AppColors.ink.withValues(
+                                      alpha: 0.2,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: child,
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: child,
+                                ),
+                              ),
+                            ),
+                        dragBoundaryProvider: (_) => null,
+                        onReorderStart: (index) {
+                          _skipReorder = false;
+                          _isDragging = true;
+                          _dragVisual.value = (0, false);
+                          widget.onDragStart(widget.tasks[index]);
+                        },
+                        onReorderEnd: (_) {
+                          _isDragging = false;
+                          _skipReorder = widget.onDragEnd();
+                        },
+                        onReorderItem: (oldIndex, newIndex) {
+                          if (_skipReorder) return;
+                          if (newIndex == oldIndex) return;
+                          widget.onMove(widget.tasks[oldIndex], newIndex);
+                        },
+                        itemBuilder: (context, index) {
+                          final task = widget.tasks[index];
+                          return Padding(
+                            key: ValueKey(task.id),
+                            padding: const EdgeInsets.only(bottom: 9),
+                            child: ReorderableDelayedDragStartListener(
+                              index: index,
+                              enabled:
+                                  widget.canReorder &&
+                                  !context
+                                      .watch<KanbanCubit>()
+                                      .state
+                                      .movingTaskIds
+                                      .contains(task.id),
+                              child: TaskCard(
+                                boardStyle: true,
+                                task: task,
+                                cardView: widget.cardView,
+                                currentUserId: widget.currentUserId,
+                                onAction: (action) =>
+                                    widget.onTaskAction(task, action),
+                                onMove:
+                                    context
+                                        .watch<KanbanCubit>()
+                                        .state
+                                        .movingTaskIds
+                                        .contains(task.id)
+                                    ? null
+                                    : () => widget.onMoveTask(task),
+                                isUpdating: context
+                                    .watch<KanbanCubit>()
+                                    .state
+                                    .movingTaskIds
+                                    .contains(task.id),
+                                onToggleCompleted:
+                                    context
+                                        .watch<KanbanCubit>()
+                                        .state
+                                        .movingTaskIds
+                                        .contains(task.id)
+                                    ? null
+                                    : () => context
+                                          .read<KanbanCubit>()
+                                          .toggleCompleted(task),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              ClipRect(
+                child: AnimatedSize(
+                  duration: _composerAnimationDuration,
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.bottomCenter,
+                  child: AnimatedSwitcher(
+                    duration: _composerAnimationDuration,
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    layoutBuilder: (currentChild, previousChildren) => Stack(
+                      alignment: Alignment.bottomCenter,
+                      children: <Widget>[...previousChildren, ?currentChild],
+                    ),
+                    transitionBuilder: (child, animation) {
+                      final curvedAnimation = CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOutCubic,
+                      );
+                      return FadeTransition(
+                        opacity: curvedAnimation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0, 0.08),
+                            end: Offset.zero,
+                          ).animate(curvedAnimation),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _isAddingTask
+                        ? _InlineTaskComposer(
+                            key: const ValueKey<String>('task-composer'),
+                            controller: _taskTitleController,
+                            focusNode: _taskTitleFocusNode,
+                            isSubmitting: _isSubmittingTask,
+                            accentColor: headerColor,
+                            onSubmit: _submitTask,
+                            onCancel: _closeTaskComposer,
+                          )
+                        : Padding(
+                            key: const ValueKey<String>('add-task-button'),
+                            padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: TextButton.icon(
+                                onPressed: _openTaskComposer,
+                                icon: const Icon(
+                                  LucideIcons.plus,
+                                  size: AppIconSizes.standard,
+                                ),
+                                label: const Text('Добавить карточку'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.accent,
+                                  backgroundColor: BoardStyle.badgeBackground(
+                                    context,
+                                  ).withValues(alpha: 0.65),
+                                  minimumSize: const Size.fromHeight(
+                                    AppSpacing.touchTarget,
+                                  ),
+                                  alignment: Alignment.centerLeft,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.smMd,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.md,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                      dragBoundaryProvider: (_) => null,
-                      onReorderStart: (index) {
-                        _skipReorder = false;
-                        _isDragging = true;
-                        _dragVisual.value = (0, false);
-                        widget.onDragStart(widget.tasks[index]);
-                      },
-                      onReorderEnd: (_) {
-                        _isDragging = false;
-                        _skipReorder = widget.onDragEnd();
-                      },
-                      onReorderItem: (oldIndex, newIndex) {
-                        if (_skipReorder) return;
-                        if (newIndex == oldIndex) return;
-                        widget.onMove(widget.tasks[oldIndex], newIndex);
-                      },
-                      itemBuilder: (context, index) {
-                        final task = widget.tasks[index];
-                        return Padding(
-                          key: ValueKey(task.id),
-                          padding: const EdgeInsets.only(bottom: 9),
-                          child: ReorderableDelayedDragStartListener(
-                            index: index,
-                            enabled: widget.canReorder,
-                            child: TaskCard(
-                              task: task,
-                              cardView: widget.cardView,
-                              currentUserId: widget.currentUserId,
-                              onAction: (action) =>
-                                  widget.onTaskAction(task, action),
-                              onMove:
-                                  context
-                                      .watch<KanbanCubit>()
-                                      .state
-                                      .movingTaskIds
-                                      .isEmpty
-                                  ? () => widget.onMoveTask(task)
-                                  : null,
-                              isUpdating: context
-                                  .watch<KanbanCubit>()
-                                  .state
-                                  .movingTaskIds
-                                  .contains(task.id),
-                              onToggleCompleted:
-                                  context
-                                      .watch<KanbanCubit>()
-                                      .state
-                                      .movingTaskIds
-                                      .isEmpty
-                                  ? () => context
-                                        .read<KanbanCubit>()
-                                        .toggleCompleted(task)
-                                  : null,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            ClipRect(
-              child: AnimatedSize(
-                duration: _composerAnimationDuration,
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.bottomCenter,
-                child: AnimatedSwitcher(
-                  duration: _composerAnimationDuration,
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  layoutBuilder: (currentChild, previousChildren) => Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: <Widget>[...previousChildren, ?currentChild],
                   ),
-                  transitionBuilder: (child, animation) {
-                    final curvedAnimation = CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
-                    );
-                    return FadeTransition(
-                      opacity: curvedAnimation,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, 0.08),
-                          end: Offset.zero,
-                        ).animate(curvedAnimation),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: _isAddingTask
-                      ? _InlineTaskComposer(
-                          key: const ValueKey<String>('task-composer'),
-                          controller: _taskTitleController,
-                          focusNode: _taskTitleFocusNode,
-                          isSubmitting: _isSubmittingTask,
-                          accentColor: headerColor,
-                          onSubmit: _submitTask,
-                          onCancel: _closeTaskComposer,
-                        )
-                      : Padding(
-                          key: const ValueKey<String>('add-task-button'),
-                          padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: TextButton.icon(
-                              onPressed: _openTaskComposer,
-                              icon: const Icon(
-                                LucideIcons.plus,
-                                size: AppIconSizes.standard,
-                              ),
-                              label: const Text('Добавить задачу'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: headerColor,
-                              ),
-                            ),
-                          ),
-                        ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1270,16 +1395,18 @@ Color _parseColumnColor(String? value) {
   return parsed == null ? AppColors.accent : Color(parsed);
 }
 
-enum _ColumnAction { moveLeft, moveRight, rename, archive, delete }
+enum _ColumnAction { moveLeft, moveRight, rename, color, archive, delete }
 
 class _EmptyColumn extends StatelessWidget {
   const _EmptyColumn();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Text(
         'В этой колонке пока нет задач',
+        textAlign: TextAlign.center,
         style: GoogleFonts.manrope(fontSize: 12, color: AppColors.muted),
       ),
     );
@@ -1475,7 +1602,12 @@ class _EditColumnSheetState extends State<_EditColumnSheet> {
 }
 
 class _MoveTaskSheet extends StatefulWidget {
-  const _MoveTaskSheet({required this.state, required this.task});
+  const _MoveTaskSheet({
+    required this.state,
+    required this.task,
+    required this.projectId,
+  });
+  final String projectId;
   final KanbanState state;
   final ProjectTaskModel task;
 
@@ -1489,8 +1621,17 @@ class _MoveTaskSheetState extends State<_MoveTaskSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final task = widget.state.projectId == widget.projectId
+        ? widget.state.tasks
+              .where((item) => item.id == widget.task.id)
+              .firstOrNull
+        : null;
     final column = widget.state.columns
-        .where((item) => item.statusMap == _status)
+        .where(
+          (item) =>
+              !item.archived &&
+              item.statusMap.toUpperCase() == _status.toUpperCase(),
+        )
         .firstOrNull;
     final count = column == null
         ? 0
@@ -1543,10 +1684,11 @@ class _MoveTaskSheetState extends State<_MoveTaskSheet> {
                 separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (context, index) {
                   final item = widget.state.columns[index];
-                  final selected = item.statusMap == _status;
+                  final selected =
+                      item.statusMap.toUpperCase() == _status.toUpperCase();
                   final current =
                       item.statusMap.toUpperCase() ==
-                      widget.task.status.toUpperCase();
+                      task?.status.toUpperCase();
                   return Material(
                     color: selected
                         ? AppColors.accent.withValues(alpha: 0.1)
@@ -1585,7 +1727,7 @@ class _MoveTaskSheetState extends State<_MoveTaskSheet> {
               label: 'Позиция',
               child: DropdownButtonFormField<int>(
                 isExpanded: true,
-                key: ValueKey<String>(_status),
+                key: ValueKey((_status, count, _position)),
                 initialValue: _position,
                 decoration: const InputDecoration(hintText: 'Позиция'),
                 items: <DropdownMenuItem<int>>[
@@ -1597,7 +1739,13 @@ class _MoveTaskSheetState extends State<_MoveTaskSheet> {
             ),
             const SizedBox(height: 18),
             FilledButton(
-              onPressed: () => Navigator.pop(context, (_status, _position)),
+              key: const Key('confirm-task-move'),
+              onPressed:
+                  task == null ||
+                      column == null ||
+                      widget.state.movingTaskIds.contains(widget.task.id)
+                  ? null
+                  : () => Navigator.pop(context, (column.statusMap, _position)),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(52),
                 shape: RoundedRectangleBorder(
@@ -1614,7 +1762,11 @@ class _MoveTaskSheetState extends State<_MoveTaskSheet> {
                   const SizedBox(width: 10),
                   Flexible(
                     child: Text(
-                      'Перенести в «${column?.name ?? ''}»',
+                      task == null
+                          ? 'Задача больше недоступна'
+                          : column == null
+                          ? 'Выберите колонку'
+                          : 'Перенести в «${column.name}»',
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -1643,3 +1795,52 @@ IconData _cardFieldIcon(CardField field) => switch (field) {
   CardField.resources => LucideIcons.chartNoAxesCombined,
   CardField.files => LucideIcons.paperclip,
 };
+
+class _ColumnColorSheet extends StatefulWidget {
+  const _ColumnColorSheet({required this.column});
+  final KanbanColumnModel column;
+
+  @override
+  State<_ColumnColorSheet> createState() => _ColumnColorSheetState();
+}
+
+class _ColumnColorSheetState extends State<_ColumnColorSheet> {
+  late String _color = widget.column.color ?? '#94A3B8';
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        0,
+        24,
+        24 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Цвет колонки', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            widget.column.name,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          AppColorPicker(
+            value: _color,
+            extraColors: const [Color(0xFF94A3B8)],
+            onChanged: (value) => setState(() => _color = value),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            key: const Key('save_column_color'),
+            onPressed: () => Navigator.pop(context, _color),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    ),
+  );
+}

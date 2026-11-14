@@ -50,6 +50,7 @@ app.*.map.json
 # Local Firebase server credentials and test device tokens
 .config/firebase-admin*.json
 .config/firebase-test-device.local.json
+*-firebase-adminsdk-*.json
 
 # Apple APNs private keys belong in secure storage, never in the app.
 AuthKey_*.p8

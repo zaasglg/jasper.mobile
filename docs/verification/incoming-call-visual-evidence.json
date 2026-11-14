@@ -1,0 +1,44 @@
+{
+  "scope": "Fullscreen incoming call on Flutter Android/iOS, Android lock-screen Activity",
+  "comparison": "Supplied incoming-call image; dark surface, caller avatar, circular red decline and green accept",
+  "sources": [
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/calls/presentation/incoming_call_screen.dart",
+      "sha256": "7807101168514501cb6307e6d3b920663142fcb3b80c48ddd071cf0203f56db8"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/calls/presentation/calls_host.dart",
+      "sha256": "77c8be3641bce8ab2bd1d2b73d31dc80256a7d139ba58b08b8054cf09c336cce"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/android/app/src/main/kotlin/com/jospar/app/IncomingCallActivity.kt",
+      "sha256": "2475027fd59066e5b6ff78fc8dd3e648c9c79f08be52eac6c52fd9ac4a9bc73b"
+    }
+  ],
+  "checks": [
+    {
+      "id": "widget",
+      "status": "pass",
+      "observed": "320x568 widget test: caller text and functional accept/decline actions, disabled actions while busy, no layout exception. 30 incoming/controller/cubit tests pass; Flutter analyze passes."
+    },
+    {
+      "id": "native-visual",
+      "status": "blocked",
+      "observed": "No Android or iOS native incoming call capture; lock-screen appearance and end-to-end incoming call not visually verified."
+    },
+    {
+      "id": "android-kotlin",
+      "status": "pass",
+      "observed": "JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:compileDebugKotlin --offline completed successfully."
+    },
+    {
+      "id": "outside-navigator-regression",
+      "status": "pass",
+      "observed": "Reproduced No Overlay widget found in MaterialApp.builder before fix; regression now verifies both incoming actions render and work without an ancestor Overlay. Tooltip dependency removed; accessible icon labels preserved."
+    }
+  ],
+  "limitations": [
+    "iOS lock-screen interface remains owned by CallKit.",
+    "Android native avatar uses caller initials. Reminder and message actions omitted because no corresponding flow exists."
+  ]
+}

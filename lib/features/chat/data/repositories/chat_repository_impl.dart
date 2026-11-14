@@ -284,6 +284,7 @@ class ChatRepositoryImpl
         ...users
             .whereType<Map>()
             .where((item) => item['id']?.toString() != currentUserId)
+            .where((item) => item['isActive'] != false)
             .map((item) {
               final json = Map<String, dynamic>.from(item);
               final id = json['id']?.toString() ?? '';
@@ -443,6 +444,12 @@ class ChatRepositoryImpl
       }
       final response = await _dio.post<dynamic>(
         'messages',
+        options: transcript == null
+            ? null
+            : Options(
+                sendTimeout: const Duration(minutes: 2),
+                receiveTimeout: const Duration(minutes: 2),
+              ),
         data: <String, dynamic>{
           'text': text,
           'kind': kind.name.toUpperCase(),

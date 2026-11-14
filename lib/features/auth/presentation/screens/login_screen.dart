@@ -1,5 +1,8 @@
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:forui/forui.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -23,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   static const Color _muted = Color(0xFF737587);
   static const Color _accent = AppColors.accent;
   static const Color _fieldFill = Color(0xFFFAFAFC);
-  static const Color _canvas = Color(0xFFF7F7FC);
+  static const Color _canvas = Colors.white;
 
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -64,6 +67,16 @@ class _LoginScreenState extends State<LoginScreen> {
     await context.read<AuthCubit>().loginWithGoogle();
   }
 
+  Future<void> _signInWithApple() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await context.read<AuthCubit>().loginWithApple();
+  }
+
+  bool get _supportsNativeAppleSignIn =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS);
+
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<AuthCubit, AuthState>(
@@ -75,57 +88,66 @@ class _LoginScreenState extends State<LoginScreen> {
         final isLoading = state is AuthLoading;
         final error = state is AuthFailure ? state.message : null;
 
-        return Scaffold(
-          backgroundColor: _canvas,
-          body: SafeArea(
-            child: AutofillGroup(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth >= 900;
-                  return SingleChildScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isWide ? 48 : 20,
-                      vertical: isWide ? 40 : 20,
-                    ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight - (isWide ? 80 : 40),
+        return FTheme(
+          data: FThemeData(
+            touch: true,
+            colors: FTheme.neutral.light.touch.colors.copyWith(
+              primary: AppColors.accent,
+              primaryForeground: Colors.white,
+            ),
+          ),
+          child: Scaffold(
+            backgroundColor: _canvas,
+            body: SafeArea(
+              child: AutofillGroup(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 900;
+                    return SingleChildScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isWide ? 48 : 20,
+                        vertical: isWide ? 40 : 20,
                       ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1080),
-                          child: isWide
-                              ? Row(
-                                  children: [
-                                    const Expanded(child: _BrandStory()),
-                                    const SizedBox(width: 72),
-                                    SizedBox(
-                                      width: 440,
-                                      child: _buildLoginCard(
-                                        isLoading: isLoading,
-                                        error: error,
-                                        showLogo: false,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight - (isWide ? 80 : 40),
+                        ),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1080),
+                            child: isWide
+                                ? Row(
+                                    children: [
+                                      const Expanded(child: _BrandStory()),
+                                      const SizedBox(width: 72),
+                                      SizedBox(
+                                        width: 440,
+                                        child: _buildLoginCard(
+                                          isLoading: isLoading,
+                                          error: error,
+                                          showLogo: false,
+                                        ),
                                       ),
+                                    ],
+                                  )
+                                : ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 460,
                                     ),
-                                  ],
-                                )
-                              : ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 460,
+                                    child: _buildLoginCard(
+                                      isLoading: isLoading,
+                                      error: error,
+                                      showLogo: true,
+                                    ),
                                   ),
-                                  child: _buildLoginCard(
-                                    isLoading: isLoading,
-                                    error: error,
-                                    showLogo: true,
-                                  ),
-                                ),
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -141,23 +163,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }) {
     return Container(
       padding: const EdgeInsets.fromLTRB(28, 30, 28, 26),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x140F102A),
-            blurRadius: 40,
-            offset: Offset(0, 18),
-          ),
-          BoxShadow(
-            color: Color(0x0A0F102A),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
       child: Form(
         key: _formKey,
         child: Column(
@@ -165,22 +170,22 @@ class _LoginScreenState extends State<LoginScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (showLogo) ...[
-              const AppLogo(height: 27),
-              const SizedBox(height: 42),
+              const AppLogo(height: 24),
+              const SizedBox(height: AppSpacing.lg * 2),
             ],
             Text(
-              'С возвращением',
+              'Войти в JosparBee',
               style: GoogleFonts.manrope(
                 color: _ink,
-                fontSize: 30,
+                fontSize: 26,
                 height: 1.15,
                 letterSpacing: -0.9,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 10),
             Text(
-              'Продолжите работу с командой и проектами',
+              'Ваши задачи, проекты и команда — рядом.',
               style: GoogleFonts.manrope(
                 color: _muted,
                 fontSize: 14,
@@ -190,6 +195,10 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 28),
             _buildGoogleButton(isLoading),
+            if (_supportsNativeAppleSignIn) ...[
+              const SizedBox(height: 12),
+              _buildAppleButton(isLoading),
+            ],
             const SizedBox(height: 22),
             const _LoginDivider(),
             const SizedBox(height: 22),
@@ -244,23 +253,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildGoogleButton(bool isLoading) {
     return SizedBox(
-      height: 54,
-      child: OutlinedButton(
+      height: AppSpacing.touchTarget,
+      child: FButton(
         key: const Key('google_login_button'),
-        onPressed: isLoading ? null : _signInWithGoogle,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: _ink,
-          backgroundColor: Colors.white,
-          disabledForegroundColor: _muted,
-          side: const BorderSide(color: Color(0xFFE4E5EC)),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          textStyle: GoogleFonts.manrope(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        variant: FButtonVariant.outline,
+        onPress: isLoading ? null : _signInWithGoogle,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
@@ -273,6 +270,26 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(width: 11),
             const Text('Войти через Google'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppleButton(bool isLoading) {
+    return SizedBox(
+      height: AppSpacing.touchTarget,
+      child: FButton(
+        key: const Key('apple_login_button'),
+        variant: FButtonVariant.outline,
+        onPress: isLoading ? null : _signInWithApple,
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.apple, size: 22, color: Colors.black),
+            SizedBox(width: 11),
+            Text('Войти через Apple'),
           ],
         ),
       ),
@@ -372,8 +389,8 @@ class _LoginScreenState extends State<LoginScreen> {
       filled: true,
       fillColor: _fieldFill,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: border(Colors.transparent),
-      enabledBorder: border(Colors.transparent),
+      border: border(AppColors.border),
+      enabledBorder: border(AppColors.border),
       disabledBorder: border(Colors.transparent),
       focusedBorder: border(_accent),
       errorBorder: border(const Color(0xFFD14B4B)),
@@ -390,7 +407,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 180),
       child: error == null
-          ? const SizedBox(key: ValueKey<String>('empty'), height: 36)
+          ? const SizedBox.shrink(key: ValueKey<String>('empty'))
           : Semantics(
               key: const ValueKey<String>('error'),
               liveRegion: true,
@@ -423,22 +440,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildSubmitButton(bool isLoading) {
     return SizedBox(
       height: 54,
-      child: FilledButton(
+      child: FButton(
         key: const Key('login_submit_button'),
-        onPressed: isLoading ? null : _submit,
-        style: FilledButton.styleFrom(
-          backgroundColor: _accent,
-          disabledBackgroundColor: const Color(0xFFA7A9F5),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 0,
-          textStyle: GoogleFonts.manrope(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        onPress: isLoading ? null : _submit,
         child: isLoading
             ? const SizedBox.square(
                 dimension: 20,

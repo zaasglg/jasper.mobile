@@ -1,0 +1,31 @@
+{
+  "scope": "Project settings: remove date controls and group form",
+  "comparison": "existing-system",
+  "sources": [
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/collaboration/presentation/space_management_screen.dart",
+      "sha256": "cbfca753d04bbb923abc5530f01bcb2f92a28aece9eb2a310a3b97151b74fa3f"
+    }
+  ],
+  "environment": {
+    "kind": "Flutter widget test render",
+    "width": 390,
+    "height": 844,
+    "font": "SFNS substituted for Manrope"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/test/features/collaboration/goldens/project_settings.png",
+      "sha256": "297058c08845e168590785e64b6e895e137c0cdf65e05a7ff409f5b5e66d3e46"
+    }
+  ],
+  "checks": {
+    "saveWithoutDates": "passed",
+    "narrowLayout": "passed",
+    "nativeSimulator": "not run",
+    "actionSpacing": "Inspected at 390x844: inset icons, unified action surface and divider"
+  },
+  "limitations": [
+    "Widget render only; native simulator and exact production font not verified"
+  ]
+}

@@ -1,3 +1,6 @@
+import 'package:jospar/features/dashboard/presentation/widgets/dashboard_app_bar.dart';
+import 'package:jospar/features/profile/presentation/cubit/profile_cubit.dart';
+import 'package:jospar/features/profile/presentation/cubit/profile_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,6 +30,7 @@ void main() {
               create: (_) => ChatCubit(_FakeChatRepository())..load(),
             ),
             BlocProvider<WorkspaceCubit>(create: (_) => _Workspace()),
+            BlocProvider<ProfileCubit>(create: (_) => _Profile()),
           ],
           child: const ChatScreen(),
         ),
@@ -34,6 +38,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byType(DashboardAppBar), findsOneWidget);
+    expect(find.byKey(const Key('dashboard-ai-icon')), findsOneWidget);
     expect(find.text('Цифровизация'), findsOneWidget);
     expect(find.text('JOSPAR.ME'), findsNothing);
     expect(find.byKey(const Key('messenger-search')), findsOneWidget);
@@ -106,4 +112,11 @@ class _FakeChatRepository implements ChatRepository {
     String? mention,
     int? duration,
   }) => throw UnimplementedError();
+}
+
+class _Profile extends Cubit<ProfileState> implements ProfileCubit {
+  _Profile() : super(const ProfileInitial());
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

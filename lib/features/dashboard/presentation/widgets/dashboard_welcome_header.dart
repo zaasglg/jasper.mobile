@@ -1,7 +1,8 @@
-import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:forui/forui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 
 class DashboardWelcomeHeader extends StatelessWidget {
   const DashboardWelcomeHeader({
@@ -10,164 +11,120 @@ class DashboardWelcomeHeader extends StatelessWidget {
     this.onEdit,
     this.onCreate,
   });
-
   final String name;
   final VoidCallback? onEdit;
   final VoidCallback? onCreate;
 
-  static const Color _title = Color(0xFF16181D);
-  static const Color _subtitle = Color(0xFF8A9099);
-  static const Color _accent = Color(0xFF6D5FE0);
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(color: Colors.white),
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Приветствую,',
-                            style: GoogleFonts.manrope(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                              color: _subtitle,
-                              height: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            name,
-                            style: GoogleFonts.manrope(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: _title,
-                              height: 1.15,
-                              letterSpacing: -0.6,
-                            ),
-                          ),
-                        ],
-                      ),
+  Widget build(BuildContext context) => FTheme(
+    data: FThemeData(
+      touch: true,
+      colors: FTheme.neutral.light.touch.colors.copyWith(
+        primary: AppColors.accent,
+        primaryForeground: Colors.white,
+      ),
+    ),
+    child: ColoredBox(
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.lg,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Приветствую,',
+                    style: AppTypography.body(
+                      context,
+                    )?.copyWith(color: AppColors.muted),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    name,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: 12),
-                    _ActionCluster(onEdit: onEdit, onCreate: onCreate),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: AppSpacing.sm),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _WelcomeAction(
+                    label: 'Редактировать виджеты',
+                    icon: LucideIcons.pencil,
+                    onPress: onEdit,
+                  ),
+                  _WelcomeAction(
+                    label: 'Добавить задачу',
+                    icon: LucideIcons.plus,
+                    onPress: onCreate,
+                    primary: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  );
 }
 
-class _ActionCluster extends StatelessWidget {
-  const _ActionCluster({this.onEdit, this.onCreate});
-
-  final VoidCallback? onEdit;
-  final VoidCallback? onCreate;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE7E9EF)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _ActionButton(
-            tooltip: 'Редактировать виджеты',
-            onTap: onEdit,
-            background: Colors.white,
-            child: const Icon(
-              LucideIcons.pencil,
-              size: AppIconSizes.standard,
-              color: Color(0xFF4A4F58),
-            ),
-          ),
-          const SizedBox(width: 4),
-          _ActionButton(
-            tooltip: 'Добавить задачу',
-            onTap: onCreate,
-            background: DashboardWelcomeHeader._accent,
-            elevated: true,
-            child: const Icon(
-              LucideIcons.plus,
-              size: AppIconSizes.standard,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.background,
-    required this.tooltip,
-    required this.child,
-    this.onTap,
-    this.elevated = false,
+class _WelcomeAction extends StatelessWidget {
+  const _WelcomeAction({
+    required this.label,
+    required this.icon,
+    this.onPress,
+    this.primary = false,
   });
-
-  final String tooltip;
-  final Color background;
-  final Widget child;
-  final VoidCallback? onTap;
-  final bool elevated;
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPress;
+  final bool primary;
 
   @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: background,
-        borderRadius: BorderRadius.circular(10),
-        elevation: 0,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            width: 38,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: elevated
-                  ? [
-                      BoxShadow(
-                        color: DashboardWelcomeHeader._accent.withValues(
-                          alpha: 0.28,
-                        ),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: child,
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: AppSpacing.touchTarget,
+    child: FButton.raw(
+      key: ValueKey('welcome-$label'),
+      variant: FButtonVariant.ghost,
+      onPress: onPress,
+      semanticsLabel: label,
+      semanticsTooltip: label,
+      child: Center(
+        child: Container(
+          width: AppSpacing.touchTarget - AppSpacing.sm,
+          height: AppSpacing.touchTarget - AppSpacing.sm,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: primary ? AppColors.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.md - AppSpacing.xs),
+          ),
+          child: Icon(
+            icon,
+            size: AppSpacing.md + AppSpacing.xs,
+            color: primary ? Colors.white : AppColors.ink,
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }

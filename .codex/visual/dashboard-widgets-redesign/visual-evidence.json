@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "JosparBee dashboard widget redesign: task project card, mentions and resource empty state; generated target 851x1849 and native iPhone 17 Pro Max renders 1320x2868",
+  "platform": "ios",
+  "sources": [
+    {
+      "path": "../../../lib/core/widgets/app_widget_heading.dart",
+      "sha256": "b2f4460877a1842eec9c3863de75a7e7fc407cf1d85cce2dd2fbb7933e7eacba"
+    },
+    {
+      "path": "../../../lib/features/tasks/presentation/widgets/my_tasks_widget.dart",
+      "sha256": "28f6ca956062e0b4e3b1356d4085ae23d4f5942cfafbccbafeb30024de074fe1"
+    },
+    {
+      "path": "../../../lib/features/dashboard/presentation/widgets/dashboard_mentions_widget.dart",
+      "sha256": "b9a5364e43641c9f0bc7feb35725a6315c3568d17560859883ebbfa4a8417003"
+    },
+    {
+      "path": "../../../lib/features/dashboard/presentation/widgets/dashboard_resource_widget.dart",
+      "sha256": "4eecd34e86769cb130e73ba559dbb9a60dcea9eedc7903dab274ce008a2f9bfe"
+    }
+  ],
+  "comparison": "target",
+  "target": {
+    "path": "/Users/erdaulettojbekov/.codex/generated_images/01a1d522-118b-7040-9ddd-68e51c4c8551/exec-2ee63783-ac51-47ac-b1e7-5ff4ff5e792f.png",
+    "kind": "image",
+    "sha256": "3e677cde6ca2a1c6b7a75732fecb6310219fc5985bb46021adad4dcb7d5faf6a"
+  },
+  "requiredChecks": [
+    {
+      "id": "ios-dashboard-widgets",
+      "kind": "visual"
+    }
+  ],
+  "checks": [
+    {
+      "id": "ios-dashboard-widgets",
+      "status": "pass",
+      "state": "Dashboard loaded with project tasks, one mention and an empty resource widget",
+      "environment": {
+        "kind": "simulator",
+        "name": "iPhone 17 Pro Max, iOS 26.2",
+        "width": 1320,
+        "height": 2868
+      },
+      "observed": "Inspected native renders against the generated direction. The project header, task hierarchy, checkbox hit targets, metadata badges, widget headings, mention row and composed resource empty state are aligned and readable without horizontal overflow. The target used different pixel dimensions, so this is a structural visual comparison rather than a 1:1 claim.",
+      "artifacts": [
+        {
+          "path": "ios-dashboard-scrolled.png",
+          "kind": "image",
+          "sha256": "1ee3d0935aaf29125b6b4d956c5f083927d1e93b8d6da29f8fec6d0ce027c9a9"
+        },
+        {
+          "path": "ios-dashboard-lower.png",
+          "kind": "image",
+          "sha256": "55b2b1a6c8962f09420e725f9d95897f1beaaa0d10eccf46984cf99228bf465f"
+        }
+      ]
+    }
+  ],
+  "unresolved": []
+}

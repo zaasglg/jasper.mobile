@@ -5,7 +5,6 @@ enum PlannerStatus { initial, loading, success, failure }
 
 class PlannerState extends Equatable {
   const PlannerState({
-    this.workspaceId = '',
     this.status = PlannerStatus.initial,
     this.items = const [],
     this.busyIds = const {},
@@ -14,7 +13,6 @@ class PlannerState extends Equatable {
     this.actionRevision = 0,
     this.isSaving = false,
   });
-  final String workspaceId;
   final PlannerStatus status;
   final List<PlannerItemModel> items;
   final Set<String> busyIds;
@@ -31,7 +29,6 @@ class PlannerState extends Equatable {
     bool? isSaving,
     bool clearError = false,
   }) => PlannerState(
-    workspaceId: workspaceId,
     status: status ?? this.status,
     items: items ?? this.items,
     busyIds: busyIds ?? this.busyIds,
@@ -42,7 +39,6 @@ class PlannerState extends Equatable {
   );
   @override
   List<Object?> get props => [
-    workspaceId,
     status,
     items,
     busyIds,

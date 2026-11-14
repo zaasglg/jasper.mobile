@@ -1,17 +1,20 @@
-import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../shell/presentation/screens/main_shell.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
+import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
 import '../../data/models/inbox_task_model.dart';
 import '../cubit/inbox_cubit.dart';
 import '../cubit/inbox_state.dart';
 import '../widgets/inbox_task_menu.dart';
 
 class InboxScreen extends StatefulWidget {
-  const InboxScreen({super.key});
+  const InboxScreen({super.key, this.showAppBar = true, this.composeRequest});
+  final String? composeRequest;
+
+  final bool showAppBar;
 
   @override
   State<InboxScreen> createState() => _InboxScreenState();
@@ -20,6 +23,25 @@ class InboxScreen extends StatefulWidget {
 class _InboxScreenState extends State<InboxScreen> {
   final TextEditingController _taskController = TextEditingController();
   final FocusNode _taskFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusComposer();
+  }
+
+  @override
+  void didUpdateWidget(InboxScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.composeRequest != widget.composeRequest) _focusComposer();
+  }
+
+  void _focusComposer() {
+    if (widget.composeRequest == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _taskFocusNode.requestFocus();
+    });
+  }
 
   @override
   void dispose() {
@@ -31,67 +53,20 @@ class _InboxScreenState extends State<InboxScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          tooltip: 'Открыть меню',
-          onPressed: MainShell.openDrawer,
-          icon: const Icon(
-            Icons.menu_rounded,
-            color: AppColors.ink,
-            size: AppIconSizes.standard,
-          ),
-        ),
-        title: Text(
-          'Инбокс',
-          style: GoogleFonts.manrope(
-            fontSize: 21,
-            fontWeight: FontWeight.w700,
-            color: AppColors.ink,
-            letterSpacing: -0.35,
-          ),
-        ),
-      ),
+      backgroundColor: AppColors.canvas,
+      appBar: widget.showAppBar ? const DashboardAppBar() : null,
       body: SafeArea(
         top: false,
         child: BlocBuilder<InboxCubit, InboxState>(
           builder: (context, state) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                child: Row(
-                  children: <Widget>[
-                    Text(
-                      'Неразобранные',
-                      style: GoogleFonts.manrope(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _TaskCount(count: state.tasks.length),
-                  ],
-                ),
-              ),
-              Expanded(child: _InboxContent(state: state)),
-              Container(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  border: Border(top: BorderSide(color: AppColors.border)),
-                ),
-                child: _QuickTaskComposer(
-                  controller: _taskController,
-                  focusNode: _taskFocusNode,
-                  isSubmitting: state.isCreating,
-                  onChanged: (_) => setState(() {}),
-                  onAdd: _addTask,
-                ),
+              Expanded(child: InboxContent(state: state)),
+              QuickTaskComposer(
+                controller: _taskController,
+                focusNode: _taskFocusNode,
+                isSubmitting: state.isCreating,
+                onChanged: (_) => setState(() {}),
+                onAdd: _addTask,
               ),
             ],
           ),
@@ -118,25 +93,25 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 }
 
-class _InboxContent extends StatelessWidget {
-  const _InboxContent({required this.state});
+class InboxContent extends StatelessWidget {
+  const InboxContent({super.key, required this.state});
 
   final InboxState state;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 180),
       child: switch (state.status) {
-        InboxStatus.initial || InboxStatus.loading => const _InboxLoading(
+        InboxStatus.initial || InboxStatus.loading => const InboxLoading(
           key: ValueKey<String>('loading'),
         ),
-        InboxStatus.failure => _InboxFailure(
+        InboxStatus.failure => InboxFailure(
           key: const ValueKey<String>('failure'),
           message: state.errorMessage ?? 'Не удалось загрузить задачи.',
           onRetry: context.read<InboxCubit>().load,
         ),
-        InboxStatus.success when state.tasks.isEmpty => _RefreshableEmpty(
+        InboxStatus.success when state.tasks.isEmpty => RefreshableInboxEmpty(
           key: const ValueKey<String>('empty'),
           onRefresh: context.read<InboxCubit>().load,
         ),
@@ -144,31 +119,45 @@ class _InboxContent extends StatelessWidget {
           key: const ValueKey<String>('tasks'),
           color: AppColors.accent,
           onRefresh: context.read<InboxCubit>().load,
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(12, 2, 12, 28),
+          child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            itemCount: state.tasks.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 7),
-            itemBuilder: (context, index) {
-              final task = state.tasks[index];
-              return _QuickTaskTile(
-                key: ValueKey<String>(task.id),
-                task: task,
-                isCompleting: state.completingTaskIds.contains(task.id),
-                onToggle: () => task.isLocalOnly
-                    ? context.read<InboxCubit>().toggleLocal(task.id)
-                    : _completeTask(context, task.id),
-              );
-            },
+            slivers: <Widget>[
+              SliverToBoxAdapter(
+                child: InboxHeader(taskCount: state.tasks.length),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                sliver: SliverList.separated(
+                  itemCount: state.tasks.length,
+                  separatorBuilder: (context, index) => const Divider(
+                    height: AppSpacing.xxs,
+                    thickness: AppSpacing.xxs / 2,
+                    color: AppColors.border,
+                  ),
+                  itemBuilder: (context, index) {
+                    final task = state.tasks[index];
+                    return InboxTaskRow(
+                      key: ValueKey<String>(task.id),
+                      task: task,
+                      isCompleting: state.completingTaskIds.contains(task.id),
+                      onToggle: () => task.isLocalOnly
+                          ? context.read<InboxCubit>().toggleLocal(task.id)
+                          : completeTask(context, task.id),
+                    );
+                  },
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+            ],
           ),
         ),
       },
     );
   }
 
-  Future<void> _completeTask(BuildContext context, String taskId) async {
+  Future<void> completeTask(BuildContext context, String taskId) async {
     final cubit = context.read<InboxCubit>();
     final completed = await cubit.complete(taskId);
     if (!context.mounted || completed) return;
@@ -182,100 +171,102 @@ class _InboxContent extends StatelessWidget {
   }
 }
 
-class _InboxLoading extends StatelessWidget {
-  const _InboxLoading({super.key});
+class InboxHeader extends StatelessWidget {
+  const InboxHeader({super.key, required this.taskCount});
+
+  final int taskCount;
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(12, 2, 12, 28),
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 3,
-      separatorBuilder: (_, _) => const SizedBox(height: 7),
-      itemBuilder: (_, _) => Container(
-        height: 112,
-        decoration: BoxDecoration(
-          color: AppColors.subtleSurface,
-          borderRadius: BorderRadius.circular(12),
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.mdLg,
       ),
-    );
-  }
-}
-
-class _InboxFailure extends StatelessWidget {
-  const _InboxFailure({
-    super.key,
-    required this.message,
-    required this.onRetry,
-  });
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(
-              Icons.cloud_off_rounded,
-              size: 36,
-              color: AppColors.muted,
-            ),
-            const SizedBox(height: 14),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
-                fontSize: 13,
-                height: 1.45,
-                color: AppColors.muted,
-              ),
-            ),
-            const SizedBox(height: 14),
-            OutlinedButton(
-              key: const Key('inbox-retry'),
-              onPressed: onRetry,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.ink,
-                side: const BorderSide(color: AppColors.border),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Flexible(
+                child: Text(
+                  'Inbox',
+                  style: AppTypography.pageTitle(
+                    context,
+                  )?.copyWith(color: AppColors.ink),
                 ),
               ),
-              child: const Text('Повторить'),
-            ),
-          ],
-        ),
+              const SizedBox(width: AppSpacing.sm),
+              TaskCount(count: taskCount),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Задачи из инбокса — распределите их по проектам.',
+            style: AppTypography.body(
+              context,
+            )?.copyWith(color: AppColors.muted, height: 1.4),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _RefreshableEmpty extends StatelessWidget {
-  const _RefreshableEmpty({super.key, required this.onRefresh});
+class InboxTaskRow extends StatelessWidget {
+  const InboxTaskRow({
+    super.key,
+    required this.task,
+    required this.isCompleting,
+    required this.onToggle,
+  });
 
-  final RefreshCallback onRefresh;
+  final InboxTaskModel task;
+  final bool isCompleting;
+  final VoidCallback? onToggle;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) => RefreshIndicator(
-        color: AppColors.accent,
-        onRefresh: onRefresh,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
+    return Semantics(
+      container: true,
+      label: 'Задача: ${task.title}',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.smMd),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            SizedBox(
-              height: constraints.maxHeight,
-              child: const _QuickTasksEmpty(),
+            CompletionButton(
+              task: task,
+              isCompleting: isCompleting,
+              onToggle: onToggle,
             ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xs),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      task.title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.taskTitle(context)?.copyWith(
+                        color: task.completed ? AppColors.muted : AppColors.ink,
+                        decoration: task.completed
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const TaskMetadata(),
+                  ],
+                ),
+              ),
+            ),
+            InboxTaskMenu(task: task, busy: isCompleting),
           ],
         ),
       ),
@@ -283,8 +274,163 @@ class _RefreshableEmpty extends StatelessWidget {
   }
 }
 
-class _QuickTaskComposer extends StatelessWidget {
-  const _QuickTaskComposer({
+class CompletionButton extends StatelessWidget {
+  const CompletionButton({
+    super.key,
+    required this.task,
+    required this.isCompleting,
+    required this.onToggle,
+  });
+
+  final InboxTaskModel task;
+  final bool isCompleting;
+  final VoidCallback? onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = task.completed ? 'Вернуть в работу' : 'Завершить задачу';
+    return Semantics(
+      button: true,
+      checked: task.completed,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: InkResponse(
+          key: Key('inbox-task-checkbox-${task.id}'),
+          onTap: isCompleting ? null : onToggle,
+          radius: AppSpacing.lg,
+          child: SizedBox.square(
+            dimension: AppSpacing.touchTarget,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                width: AppSpacing.lg,
+                height: AppSpacing.lg,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: task.completed ? AppColors.accent : AppColors.canvas,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: task.completed ? AppColors.accent : AppColors.muted,
+                    width: AppSpacing.xxs,
+                  ),
+                ),
+                child: isCompleting
+                    ? const SizedBox.square(
+                        dimension: AppSpacing.md,
+                        child: CircularProgressIndicator(
+                          strokeWidth: AppSpacing.xxs,
+                          color: AppColors.accent,
+                        ),
+                      )
+                    : task.completed
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: AppIconSizes.standard,
+                        color: AppColors.onAccent,
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class TaskMetadata extends StatelessWidget {
+  const TaskMetadata({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final metadataStyle = AppTypography.caption(
+      context,
+    )?.copyWith(color: AppColors.muted, fontWeight: FontWeight.w500);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final project = ProjectMetadata(style: metadataStyle);
+        const badge = InboxBadge();
+        if (constraints.maxWidth < 220) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              project,
+              const SizedBox(height: AppSpacing.sm),
+              badge,
+            ],
+          );
+        }
+        return Row(
+          children: <Widget>[
+            project,
+            const SizedBox(width: AppSpacing.sm),
+            badge,
+          ],
+        );
+      },
+    );
+  }
+}
+
+class ProjectMetadata extends StatelessWidget {
+  const ProjectMetadata({super.key, required this.style});
+
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const Icon(
+          Icons.folder_outlined,
+          size: AppIconSizes.standard,
+          color: AppColors.muted,
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Flexible(
+          child: Text(
+            'Не распределена',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class InboxBadge extends StatelessWidget {
+  const InboxBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Text(
+        'ИНБОКС',
+        style: AppTypography.caption(context)?.copyWith(
+          color: AppColors.accent,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+class QuickTaskComposer extends StatelessWidget {
+  const QuickTaskComposer({
+    super.key,
     required this.controller,
     required this.focusNode,
     required this.isSubmitting,
@@ -301,298 +447,312 @@ class _QuickTaskComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canAdd = controller.text.trim().isNotEmpty && !isSubmitting;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(13, 4, 5, 4),
-      decoration: BoxDecoration(
-        color: AppColors.subtleSurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: AppColors.canvas,
+        border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: Row(
-        children: <Widget>[
-          const Icon(
-            Icons.add_task_rounded,
-            size: AppIconSizes.standard,
-            color: AppColors.muted,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.smMd,
+          AppSpacing.md,
+          AppSpacing.smMd + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Container(
+          constraints: const BoxConstraints(
+            minHeight: AppSpacing.touchTarget + AppSpacing.sm,
           ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: TextField(
-              key: const Key('inbox-task-input'),
-              controller: controller,
-              focusNode: focusNode,
-              onChanged: onChanged,
-              onSubmitted: (_) => canAdd ? onAdd() : null,
-              readOnly: isSubmitting,
-              textCapitalization: TextCapitalization.sentences,
-              textInputAction: TextInputAction.done,
-              style: GoogleFonts.manrope(fontSize: 14, color: AppColors.ink),
-              decoration: InputDecoration(
-                hintText: 'Добавить быструю задачу',
-                hintStyle: GoogleFonts.manrope(
-                  fontSize: 14,
-                  color: AppColors.muted,
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-              ),
-            ),
+          padding: const EdgeInsets.only(
+            left: AppSpacing.smMd,
+            right: AppSpacing.xs,
           ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 150),
-            child: IconButton.filled(
-              key: const Key('inbox-add-task'),
-              tooltip: 'Добавить задачу',
-              onPressed: canAdd ? onAdd : null,
-              style: IconButton.styleFrom(
-                minimumSize: const Size.square(38),
-                backgroundColor: AppColors.accent,
-                disabledBackgroundColor: AppColors.skeleton,
-                foregroundColor: Colors.white,
-                disabledForegroundColor: AppColors.muted,
-              ),
-              icon: isSubmitting
-                  ? const SizedBox.square(
-                      dimension: 17,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(
-                      Icons.arrow_upward_rounded,
-                      size: AppIconSizes.standard,
-                    ),
-            ),
+          decoration: BoxDecoration(
+            color: AppColors.quietSurface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.border),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickTaskTile extends StatelessWidget {
-  const _QuickTaskTile({
-    super.key,
-    required this.task,
-    required this.isCompleting,
-    required this.onToggle,
-  });
-
-  final InboxTaskModel task;
-  final bool isCompleting;
-  final VoidCallback? onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      padding: const EdgeInsets.fromLTRB(13, 11, 8, 12),
-      decoration: BoxDecoration(
-        color: task.completed
-            ? Color.alphaBlend(
-                AppColors.accent.withValues(alpha: 0.05),
-                Colors.white,
-              )
-            : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: AppColors.ink.withValues(alpha: 0.05),
-            blurRadius: 9,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'ИНБОКС',
-                  style: GoogleFonts.manrope(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.45,
-                    color: AppColors.accent,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              InboxTaskMenu(task: task, busy: isCompleting),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: <Widget>[
-              Tooltip(
-                message: task.completed
-                    ? 'Вернуть в работу'
-                    : 'Завершить задачу',
-                child: InkWell(
-                  key: Key('inbox-task-checkbox-${task.id}'),
-                  onTap: isCompleting ? null : onToggle,
-                  customBorder: const CircleBorder(),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    width: 18,
-                    height: 18,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: task.completed
-                          ? AppColors.accent
-                          : Colors.transparent,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: task.completed
-                            ? AppColors.accent
-                            : AppColors.muted,
-                        width: 1.6,
-                      ),
-                    ),
-                    child: isCompleting
-                        ? const SizedBox.square(
-                            dimension: 12,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.8,
-                              color: AppColors.accent,
-                            ),
-                          )
-                        : task.completed
-                        ? const Icon(
-                            Icons.check_rounded,
-                            size: 12,
-                            color: Colors.white,
-                          )
-                        : null,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  task.title,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.manrope(
-                    fontSize: 14,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                    color: task.completed ? AppColors.muted : AppColors.ink,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 13),
-          Row(
+          child: Row(
             children: <Widget>[
               const Icon(
-                Icons.folder_open_rounded,
+                Icons.add_task_rounded,
                 size: AppIconSizes.standard,
                 color: AppColors.muted,
               ),
-              const SizedBox(width: 5),
-              Text(
-                'Не распределена',
-                style: GoogleFonts.manrope(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.muted,
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: TextField(
+                  key: const Key('inbox-task-input'),
+                  controller: controller,
+                  focusNode: focusNode,
+                  onChanged: onChanged,
+                  onSubmitted: (_) => canAdd ? onAdd() : null,
+                  readOnly: isSubmitting,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.done,
+                  style: AppTypography.body(
+                    context,
+                  )?.copyWith(color: AppColors.ink),
+                  decoration: InputDecoration(
+                    hintText: 'Добавить быструю задачу',
+                    hintStyle: AppTypography.body(
+                      context,
+                    )?.copyWith(color: AppColors.muted),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                  ),
+                ),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 140),
+                child: IconButton.filled(
+                  key: const Key('inbox-add-task'),
+                  tooltip: 'Добавить задачу',
+                  onPressed: canAdd ? onAdd : null,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size.square(AppSpacing.touchTarget),
+                    backgroundColor: AppColors.accent,
+                    disabledBackgroundColor: AppColors.skeleton,
+                    foregroundColor: AppColors.onAccent,
+                    disabledForegroundColor: AppColors.muted,
+                  ),
+                  icon: isSubmitting
+                      ? const SizedBox.square(
+                          dimension: AppSpacing.md,
+                          child: CircularProgressIndicator(
+                            strokeWidth: AppSpacing.xxs,
+                            color: AppColors.onAccent,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.arrow_upward_rounded,
+                          size: AppIconSizes.standard,
+                        ),
                 ),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TaskCount extends StatelessWidget {
-  const _TaskCount({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 22,
-      constraints: const BoxConstraints(minWidth: 22),
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      decoration: BoxDecoration(
-        color: AppColors.badgeSurface,
-        borderRadius: BorderRadius.circular(7),
-      ),
-      child: Text(
-        '$count',
-        style: GoogleFonts.manrope(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: AppColors.muted,
         ),
       ),
     );
   }
 }
 
-class _QuickTasksEmpty extends StatelessWidget {
-  const _QuickTasksEmpty();
+class TaskCount extends StatelessWidget {
+  const TaskCount({super.key, required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(
+        minWidth: AppSpacing.xl,
+        minHeight: AppSpacing.xl,
+      ),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Text(
+        '$count',
+        style: AppTypography.body(
+          context,
+        )?.copyWith(fontWeight: FontWeight.w700, color: AppColors.accent),
+      ),
+    );
+  }
+}
+
+class InboxLoading extends StatelessWidget {
+  const InboxLoading({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      slivers: <Widget>[
+        const SliverToBoxAdapter(child: InboxHeader(taskCount: 0)),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          sliver: SliverList.separated(
+            itemCount: 3,
+            separatorBuilder: (context, index) =>
+                const Divider(height: AppSpacing.xxs, color: AppColors.border),
+            itemBuilder: (context, index) => const InboxTaskSkeleton(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class InboxTaskSkeleton extends StatelessWidget {
+  const InboxTaskSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: Row(
+        children: <Widget>[
+          const CircleAvatar(
+            radius: AppSpacing.smMd,
+            backgroundColor: AppColors.skeleton,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                FractionallySizedBox(
+                  widthFactor: 0.72,
+                  child: Container(
+                    height: AppSpacing.md,
+                    decoration: BoxDecoration(
+                      color: AppColors.skeleton,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                FractionallySizedBox(
+                  widthFactor: 0.48,
+                  child: Container(
+                    height: AppSpacing.smMd,
+                    decoration: BoxDecoration(
+                      color: AppColors.skeletonTrack,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class InboxFailure extends StatelessWidget {
+  const InboxFailure({super.key, required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: AppSpacing.touchTarget,
+              color: AppColors.muted,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTypography.body(
+                context,
+              )?.copyWith(color: AppColors.muted, height: 1.45),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton(
+              key: const Key('inbox-retry'),
+              onPressed: onRetry,
+              child: const Text('Повторить'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class RefreshableInboxEmpty extends StatelessWidget {
+  const RefreshableInboxEmpty({super.key, required this.onRefresh});
+
+  final RefreshCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => RefreshIndicator(
+        color: AppColors.accent,
+        onRefresh: onRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          children: <Widget>[
+            const InboxHeader(taskCount: 0),
+            SizedBox(
+              height: (constraints.maxHeight - 120).clamp(0, double.infinity),
+              child: const InboxEmpty(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class InboxEmpty extends StatelessWidget {
+  const InboxEmpty({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(36, 24, 36, 76),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          AppSpacing.lg,
+          AppSpacing.xl,
+          AppSpacing.xl,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Container(
-              width: 58,
-              height: 58,
+              width: AppSpacing.touchTarget,
+              height: AppSpacing.touchTarget,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.075),
-                borderRadius: BorderRadius.circular(16),
+                color: AppColors.accent.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: const Icon(
-                Icons.playlist_add_rounded,
-                size: AppIconSizes.standard,
+                Icons.inbox_outlined,
+                size: AppSpacing.lg,
                 color: AppColors.accent,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.md),
             Text(
-              'Запишите первую задачу',
+              'Инбокс разобран',
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.ink,
-                letterSpacing: -0.25,
-              ),
+              style: AppTypography.title(
+                context,
+              )?.copyWith(color: AppColors.ink),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: AppSpacing.sm),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 285),
+              constraints: const BoxConstraints(maxWidth: 300),
               child: Text(
-                'Инбокс хранит быстрые задачи, пока вы не распределите их по проектам.',
+                'Быстро добавляйте сюда новые задачи, а позже распределяйте их по проектам.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.manrope(
-                  fontSize: 13,
-                  height: 1.45,
-                  color: AppColors.muted,
-                ),
+                style: AppTypography.body(
+                  context,
+                )?.copyWith(color: AppColors.muted, height: 1.45),
               ),
             ),
           ],

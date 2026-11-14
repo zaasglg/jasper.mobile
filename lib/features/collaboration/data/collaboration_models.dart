@@ -41,11 +41,21 @@ class SpaceMember extends Equatable {
     required this.name,
     this.email = '',
     this.role = 'EXECUTOR',
+    this.avatarUrl,
+    this.about = '',
+    this.access = '',
+    this.isWorkspaceOwner = false,
+    this.details = const {},
   });
   final String userId;
   final String name;
   final String email;
   final String role;
+  final String? avatarUrl;
+  final String about;
+  final String access;
+  final bool isWorkspaceOwner;
+  final Map<String, dynamic> details;
   factory SpaceMember.fromJson(Map<String, dynamic> json) {
     final user = json['user'] is Map
         ? Map<String, dynamic>.from(json['user'] as Map)
@@ -55,27 +65,61 @@ class SpaceMember extends Equatable {
       name: (user['name'] ?? user['email'] ?? '').toString(),
       email: (user['email'] ?? '').toString(),
       role: (json['role'] ?? 'EXECUTOR').toString(),
+      avatarUrl: user['avatarUrl'] as String?,
+      about: (user['about'] ?? '').toString(),
+      access: (json['access'] ?? '').toString(),
+      isWorkspaceOwner: json['isWorkspaceOwner'] == true,
+      details: {
+        for (final key in ['projects', 'projectCount', 'lastActiveAt', 'isGuest'])
+          if (json.containsKey(key) || user.containsKey(key))
+            key: json[key] ?? user[key],
+      },
     );
   }
   Map<String, dynamic> toJson() => {
+    ...details,
     'userId': userId,
     'name': name,
     'email': email,
     'role': role,
+    'avatarUrl': avatarUrl,
+    'about': about,
+    'access': access,
+    'isWorkspaceOwner': isWorkspaceOwner,
   };
   SpaceMember copyWith({
     String? userId,
     String? name,
     String? email,
     String? role,
+    String? avatarUrl,
+    String? about,
+    String? access,
+    bool? isWorkspaceOwner,
+    Map<String, dynamic>? details,
   }) => SpaceMember(
     userId: userId ?? this.userId,
     name: name ?? this.name,
     email: email ?? this.email,
     role: role ?? this.role,
+    avatarUrl: avatarUrl ?? this.avatarUrl,
+    about: about ?? this.about,
+    access: access ?? this.access,
+    isWorkspaceOwner: isWorkspaceOwner ?? this.isWorkspaceOwner,
+    details: details ?? this.details,
   );
   @override
-  List<Object?> get props => [userId, name, email, role];
+  List<Object?> get props => [
+    userId,
+    name,
+    email,
+    role,
+    avatarUrl,
+    about,
+    access,
+    isWorkspaceOwner,
+    details,
+  ];
 }
 
 const memberRoles = {

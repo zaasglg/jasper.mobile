@@ -1,4 +1,8 @@
+import '../../../../core/network/api_constants.dart';
+import '../../../../core/widgets/cached_svg_image.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
+import '../../../../core/theme/app_theme.dart';
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -20,10 +24,9 @@ class AppDrawer extends StatelessWidget {
 
   final VoidCallback onOpenSettings;
 
-  static const Color _bg = Color(0xFFF7F8FA);
   static const Color _text = Color(0xFF2F333A);
   static const Color _muted = Color(0xFF737A86);
-  static const Color _border = Color(0xFFDDE1E7);
+  static const Color _border = AppColors.border;
   static const Color _purple = Color(0xFF6D5FE0);
   static const double width = 280;
 
@@ -31,16 +34,14 @@ class AppDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Drawer(
       width: width,
-      backgroundColor: _bg,
+      backgroundColor: Theme.of(context).brightness == Brightness.light
+          ? AppColors.canvas
+          : Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(),
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(21, 20, 21, 16),
-              child: _SectionLabel('ВОРКСПЕЙСЫ'),
-            ),
             Expanded(
               child: SingleChildScrollView(
                 key: const Key('drawer-scroll-view'),
@@ -75,17 +76,56 @@ class _DrawerWorkspaces extends StatefulWidget {
 
 class _DrawerWorkspacesState extends State<_DrawerWorkspaces> {
   bool _showCreateForm = false;
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<WorkspaceCubit, WorkspaceState>(
-      builder: (context, state) => _WorkspaceList(
-        state: state,
-        showCreateForm: _showCreateForm,
-        onAdd: () => setState(() => _showCreateForm = true),
-        onCancel: () => setState(() => _showCreateForm = false),
-        onCreated: () => setState(() => _showCreateForm = false),
-      ),
+      builder: (context, state) {
+        final selected = state is WorkspaceLoaded ? state.selected : null;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              expanded: _expanded,
+              child: ListTile(
+                key: const Key('drawer-workspace-switcher'),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                ),
+                minVerticalPadding: AppSpacing.md,
+                leading: _WorkspaceBadge(
+                  workspace: selected,
+                  size: AppSpacing.xl,
+                ),
+                title: Text(
+                  selected?.name ?? 'Рабочие пространства',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.title(context),
+                ),
+                trailing: Icon(
+                  _expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+                  size: AppIconSizes.standard,
+                  color: AppColors.muted,
+                ),
+                onTap: () => setState(() => _expanded = !_expanded),
+              ),
+            ),
+            const Divider(height: 1),
+            if (_expanded || state is! WorkspaceLoaded)
+              _WorkspaceList(
+                state: state,
+                showCreateForm: _showCreateForm,
+                onAdd: () => setState(() => _showCreateForm = true),
+                onCancel: () => setState(() => _showCreateForm = false),
+                onCreated: () => setState(() => _showCreateForm = false),
+                onSelected: () => setState(() => _expanded = false),
+              ),
+            const _ArchivedWorkspacesRow(),
+          ],
+        );
+      },
     );
   }
 }
@@ -97,6 +137,7 @@ class _WorkspaceList extends StatelessWidget {
     required this.onAdd,
     required this.onCancel,
     required this.onCreated,
+    required this.onSelected,
   });
 
   final WorkspaceState state;
@@ -104,6 +145,7 @@ class _WorkspaceList extends StatelessWidget {
   final VoidCallback onAdd;
   final VoidCallback onCancel;
   final VoidCallback onCreated;
+  final VoidCallback onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +186,9 @@ class _WorkspaceList extends StatelessWidget {
     }
     final loaded = state as WorkspaceLoaded;
     return Material(
-      color: AppDrawer._bg,
+      color: Theme.of(context).brightness == Brightness.light
+          ? AppColors.canvas
+          : Theme.of(context).colorScheme.surface,
       child: Padding(
         key: const Key('drawer-workspaces-content'),
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
@@ -202,7 +246,10 @@ class _WorkspaceList extends StatelessWidget {
                   key: ValueKey('drawer-workspace-${workspace.id}'),
                   icon: LucideIcons.layers,
                   iconColor: AppDrawer._muted,
-                  leading: _WorkspaceBadge(workspace: workspace, size: 28),
+                  leading: _WorkspaceBadge(
+                    workspace: workspace,
+                    size: AppSpacing.lg + AppSpacing.sm,
+                  ),
                   label: workspace.name.isEmpty
                       ? 'Без названия'
                       : workspace.name,
@@ -221,8 +268,17 @@ class _WorkspaceList extends StatelessWidget {
               )
             else
               _AddWorkspaceRow(onTap: onAdd),
+            if (loaded.selected != null)
+              _SidebarItem(
+                icon: LucideIcons.settings,
+                iconColor: AppDrawer._muted,
+                label: 'Участники и доступы',
+                onTap: () {
+                  Scaffold.of(context).closeDrawer();
+                  context.push('/manage/workspaces/${loaded.selected!.id}');
+                },
+              ),
             const Divider(height: 1, color: AppDrawer._border),
-            const _ArchivedWorkspacesRow(),
           ],
         ),
       ),
@@ -237,20 +293,22 @@ class _WorkspaceList extends StatelessWidget {
     final previous = cubit.state;
     final changed =
         previous is WorkspaceLoaded && previous.selected?.id != workspace.id;
-    await cubit.select(workspace);
+    final selection = cubit.select(workspace);
     if (!context.mounted) return;
     final current = cubit.state;
     if (current is! WorkspaceLoaded || current.selected?.id != workspace.id) {
       return;
     }
     final router = GoRouter.of(context);
-    Scaffold.of(context).closeDrawer();
+    onSelected();
+    Scaffold.maybeOf(context)?.closeDrawer();
     if (changed &&
         router.routeInformationProvider.value.uri.path.startsWith(
           '/projects/',
         )) {
       router.go('/projects');
     }
+    await selection;
   }
 }
 
@@ -276,7 +334,7 @@ class _AddWorkspaceRow extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Добавить workspace',
+                'Создать Workspace',
                 style: GoogleFonts.manrope(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
@@ -308,18 +366,15 @@ class _CreateWorkspacePanel extends StatefulWidget {
 
 class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
   static const List<Color> _palette = <Color>[
-    Color(0xFF6D5FE0),
-    Color(0xFFE45D70),
-    Color(0xFF3CAF78),
-    Color(0xFFE3A25B),
-    Color(0xFF3DABC3),
-    Color(0xFFB65BD8),
-    Color(0xFFC79732),
-    Color(0xFF5EAAD2),
+    Color(0xFFE91646),
+    Color(0xFFEAB500),
+    Color(0xFF16A34A),
+    Color(0xFF2563EB),
+    AppColors.accent,
   ];
 
   final TextEditingController _nameController = TextEditingController();
-  int _selectedColorIndex = 0;
+  int _selectedColorIndex = 4;
 
   @override
   void dispose() {
@@ -351,7 +406,7 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
                 color: AppDrawer._text,
               ),
               decoration: InputDecoration(
-                hintText: 'Название...',
+                hintText: 'Название пространства',
                 hintStyle: GoogleFonts.manrope(
                   fontSize: 14,
                   color: const Color(0xFF9298A3),
@@ -360,15 +415,14 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
                 filled: true,
                 fillColor: const Color(0xFFFCFCFB),
                 border: _fieldBorder(Colors.transparent),
-                enabledBorder: _fieldBorder(Colors.transparent),
+                enabledBorder: _fieldBorder(AppDrawer._border),
                 focusedBorder: _fieldBorder(const Color(0xFF6D5FE0)),
                 disabledBorder: _fieldBorder(Colors.transparent),
               ),
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
             children: List<Widget>.generate(_palette.length, (index) {
               final selected = index == _selectedColorIndex;
               return Semantics(
@@ -383,21 +437,33 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
                           setState(() => _selectedColorIndex = index);
                           context.read<WorkspaceCubit>().clearCreationError();
                         },
-                  borderRadius: BorderRadius.circular(5),
-                  child: Container(
-                    width: 27,
-                    height: 27,
-                    padding: EdgeInsets.all(selected ? 3 : 0),
-                    decoration: BoxDecoration(
-                      color: selected ? const Color(0xFF262A35) : null,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: isCreating
-                            ? _palette[index].withValues(alpha: 0.55)
-                            : _palette[index],
-                        borderRadius: BorderRadius.circular(selected ? 2 : 5),
+                  customBorder: const CircleBorder(),
+                  child: SizedBox.square(
+                    dimension: AppSpacing.touchTarget,
+                    child: Center(
+                      child: Container(
+                        width: AppSpacing.lg + AppSpacing.sm,
+                        height: AppSpacing.lg + AppSpacing.sm,
+                        padding: EdgeInsets.all(selected ? 3 : 0),
+                        decoration: BoxDecoration(
+                          color: selected ? const Color(0xFF262A35) : null,
+                          shape: BoxShape.circle,
+                        ),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: isCreating
+                                ? _palette[index].withValues(alpha: 0.55)
+                                : _palette[index],
+                            shape: BoxShape.circle,
+                          ),
+                          child: selected
+                              ? const Icon(
+                                  LucideIcons.check,
+                                  color: Colors.white,
+                                  size: AppIconSizes.standard,
+                                )
+                              : null,
+                        ),
                       ),
                     ),
                   ),
@@ -498,13 +564,13 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
     );
     if (!mounted || !created) return;
     _nameController.clear();
-    setState(() => _selectedColorIndex = 0);
+    setState(() => _selectedColorIndex = 4);
     widget.onCreated();
   }
 
   void _cancel() {
     _nameController.clear();
-    setState(() => _selectedColorIndex = 0);
+    setState(() => _selectedColorIndex = 4);
     context.read<WorkspaceCubit>().clearCreationError();
     widget.onCancel();
   }
@@ -621,14 +687,36 @@ class _ArchivedWorkspacesRowState extends State<_ArchivedWorkspacesRow> {
       );
 }
 
-class _WorkspaceBadge extends StatelessWidget {
+class _WorkspaceBadge extends StatefulWidget {
   const _WorkspaceBadge({required this.workspace, required this.size});
 
   final WorkspaceModel? workspace;
   final double size;
 
   @override
-  Widget build(BuildContext context) {
+  State<_WorkspaceBadge> createState() => _WorkspaceBadgeState();
+}
+
+class _WorkspaceBadgeState extends State<_WorkspaceBadge> {
+  WorkspaceModel? get workspace => widget.workspace;
+  double get size => widget.size;
+  Widget? _image;
+
+  @override
+  void didUpdateWidget(_WorkspaceBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.workspace?.logoUrl != workspace?.logoUrl ||
+        oldWidget.workspace?.name != workspace?.name ||
+        oldWidget.workspace?.color != workspace?.color ||
+        oldWidget.size != size) {
+      _image = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _image ??= _createImage();
+
+  Widget _createImage() {
     final logoUrl = workspace?.logoUrl;
     if (logoUrl != null && logoUrl.isNotEmpty) {
       final embeddedImage = _embeddedImage(logoUrl);
@@ -639,7 +727,7 @@ class _WorkspaceBadge extends StatelessWidget {
         );
       }
 
-      final sameOrigin = Uri.tryParse(logoUrl)?.host == 'jospar.me';
+      final sameOrigin = ApiConstants.isSameOrigin(logoUrl);
       final token = sameOrigin && sl.isRegistered<AuthTokenStorage>()
           ? sl<AuthTokenStorage>().cachedToken
           : null;
@@ -650,21 +738,22 @@ class _WorkspaceBadge extends StatelessWidget {
       return ClipRRect(
         borderRadius: BorderRadius.circular(size * 0.24),
         child: _isSvg(logoUrl)
-            ? SvgPicture.network(
-                logoUrl,
+            ? CachedSvgImage(
+                url: logoUrl,
                 headers: headers,
                 width: size,
                 height: size,
-                fit: BoxFit.cover,
-                placeholderBuilder: (_) => _initialBadge(),
-                errorBuilder: (context, _, _) => _initialBadge(),
+                fit: BoxFit.contain,
+                fallback: _initialBadge(),
               )
             : CachedNetworkImage(
                 imageUrl: logoUrl,
                 httpHeaders: headers,
+                fadeInDuration: Duration.zero,
+                fadeOutDuration: Duration.zero,
                 width: size,
                 height: size,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
                 placeholder: (context, _) => _initialBadge(),
                 errorWidget: (context, _, _) => _initialBadge(),
               ),
@@ -689,7 +778,7 @@ class _WorkspaceBadge extends StatelessWidget {
           source,
           width: size,
           height: size,
-          fit: BoxFit.cover,
+          fit: BoxFit.contain,
         );
       }
 
@@ -700,7 +789,7 @@ class _WorkspaceBadge extends StatelessWidget {
         bytes,
         width: size,
         height: size,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         gaplessPlayback: true,
         errorBuilder: (context, _, _) => _initialBadge(),
       );
@@ -749,25 +838,6 @@ class _WorkspaceBadge extends StatelessWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: GoogleFonts.manrope(
-        fontSize: 11.5,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.6,
-        color: AppDrawer._muted,
-      ),
-    );
-  }
-}
-
 class _SidebarItem extends StatelessWidget {
   const _SidebarItem({
     super.key,
@@ -797,7 +867,7 @@ class _SidebarItem extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 1),
         decoration: BoxDecoration(
           color: isActive
-              ? AppDrawer._purple.withValues(alpha: 0.12)
+              ? AppDrawer._purple.withValues(alpha: 0.04)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(9),
         ),
@@ -822,8 +892,10 @@ class _SidebarItem extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.manrope(
                       fontSize: 14,
-                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                      color: isActive ? AppDrawer._purple : AppDrawer._text,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                      color: isActive
+                          ? AppDrawer._purple
+                          : Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),

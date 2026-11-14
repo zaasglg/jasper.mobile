@@ -9,6 +9,21 @@ import 'package:jospar/features/collaboration/presentation/collaboration_cubit.d
 import 'package:jospar/features/collaboration/presentation/archive_screen.dart';
 
 void main() {
+  test('failed refresh after saving does not report full success', () async {
+    final adapter = _Adapter();
+    final repo = CollaborationRepositoryImpl(Dio()..httpClientAdapter = adapter);
+    final cubit = CollaborationCubit(repo, SpaceKind.workspace, 'w');
+    addTearDown(cubit.close);
+    await cubit.load();
+    final result = await cubit.run(() async {
+      await repo.updateSpace(SpaceKind.workspace, 'w', {'name': 'Новое'});
+      adapter.forbidden = true;
+    });
+    expect(result, false);
+    expect(cubit.state.saving, false);
+    expect(cubit.state.space, isNotNull);
+    expect(cubit.state.error, contains('Недостаточно прав'));
+  });
   test(
     'project invitations use email while workspace membership uses user id',
     () async {

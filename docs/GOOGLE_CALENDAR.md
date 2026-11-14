@@ -31,8 +31,21 @@ External events show read-only details; completion and drag rescheduling are
 disabled. Google loading failures do not prevent using Jospar's own planner.
 Source switches can hide Google events or holiday calendars in this screen.
 
-Jospar create/update/remove operations keep using the existing project-planner
-API. The existing backend GooglePlannerSyncService exports eligible scheduled
+The daily planner belongs to the signed-in account. Mobile loads all pages of
+`GET project-planner/account` (`skip`/`take`, 250 per page), creates personal
+entries with `POST project-planner/account/tasks`, and adds Inbox tasks through
+`POST project-planner/account/inbox-tasks`. No selected workspace is required.
+Updates and removal continue through `project-planner/items/:id`. Linking an
+existing project task still uses `POST project-planner/:projectId/tasks`, as
+required by the backend; it appears in the account-wide list. Due dates and the
+existing-task picker load the account's assigned tasks across workspaces.
+
+Backend contract checked against `zaasglg/orbita-back` commit
+`c08a34bbdd00eb9f63792eb460db5c27ac1e3207` (controller, service, account tests).
+This checks source compatibility; authenticated production behavior still needs
+verification on a device.
+
+ The existing backend GooglePlannerSyncService exports eligible scheduled
 entries to the user's primary Google calendar approximately every minute. It
 updates/deletes only its own exported events; imported Google events are not
 written by the app. The backend excludes exported entries from imports to avoid

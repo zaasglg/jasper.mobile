@@ -47,6 +47,7 @@ void main() {
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       await tester.tap(find.text('Создать'));
       await tester.pumpAndSettle();
+      expect(find.text('Приоритет'), findsNothing);
       final submit = find.byKey(const Key('create-task-submit'));
       expect(tester.widget<AppFormButton>(submit).onPressed, null);
       await tester.enterText(
@@ -99,6 +100,7 @@ void main() {
       expect(repository.requests.last.assigneeIds, ['v']);
       expect(repository.requests.last.projectId, 'p');
       expect(repository.requests.last.workspaceId, 'w');
+      expect(repository.requests.last.priority, 'MED');
       expect(tester.takeException(), isNull);
     },
   );

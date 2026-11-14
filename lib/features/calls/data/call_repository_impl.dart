@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../domain/call_repository.dart';
 import 'call_models.dart';
 
@@ -25,6 +26,12 @@ class CallRepositoryImpl implements CallRepository {
         )).data,
       );
     } on DioException catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          'Call request failed: method=$method, path=video/$path, '
+          'status=${e.response?.statusCode}, response=${e.response?.data}',
+        );
+      }
       throw CallException(switch (e.response?.statusCode) {
         403 => 'Нет доступа к этому звонку.',
         404 => 'Звонок уже завершён или недоступен.',

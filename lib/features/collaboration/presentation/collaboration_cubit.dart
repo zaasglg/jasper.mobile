@@ -63,7 +63,7 @@ class CollaborationCubit extends Cubit<CollaborationState> {
       if (isClosed) return true;
       if (reload) await load();
       if (!isClosed) emit(state.copyWith(saving: false, error: state.error));
-      return true;
+      return state.error == null;
     } catch (e) {
       if (!isClosed) emit(state.copyWith(saving: false, error: _message(e)));
       return false;

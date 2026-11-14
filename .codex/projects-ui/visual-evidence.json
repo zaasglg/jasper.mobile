@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "Project search and view toggle refinement: outlined neutral search, joined segmented buttons, theme-aware states and responsive wrapping",
+  "platform": "ios",
+  "comparison": "existing-system",
+  "sources": [
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/projects/presentation/screens/projects_screen.dart",
+      "sha256": "7a608693da16e337ba5a7fafecd3a55e57ba82d1d6086388328e40d0707df7f3"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/core/theme/app_ui_tokens.dart",
+      "sha256": "d3303995e363aee133827696db8353867694c693526ee1d0cfb5a1c75d235ee2"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/core/theme/app_theme.dart",
+      "sha256": "d8811f3aebf563c42e530d506c1cf6250a92e5e85854c7784c6a81f5a3f9e308"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/kanban/presentation/widgets/board_style.dart",
+      "sha256": "af307e6432bea383506a0fb49c2b1b1c066da3f0508bf4f9176de452aaf08b97"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/dashboard/presentation/widgets/dashboard_app_bar.dart",
+      "sha256": "dd6c4dae78277cab81491722a1802e69d2b93ffcea5f1a9817cd53095196f45d"
+    }
+  ],
+  "checks": [
+    {
+      "id": "mobile-widget-render",
+      "status": "pass",
+      "state": "Two projects, grid, 0 and 100 percent completion",
+      "environment": {
+        "kind": "Flutter widget test renderer",
+        "width": 360,
+        "height": 800
+      },
+      "observed": "Inspected 360x800 Flutter widget capture against supplied baseline and explicit change list. Search and toggle align at 48dp height with 8dp radius. Joined toggle has selected tint and divider; no oversized floating pill. Search, clear, empty-result reset, list/grid, 2x text and 1024px width passed existing widget test. Font fallback warnings remain in capture harness.",
+      "artifacts": [
+        {
+          "path": "toolbar-mobile.png",
+          "kind": "image",
+          "sha256": "393a532ac06df8bcaecd36eb547f69f8198c0c44904cc157a59fc787bbb7db10"
+        }
+      ]
+    },
+    {
+      "id": "native-device",
+      "status": "blocked",
+      "observed": "No simulator/device capture performed. Widget rendering does not verify native gestures or the full authenticated shell."
+    }
+  ],
+  "unresolved": [
+    "Native device visual verification unavailable in this pass; screenshot font loading reported fallback warnings."
+  ]
+}

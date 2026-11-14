@@ -38,6 +38,7 @@ class ChatCubit extends Cubit<ChatState> {
   Timer? _timer;
   bool _active = false, _loading = false, _pending = false;
   int _revision = 0;
+  int _loadGeneration = 0;
   void _changed() {
     if (_active) unawaited(load(silent: true));
   }
@@ -54,6 +55,8 @@ class ChatCubit extends Cubit<ChatState> {
 
   void invalidate() {
     _revision++;
+    _loadGeneration++;
+    _loading = false;
     _pending = false;
     if (!isClosed) emit(const ChatLoading());
   }
@@ -76,6 +79,7 @@ class ChatCubit extends Cubit<ChatState> {
       return;
     }
     _loading = true;
+    final generation = ++_loadGeneration;
     final revision = _revision;
     final hadData = state is ChatLoaded;
     if (!silent || !hadData) emit(const ChatLoading());
@@ -93,10 +97,12 @@ class ChatCubit extends Cubit<ChatState> {
         );
       }
     } finally {
-      _loading = false;
-      if (_pending && !isClosed) {
-        _pending = false;
-        if (_active) unawaited(load(silent: true));
+      if (generation == _loadGeneration) {
+        _loading = false;
+        if (_pending && !isClosed) {
+          _pending = false;
+          if (_active) unawaited(load(silent: true));
+        }
       }
     }
   }

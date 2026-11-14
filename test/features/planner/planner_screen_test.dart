@@ -1,3 +1,4 @@
+import 'planner_test_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/planner/presentation/screens/planner_screen.dart';
@@ -11,12 +12,14 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const MaterialApp(home: PlannerScreen()));
+    await tester.pumpWidget(
+      PlannerTestApp(child: const MaterialApp(home: PlannerScreen())),
+    );
 
     expect(find.text('Ежедневник'), findsOneWidget);
     expect(find.text('Сегодня'), findsOneWidget);
     expect(find.text('Нет задач со сроком'), findsOneWidget);
-    expect(find.text('GMT+5'), findsOneWidget);
+    expect(find.text('GMT+5'), findsNothing);
     expect(find.text('09'), findsOneWidget);
 
     final selectedDate = find.byKey(const Key('planner-selected-date'));

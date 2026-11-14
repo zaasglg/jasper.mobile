@@ -111,6 +111,7 @@ class KanbanRepositoryImpl implements KanbanRepository {
     required String title,
     required String status,
     required String priority,
+    List<String> epicIds = const [],
   }) async {
     try {
       final response = await _dio.post<dynamic>(
@@ -122,12 +123,23 @@ class KanbanRepositoryImpl implements KanbanRepository {
           'priority': priority,
           'progress': 0,
           'assigneeIds': const <String>[],
-          'epicIds': const <String>[],
+          'epicIds': epicIds,
           'deps': const <String>[],
           'est': 0,
         },
       );
-      return ProjectTaskModel.fromJson(_object(response.data));
+      final data = _object(response.data);
+      if (data['id'] == null || data['id'].toString().isEmpty) {
+        throw const KanbanException('Сервер не вернул созданную задачу.');
+      }
+      // Creation responses can omit expanded epic relations.
+      data.putIfAbsent(
+        'epics',
+        () => [
+          for (final id in epicIds) {'id': id},
+        ],
+      );
+      return ProjectTaskModel.fromJson(data);
     } on DioException catch (error) {
       throw _exception(error, 'создать задачу');
     } on KanbanException {
@@ -383,11 +395,16 @@ class KanbanRepositoryImpl implements KanbanRepository {
     required String columnId,
     required String name,
     int? wip,
+    String? color,
   }) async {
     try {
       final response = await _dio.patch<dynamic>(
         'kanban-columns/$columnId',
-        data: <String, dynamic>{'name': name.trim(), 'wip': wip},
+        data: <String, dynamic>{
+          'name': name.trim(),
+          'wip': wip,
+          'color': ?color,
+        },
       );
       return KanbanColumnModel.fromJson(_object(response.data));
     } on DioException catch (error) {

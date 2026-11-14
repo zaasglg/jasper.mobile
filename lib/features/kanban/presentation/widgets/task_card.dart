@@ -1,4 +1,7 @@
+import 'board_style.dart';
+import '../../../../core/theme/task_label_color.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../../core/widgets/app_action_menu.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -15,20 +18,7 @@ import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/domain/utils/my_tasks_utils.dart';
 import '../../../planner/presentation/screens/planner_screen.dart';
 
-Color _parseTagColor(String? value) {
-  final source = value?.trim();
-  if (source == null || source.isEmpty) return AppColors.accent;
-
-  var hex = source.startsWith('#') ? source.substring(1) : source;
-  if (hex.length == 3) {
-    hex = hex.split('').map((character) => '$character$character').join();
-  }
-  if (hex.length == 6) hex = 'FF$hex';
-  if (hex.length != 8) return AppColors.accent;
-
-  final parsed = int.tryParse(hex, radix: 16);
-  return parsed == null ? AppColors.accent : Color(parsed);
-}
+Color _parseTagColor(String? value) => taskLabelColor(value ?? '');
 
 enum TaskCardAction {
   cover('Обложка', LucideIcons.image),
@@ -57,8 +47,10 @@ class TaskCard extends StatelessWidget {
     this.cardView = const CardViewSettings(),
     this.isUpdating = false,
     this.currentUserId,
+    this.boardStyle = false,
   });
 
+  final bool boardStyle;
   final String? currentUserId;
   final ProjectTaskModel task;
   final VoidCallback? onToggleCompleted;
@@ -200,135 +192,109 @@ class TaskCard extends StatelessWidget {
       onTap: () => context.push('/tasks/${task.id}', extra: task),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: Theme.of(context).brightness == Brightness.dark
               ? colors.surfaceContainerHigh
               : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: AppColors.ink.withValues(alpha: 0.045),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: boardStyle
+              ? null
+              : Border.all(color: colors.outlineVariant.withValues(alpha: .55)),
+          boxShadow: boardStyle
+              ? [
+                  BoxShadow(
+                    color: colors.shadow.withValues(alpha: 0.06),
+                    offset: const Offset(0, 1),
+                    blurRadius: AppSpacing.xxs,
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             if (cardView.shows(CardField.cover) && task.cover.isNotEmpty)
               TaskCover(cover: task.cover),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: !cardView.shows(CardField.id)
-                      ? const SizedBox.shrink()
-                      : Text(
-                          task.displayId.isEmpty ? task.id : task.displayId,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
-                            color: colors.onSurfaceVariant.withValues(
-                              alpha: 0.78,
+            if (boardStyle && cardView.shows(CardField.id))
+              Text(
+                task.displayId.isEmpty ? task.id : task.displayId,
+                style: AppTypography.caption(
+                  context,
+                )?.copyWith(color: colors.onSurfaceVariant),
+              ),
+            if (!boardStyle)
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: !cardView.shows(CardField.id)
+                        ? const SizedBox.shrink()
+                        : Text(
+                            task.displayId.isEmpty ? task.id : task.displayId,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                              color: colors.onSurfaceVariant.withValues(
+                                alpha: 0.78,
+                              ),
                             ),
                           ),
-                        ),
-                ),
-                IconButton(
-                  key: ValueKey('task-actions-${task.id}'),
-                  tooltip: 'Действия задачи',
-                  onPressed: isUpdating ? null : () => _showActions(context),
-                  icon: const Icon(
-                    LucideIcons.ellipsis,
-                    size: AppIconSizes.standard,
                   ),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
+                  IconButton(
+                    key: ValueKey('task-actions-${task.id}'),
+                    tooltip: 'Действия задачи',
+                    onPressed: isUpdating ? null : () => _showActions(context),
+                    icon: const Icon(
+                      LucideIcons.ellipsis,
+                      size: AppIconSizes.standard,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+            if (!boardStyle) const SizedBox(height: AppSpacing.sm),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Semantics(
-                  checked: task.isDone,
-                  label: task.isDone
-                      ? 'Вернуть задачу в работу'
-                      : 'Завершить задачу',
-                  child: IconButton(
-                    key: ValueKey('task-completion-${task.id}'),
-                    tooltip: task.isDone
-                        ? 'Вернуть в работу'
-                        : 'Завершить задачу',
-                    onPressed: isUpdating ? null : onToggleCompleted,
-                    padding: EdgeInsets.zero,
-                    alignment: Alignment.centerLeft,
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(18, 28),
-                      maximumSize: const Size(18, 28),
-                      padding: EdgeInsets.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 18,
-                      minHeight: 28,
-                    ),
-                    visualDensity: VisualDensity.compact,
-                    icon: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: task.isDone
-                            ? AppColors.accent
-                            : Colors.transparent,
-                        border: Border.all(
-                          color: task.isDone
-                              ? AppColors.accent
-                              : colors.outline,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: isUpdating
-                          ? Padding(
-                              padding: const EdgeInsets.all(3),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: task.isDone
-                                    ? Colors.white
-                                    : AppColors.accent,
-                              ),
-                            )
-                          : task.isDone
-                          ? const Icon(
-                              LucideIcons.check,
-                              size: 12,
-                              color: Colors.white,
-                            )
-                          : null,
-                    ),
-                  ),
+                _TaskCompletionControl(
+                  task: task,
+                  isUpdating: isUpdating,
+                  onPressed: onToggleCompleted,
+                  compact: true,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     task.title.isEmpty ? 'Без названия' : task.title,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.manrope(
-                      fontSize: 13,
+                      fontSize: boardStyle ? BoardStyle.cardTitleSize : 14,
                       height: 1.35,
                       fontWeight: FontWeight.w600,
                       color: colors.onSurface,
                     ),
                   ),
                 ),
+                if (boardStyle)
+                  IconButton(
+                    key: ValueKey('task-actions-${task.id}'),
+                    tooltip: 'Действия задачи',
+                    onPressed: isUpdating ? null : () => _showActions(context),
+                    icon: const Icon(
+                      LucideIcons.ellipsis,
+                      size: AppIconSizes.standard,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: AppSpacing.touchTarget,
+                      height: AppSpacing.touchTarget,
+                    ),
+                  ),
               ],
             ),
             if (visibleEpics.isNotEmpty ||
@@ -341,13 +307,17 @@ class TaskCard extends StatelessWidget {
                   for (final epic in visibleEpics)
                     _TaskTag(
                       text: epic.name,
-                      color: _parseTagColor(epic.color),
+                      color: boardStyle
+                          ? colors.onSurfaceVariant
+                          : _parseTagColor(epic.color),
                       kind: 'Эпик',
                     ),
                   for (final label in visibleLabels)
                     _TaskTag(
                       text: label.text,
-                      color: _parseTagColor(label.color),
+                      color: boardStyle
+                          ? colors.onSurfaceVariant
+                          : _parseTagColor(label.color),
                       kind: label.isPersonal ? 'Личная метка' : 'Метка',
                       outlined: label.isPersonal,
                       personal: label.isPersonal,
@@ -462,6 +432,76 @@ class TaskCard extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskCompletionControl extends StatelessWidget {
+  const _TaskCompletionControl({
+    required this.task,
+    required this.isUpdating,
+    required this.onPressed,
+    required this.compact,
+  });
+  final ProjectTaskModel task;
+  final bool isUpdating;
+  final VoidCallback? onPressed;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      checked: task.isDone,
+      label: task.isDone ? 'Вернуть задачу в работу' : 'Завершить задачу',
+      child: IconButton(
+        key: ValueKey('task-completion-${task.id}'),
+        tooltip: task.isDone ? 'Вернуть в работу' : 'Завершить задачу',
+        onPressed: isUpdating ? null : onPressed,
+        padding: EdgeInsets.zero,
+        alignment: Alignment.centerLeft,
+        style: IconButton.styleFrom(
+          minimumSize: Size(
+            compact ? 18 : AppSpacing.touchTarget,
+            AppSpacing.touchTarget,
+          ),
+          maximumSize: Size(
+            compact ? 18 : AppSpacing.touchTarget,
+            AppSpacing.touchTarget,
+          ),
+          padding: EdgeInsets.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        constraints: BoxConstraints(
+          minWidth: compact ? 18 : AppSpacing.touchTarget,
+          minHeight: AppSpacing.touchTarget,
+        ),
+        visualDensity: VisualDensity.compact,
+        icon: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: task.isDone ? AppColors.accent : Colors.transparent,
+            border: Border.all(
+              color: task.isDone ? AppColors.accent : colors.outline,
+              width: 1.5,
+            ),
+          ),
+          child: isUpdating
+              ? Padding(
+                  padding: const EdgeInsets.all(3),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: task.isDone ? Colors.white : AppColors.accent,
+                  ),
+                )
+              : task.isDone
+              ? const Icon(LucideIcons.check, size: 12, color: Colors.white)
+              : null,
         ),
       ),
     );

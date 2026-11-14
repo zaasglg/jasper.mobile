@@ -512,6 +512,20 @@ class TaskFileModel extends Equatable {
   ];
 }
 
+enum ResourceUnit {
+  hours('ч'),
+  days('дн'),
+  personHours('чел·ч'),
+  pieces('шт'),
+  kilograms('кг'),
+  liters('л'),
+  tenge('₸'),
+  custom('Своя единица');
+
+  const ResourceUnit(this.label);
+  final String label;
+}
+
 class TaskResourceModel extends Equatable {
   const TaskResourceModel({
     required this.id,
@@ -519,6 +533,8 @@ class TaskResourceModel extends Equatable {
     this.planValue = 0,
     this.factValue = 0,
     this.order = 0,
+    this.unit = ResourceUnit.pieces,
+    this.customUnit = '',
   });
 
   factory TaskResourceModel.fromJson(Map<String, dynamic> json) {
@@ -528,6 +544,11 @@ class TaskResourceModel extends Equatable {
       planValue: _parseDouble(json['planValue']),
       factValue: _parseDouble(json['factValue']),
       order: _parseInt(json['order']),
+      unit: ResourceUnit.values.firstWhere(
+        (unit) => unit.name == json['unit'],
+        orElse: () => ResourceUnit.pieces,
+      ),
+      customUnit: json['customUnit'] as String? ?? '',
     );
   }
 
@@ -537,7 +558,14 @@ class TaskResourceModel extends Equatable {
   final double factValue;
   final int order;
 
+  final ResourceUnit unit;
+  final String customUnit;
+  String get unitLabel => unit == ResourceUnit.custom ? customUnit : unit.label;
+
   double get ratio => planValue <= 0 ? 0 : factValue / planValue;
+  double get percentage => ratio * 100;
+  bool get isOverBudget => percentage > 100;
+  bool get isNearBudget => percentage >= 80 && percentage <= 100;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'id': id,
@@ -545,6 +573,8 @@ class TaskResourceModel extends Equatable {
     'planValue': planValue,
     'factValue': factValue,
     'order': order,
+    'unit': unit.name,
+    'customUnit': customUnit,
   };
 
   TaskResourceModel copyWith({
@@ -553,6 +583,8 @@ class TaskResourceModel extends Equatable {
     double? planValue,
     double? factValue,
     int? order,
+    ResourceUnit? unit,
+    String? customUnit,
   }) {
     return TaskResourceModel(
       id: id ?? this.id,
@@ -560,11 +592,21 @@ class TaskResourceModel extends Equatable {
       planValue: planValue ?? this.planValue,
       factValue: factValue ?? this.factValue,
       order: order ?? this.order,
+      unit: unit ?? this.unit,
+      customUnit: customUnit ?? this.customUnit,
     );
   }
 
   @override
-  List<Object?> get props => <Object?>[id, name, planValue, factValue, order];
+  List<Object?> get props => <Object?>[
+    id,
+    name,
+    planValue,
+    factValue,
+    order,
+    unit,
+    customUnit,
+  ];
 }
 
 class TaskHistoryEntryModel extends Equatable {

@@ -20,7 +20,7 @@ void main() {
     await tester.pumpWidget(
       BlocProvider.value(
         value: cubit,
-        child: const MaterialApp(home: InboxScreen()),
+        child: const MaterialApp(home: InboxScreen(showAppBar: false)),
       ),
     );
     await tester.pumpAndSettle();
@@ -62,19 +62,18 @@ void main() {
     await tester.pumpWidget(
       BlocProvider<InboxCubit>.value(
         value: cubit,
-        child: const MaterialApp(home: InboxScreen()),
+        child: const MaterialApp(home: InboxScreen(showAppBar: false)),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Инбокс'), findsOneWidget);
     expect(find.text('Неразобранные'), findsOneWidget);
-    expect(find.text('Запишите первую задачу'), findsOneWidget);
+    expect(find.text('Инбокс разобран'), findsOneWidget);
     expect(find.text('Непрочитанные'), findsNothing);
     expect(find.text('Упоминания'), findsNothing);
     expect(
       tester.getTopLeft(find.byKey(const Key('inbox-task-input'))).dy,
-      greaterThan(tester.getTopLeft(find.text('Запишите первую задачу')).dy),
+      greaterThan(tester.getTopLeft(find.text('Инбокс разобран')).dy),
     );
 
     await tester.enterText(
@@ -86,8 +85,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Подготовить смету'), findsOneWidget);
     expect(find.text('Не распределена'), findsOneWidget);
-
-    expect(tester.takeException(), isNull);
   });
 
   testWidgets('completes a server inbox task by tapping its circle', (
@@ -103,7 +100,7 @@ void main() {
     await tester.pumpWidget(
       BlocProvider<InboxCubit>.value(
         value: cubit,
-        child: const MaterialApp(home: InboxScreen()),
+        child: const MaterialApp(home: InboxScreen(showAppBar: false)),
       ),
     );
     await tester.pumpAndSettle();

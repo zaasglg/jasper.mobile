@@ -11,6 +11,33 @@ class AuthCubit extends Cubit<AuthState> {
 
   final AuthRepository _repository;
 
+  Future<void> loginWithApple() async {
+    if (isClosed || state is AuthLoading) return;
+    emit(const AuthLoading());
+    try {
+      final repository = _repository;
+      if (repository is! AppleLoginRepository) {
+        throw const AuthException('Вход через Apple недоступен.');
+      }
+      final token = await (repository as AppleLoginRepository).loginWithApple();
+      if (isClosed) return;
+      if (token == null) {
+        emit(const AuthInitial());
+        return;
+      }
+      authSession.markAuthenticated();
+      emit(AuthAuthenticated(token));
+    } on AuthException catch (error) {
+      if (!isClosed) emit(AuthFailure(error.message));
+    } catch (_) {
+      if (!isClosed) {
+        emit(
+          const AuthFailure('Не удалось войти через Apple. Повторите попытку.'),
+        );
+      }
+    }
+  }
+
   Future<void> loginWithGoogle() async {
     if (isClosed || state is AuthLoading) return;
     emit(const AuthLoading());

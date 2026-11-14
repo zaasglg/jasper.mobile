@@ -1,42 +1,51 @@
+import '../../../assistant/data/services/assistant_task_changes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/models/planner_item_model.dart';
 import '../../domain/repositories/planner_repository.dart';
 import 'planner_state.dart';
 
 class PlannerCubit extends Cubit<PlannerState> {
-  PlannerCubit(this._repository) : super(const PlannerState());
-  final PlannerRepository _repository;
-  int _revision = 0;
-  int _workspaceRevision = 0;
+  PlannerCubit(this._repository) : super(const PlannerState()) {
+    assistantTaskChanges.addListener(_onTasksChanged);
+  }
 
-  Future<void> configure(String workspaceId) async {
-    if (state.workspaceId == workspaceId) return;
-    _workspaceRevision++;
-    emit(PlannerState(workspaceId: workspaceId));
-    if (workspaceId.isNotEmpty) await refresh();
+  void _onTasksChanged() {
+    if (!isClosed) refresh();
+  }
+
+  @override
+  Future<void> close() {
+    assistantTaskChanges.removeListener(_onTasksChanged);
+    return super.close();
+  }
+
+  final PlannerRepository _repository;
+  bool _refreshPending = false;
+  int _revision = 0;
+  bool _initialized = false;
+
+  Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
+    await refresh();
   }
 
   Future<void> refresh() async {
-    if (state.workspaceId.isEmpty ||
-        state.busyIds.isNotEmpty ||
-        state.isSaving) {
+    if (state.busyIds.isNotEmpty || state.isSaving) {
+      _refreshPending = true;
       return;
     }
+    _refreshPending = false;
     final revision = ++_revision;
-    final workspaceId = state.workspaceId;
     emit(state.copyWith(status: PlannerStatus.loading, clearError: true));
     try {
-      final items = await _repository.load(workspaceId);
-      if (isClosed ||
-          revision != _revision ||
-          workspaceId != state.workspaceId) {
+      final items = await _repository.load();
+      if (isClosed || revision != _revision) {
         return;
       }
       emit(state.copyWith(status: PlannerStatus.success, items: items));
     } catch (e) {
-      if (isClosed ||
-          revision != _revision ||
-          workspaceId != state.workspaceId) {
+      if (isClosed || revision != _revision) {
         return;
       }
       emit(state.copyWith(status: PlannerStatus.failure, error: _message(e)));
@@ -59,19 +68,14 @@ class PlannerCubit extends Cubit<PlannerState> {
     required int durationMinutes,
   }) async {
     if (item?.external == true) return false;
-    if (state.isSaving ||
-        state.workspaceId.isEmpty ||
-        state.busyIds.isNotEmpty) {
+    if (state.isSaving || state.busyIds.isNotEmpty) {
       return false;
     }
-    final workspaceId = state.workspaceId;
-    final generation = _workspaceRevision;
     ++_revision;
     emit(state.copyWith(isSaving: true));
     try {
       if (item == null) {
         await _repository.create(
-          workspaceId,
           title: title,
           scheduledAt: scheduledAt,
           durationMinutes: durationMinutes,
@@ -84,12 +88,12 @@ class PlannerCubit extends Cubit<PlannerState> {
           durationMinutes: durationMinutes,
         );
       }
-      if (isClosed || generation != _workspaceRevision) return false;
+      if (isClosed) return false;
       emit(state.copyWith(isSaving: false));
       await refresh();
       return true;
     } catch (e) {
-      if (isClosed || generation != _workspaceRevision) return false;
+      if (isClosed) return false;
       emit(state.copyWith(isSaving: false));
       _failure(e);
       return false;
@@ -111,7 +115,6 @@ class PlannerCubit extends Cubit<PlannerState> {
     if (item.external || state.busyIds.contains(item.id) || state.isSaving) {
       return;
     }
-    final generation = _workspaceRevision;
     ++_revision;
     emit(
       state.copyWith(
@@ -124,7 +127,7 @@ class PlannerCubit extends Cubit<PlannerState> {
     );
     try {
       await request();
-      if (isClosed || generation != _workspaceRevision) return;
+      if (isClosed) return;
       emit(
         state.copyWith(
           status: PlannerStatus.success,
@@ -132,7 +135,7 @@ class PlannerCubit extends Cubit<PlannerState> {
         ),
       );
     } catch (e) {
-      if (isClosed || generation != _workspaceRevision) return;
+      if (isClosed) return;
       final items = [...state.items];
       final index = items.indexWhere((e) => e.id == item.id);
       if (index < 0) {
@@ -147,6 +150,10 @@ class PlannerCubit extends Cubit<PlannerState> {
         ),
       );
       _failure(e);
+    } finally {
+      if (!isClosed && _refreshPending && state.busyIds.isEmpty) {
+        await refresh();
+      }
     }
   }
 
@@ -157,12 +164,9 @@ class PlannerCubit extends Cubit<PlannerState> {
     required DateTime scheduledAt,
     required int durationMinutes,
   }) async {
-    if (state.isSaving ||
-        state.workspaceId.isEmpty ||
-        state.busyIds.isNotEmpty) {
+    if (state.isSaving || state.busyIds.isNotEmpty) {
       return false;
     }
-    final generation = _workspaceRevision;
     ++_revision;
     emit(state.copyWith(isSaving: true));
     try {
@@ -181,7 +185,6 @@ class PlannerCubit extends Cubit<PlannerState> {
         );
       } else {
         await _repository.addTask(
-          state.workspaceId,
           projectId: projectId,
           taskId: taskId,
           inboxTaskId: inboxTaskId,
@@ -189,12 +192,12 @@ class PlannerCubit extends Cubit<PlannerState> {
           durationMinutes: durationMinutes,
         );
       }
-      if (isClosed || generation != _workspaceRevision) return false;
+      if (isClosed) return false;
       emit(state.copyWith(isSaving: false));
       await refresh();
       return true;
     } catch (e) {
-      if (isClosed || generation != _workspaceRevision) return false;
+      if (isClosed) return false;
       emit(state.copyWith(isSaving: false));
       _failure(e);
       return false;

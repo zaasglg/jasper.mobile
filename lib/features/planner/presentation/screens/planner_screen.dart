@@ -1,3 +1,6 @@
+import '../../../profile/domain/repositories/profile_repository.dart';
+import '../../../tasks/domain/repositories/my_tasks_repository.dart';
+import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../domain/repositories/google_calendar_repository.dart';
 import '../cubit/google_calendar_cubit.dart';
@@ -12,14 +15,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../shell/presentation/screens/main_shell.dart';
-import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
-import '../../../workspaces/presentation/cubit/workspace_state.dart';
-import '../../../projects/presentation/cubit/projects_cubit.dart';
-import '../../../projects/presentation/cubit/projects_state.dart';
-import '../../../projects/data/models/project_model.dart';
 import '../../../projects/data/models/project_task_model.dart';
-import '../../../projects/domain/repositories/project_task_repository.dart';
 import '../../../inbox/domain/repositories/inbox_repository.dart';
 import '../../../inbox/data/models/inbox_task_model.dart';
 import '../../data/models/planner_item_model.dart';
@@ -42,8 +38,7 @@ class _PlannerScreenState extends State<PlannerScreen>
   DateTime _selectedDate = plannerDate(plannerNow());
   _View _view = _View.day;
   List<ProjectTaskModel> _tasks = [];
-  List<ProjectModel> _projects = [];
-  String _taskScope = '';
+  bool _tasksRequested = false;
   String? _taskError;
   int _taskRevision = 0;
   Timer? _clock;
@@ -69,12 +64,11 @@ class _PlannerScreenState extends State<PlannerScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _cubit ??= context.read<PlannerCubit?>();
-    final workspace = context.read<WorkspaceCubit?>()?.state;
-    if (workspace is WorkspaceLoaded) {
-      _cubit?.configure(workspace.selected?.id ?? '');
+    unawaited(_cubit?.initialize() ?? Future<void>.value());
+    if (!_tasksRequested) {
+      _tasksRequested = true;
+      unawaited(_loadTasks());
     }
-    final projects = context.read<ProjectsCubit?>()?.state;
-    if (projects != null) _loadTasks(projects);
   }
 
   @override
@@ -90,6 +84,7 @@ class _PlannerScreenState extends State<PlannerScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      if (mounted) setState(() {});
       unawaited(_google?.refresh() ?? Future<void>.value());
     }
   }
@@ -104,27 +99,20 @@ class _PlannerScreenState extends State<PlannerScreen>
     );
   }
 
-  List<ProjectModel> _flatten(List<ProjectModel> projects) => [
-    for (final project in projects) ...[project, ..._flatten(project.children)],
-  ];
-  Future<void> _loadTasks(ProjectsState state, {bool force = false}) async {
-    _projects = _flatten(state.projects);
-    final ids = _projects.map((e) => e.id).toList();
-    final scope = '${state.workspaceId}:${ids.join(',')}';
-    if ((!force && scope == _taskScope) ||
-        !sl.isRegistered<ProjectTaskRepository>()) {
+  Future<void> _loadTasks() async {
+    if (!sl.isRegistered<MyTasksRepository>() ||
+        !sl.isRegistered<ProfileRepository>()) {
       return;
     }
-    _taskScope = scope;
     final revision = ++_taskRevision;
     setState(() {
       _tasks = [];
       _taskError = null;
     });
-    if (ids.isEmpty) return;
     try {
-      final tasks = await sl<ProjectTaskRepository>().getTasksForProjectIds(
-        ids,
+      final profile = await sl<ProfileRepository>().getCurrentUser();
+      final tasks = await sl<MyTasksRepository>().getTasks(
+        assigneeId: profile.id,
       );
       if (mounted && revision == _taskRevision) {
         setState(() => _tasks = tasks.where((e) => !e.archived).toList());
@@ -137,11 +125,10 @@ class _PlannerScreenState extends State<PlannerScreen>
   }
 
   Future<void> _refresh() async {
-    final projects = context.read<ProjectsCubit?>()?.state;
     await Future.wait([
       if (_cubit != null) _cubit!.refresh(),
       if (_google != null) _google!.refresh(),
-      if (projects != null) _loadTasks(projects, force: true),
+      _loadTasks(),
     ]);
   }
 
@@ -197,7 +184,7 @@ class _PlannerScreenState extends State<PlannerScreen>
       return;
     }
     final cubit = _cubit;
-    if (cubit == null || cubit.state.workspaceId.isEmpty) return;
+    if (cubit == null) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -209,7 +196,6 @@ class _PlannerScreenState extends State<PlannerScreen>
           initialDate: _selectedDate,
           hour: hour ?? 9,
           tasks: _tasks,
-          projects: _projects,
         ),
       ),
     );
@@ -217,7 +203,7 @@ class _PlannerScreenState extends State<PlannerScreen>
 
   @override
   Widget build(BuildContext context) {
-    Widget screen = _cubit == null
+    final screen = _cubit == null
         ? _scaffold(const PlannerState())
         : BlocConsumer<PlannerCubit, PlannerState>(
             listenWhen: (a, b) => a.actionRevision != b.actionRevision,
@@ -230,29 +216,6 @@ class _PlannerScreenState extends State<PlannerScreen>
             },
             builder: (_, state) => _scaffold(state),
           );
-    if (context.read<ProjectsCubit?>() != null) {
-      screen = BlocListener<ProjectsCubit, ProjectsState>(
-        listenWhen: (a, b) =>
-            a.workspaceId != b.workspaceId || a.projects != b.projects,
-        listener: (_, state) => _loadTasks(state),
-        child: screen,
-      );
-    }
-    if (context.read<WorkspaceCubit?>() != null) {
-      screen = BlocListener<WorkspaceCubit, WorkspaceState>(
-        listener: (_, state) {
-          if (state is WorkspaceLoaded) {
-            _cubit?.configure(state.selected?.id ?? '');
-            _taskRevision++;
-            setState(() {
-              _tasks = [];
-              _taskError = null;
-            });
-          }
-        },
-        child: screen,
-      );
-    }
     return screen;
   }
 
@@ -282,19 +245,9 @@ class _PlannerScreenState extends State<PlannerScreen>
         .toList();
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        centerTitle: false,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          tooltip: 'Открыть меню',
-          onPressed: MainShell.openDrawer,
-          icon: const Icon(Icons.menu_rounded, size: AppIconSizes.standard),
-        ),
-        title: Text(
-          'Ежедневник',
-          style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.w700),
-        ),
-        actions: [
+      appBar: DashboardAppBar(
+        accountTitle: 'Ежедневник',
+        pageActions: [
           if (_google != null)
             IconButton(
               constraints: const BoxConstraints.tightFor(width: 36, height: 48),
@@ -319,7 +272,7 @@ class _PlannerScreenState extends State<PlannerScreen>
           ),
         ],
       ),
-      floatingActionButton: state.workspaceId.isEmpty
+      floatingActionButton: _cubit == null
           ? null
           : FloatingActionButton.small(
               key: const Key('planner-add'),
@@ -592,15 +545,7 @@ class _PlannerScreenState extends State<PlannerScreen>
     ),
     child: Row(
       children: [
-        const SizedBox(
-          width: 57,
-          child: Center(
-            child: Text(
-              'GMT+5',
-              style: TextStyle(fontSize: 10, color: AppColors.muted),
-            ),
-          ),
-        ),
+        const SizedBox(width: 57),
         const VerticalDivider(width: 1),
         Expanded(
           child: due.isEmpty
@@ -1204,22 +1149,12 @@ Future<void> _showScheduleTask(
   ProjectTaskModel? task,
   InboxTaskModel? inboxTask,
 }) async {
-  final workspace = context.read<WorkspaceCubit?>()?.state;
-  final workspaceId = workspace is WorkspaceLoaded
-      ? workspace.selected?.id
-      : null;
-  if (workspaceId == null || workspaceId.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Выберите рабочее пространство.')),
-    );
-    return;
-  }
   final saved = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     builder: (_) => BlocProvider(
-      create: (_) => sl<PlannerCubit>()..configure(workspaceId),
+      create: (_) => sl<PlannerCubit>()..initialize(),
       child: BlocListener<PlannerCubit, PlannerState>(
         listenWhen: (previous, current) =>
             previous.actionRevision != current.actionRevision,
@@ -1236,7 +1171,6 @@ Future<void> _showScheduleTask(
           initialDate: plannerDate(plannerNow()),
           hour: 9,
           tasks: [?task],
-          projects: const [],
         ),
       ),
     ),
@@ -1256,7 +1190,6 @@ class _PlannerEditor extends StatefulWidget {
     required this.initialDate,
     required this.hour,
     required this.tasks,
-    required this.projects,
   });
   final PlannerItemModel? item;
   final ProjectTaskModel? initialTask;
@@ -1264,7 +1197,6 @@ class _PlannerEditor extends StatefulWidget {
   final DateTime initialDate;
   final int hour;
   final List<ProjectTaskModel> tasks;
-  final List<ProjectModel> projects;
   @override
   State<_PlannerEditor> createState() => _PlannerEditorState();
 }
@@ -1497,21 +1429,13 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                       Icons.schedule,
                       size: AppIconSizes.standard,
                     ),
-                    title: Text(
-                      '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')} · GMT+5',
-                    ),
+                    title: Text(_time.format(context)),
                     onTap: saving
                         ? null
                         : () async {
                             final time = await showTimePicker(
                               context: context,
                               initialTime: _time,
-                              builder: (context, child) => MediaQuery(
-                                data: MediaQuery.of(
-                                  context,
-                                ).copyWith(alwaysUse24HourFormat: true),
-                                child: child!,
-                              ),
                             );
                             if (time != null && mounted) {
                               setState(() => _time = time);

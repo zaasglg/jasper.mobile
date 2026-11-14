@@ -19,6 +19,7 @@ abstract interface class KanbanRepository {
     required String title,
     required String status,
     required String priority,
+    List<String> epicIds = const [],
   });
 
   Future<void> updateCompletion(
@@ -45,6 +46,7 @@ abstract interface class KanbanRepository {
     required String columnId,
     required String name,
     int? wip,
+    String? color,
   });
 
   Future<void> reorderColumns(String projectId, List<String> ids);

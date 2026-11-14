@@ -78,6 +78,17 @@ class _BoardCubit extends Cubit<KanbanState> implements KanbanCubit {
           ],
         ),
       );
+  @override
+  void setSearch(String value) => emit(state.copyWith(search: value));
+
+  void replaceBoard({
+    List<KanbanColumnModel>? columns,
+    List<ProjectTaskModel>? tasks,
+    Set<String>? busy,
+  }) {
+    emit(state.copyWith(columns: columns, tasks: tasks, movingTaskIds: busy));
+  }
+
   final moves = <int>[];
   final archived = <String>[];
   @override
@@ -115,6 +126,53 @@ class _BoardCubit extends Cubit<KanbanState> implements KanbanCubit {
 }
 
 void main() {
+  testWidgets('board shows multiple fixed-width columns on desktop', (
+    tester,
+  ) async {
+    GoogleFonts.config.allowRuntimeFetching = false;
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final cubit = _BoardCubit();
+    addTearDown(cubit.close);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BlocProvider<KanbanCubit>.value(
+            value: cubit,
+            child: const KanbanBoard(
+              project: ProjectModel(
+                id: 'p',
+                code: 'P',
+                name: 'Проект',
+                workspaceId: 'w',
+                start: null,
+                end: null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Задачи'), findsOneWidget);
+    expect(find.text('Готово'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('Готово')).dx, lessThan(640));
+    await tester.tap(find.byKey(const Key('board-search-toggle')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('board-search-field')),
+      'Первая',
+    );
+    expect(cubit.state.search, 'Первая');
+    await tester.tap(find.byKey(const Key('board-search-toggle')));
+    await tester.pumpAndSettle();
+    expect(cubit.state.search, isEmpty);
+    expect(find.text('Доска'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('card view toggles update cards, persist and reset', (
     tester,
   ) async {
@@ -186,6 +244,97 @@ void main() {
     expect(find.bySemanticsLabel(RegExp('Чек-лист: 2 из 4')), findsOneWidget);
     expect((await storage.read()).hidden, isEmpty);
     semantics.dispose();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('move sheet updates columns and disables invalid destinations', (
+    tester,
+  ) async {
+    GoogleFonts.config.allowRuntimeFetching = false;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final cubit = _BoardCubit();
+    addTearDown(cubit.close);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BlocProvider<KanbanCubit>.value(
+            value: cubit,
+            child: const KanbanBoard(
+              project: ProjectModel(
+                id: 'p',
+                code: 'P',
+                name: 'Проект',
+                workspaceId: 'w',
+                start: null,
+                end: null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    // Another task's operation must not disable this task's move menu.
+    cubit.replaceBoard(busy: {'b'});
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const ValueKey('task-actions-a')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('Переместить'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const ValueKey('move-to-done')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('confirm-task-move')))
+          .onPressed,
+      isNotNull,
+    );
+    cubit.replaceBoard(
+      columns: [cubit.state.columns.first.copyWith(name: 'Новая колонка')],
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const ValueKey('move-to-done')), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('confirm-task-move')))
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('move-to-c')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Перенести в «Новая колонка»'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('confirm-task-move')))
+          .onPressed,
+      isNotNull,
+    );
+    cubit.replaceBoard(
+      tasks: cubit.state.tasks.where((task) => task.id != 'a').toList(),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Задача больше недоступна'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('confirm-task-move')))
+          .onPressed,
+      isNull,
+    );
+    expect(cubit.moves, isEmpty);
+    Navigator.of(tester.element(find.text('Переместить задачу'))).pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(tester.takeException(), isNull);
   });
 

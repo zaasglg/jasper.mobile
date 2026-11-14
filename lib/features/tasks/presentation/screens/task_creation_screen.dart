@@ -9,6 +9,7 @@ import '../../data/models/task_creation_models.dart';
 import '../../data/services/task_file_picker.dart';
 import '../../domain/repositories/task_details_repository.dart';
 import '../cubit/task_creation_cubit.dart';
+import '../widgets/task_dates_sheet.dart';
 
 class TaskCreationScreen extends StatefulWidget {
   const TaskCreationScreen({super.key});
@@ -123,35 +124,19 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     }
   }
 
-  Future<void> _deadline() async {
-    final old = cubit.state.draft.end;
-    final date = await showDatePicker(
-      context: context,
-      initialDate: old ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(DateTime.now().year + 20),
-    );
-    if (!mounted || date == null) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: old == null
-          ? const TimeOfDay(hour: 18, minute: 0)
-          : TimeOfDay.fromDateTime(old),
-    );
-    if (mounted) {
+  Future<void> _deadline() => showTaskDatesSheet(
+    context,
+    end: cubit.state.draft.end,
+    allowStart: false,
+    onSave: (_, end) async {
       cubit.change(
-        cubit.state.draft.copyWith(
-          end: DateTime(
-            date.year,
-            date.month,
-            date.day,
-            time?.hour ?? 23,
-            time?.minute ?? 59,
-          ),
-        ),
+        end == null
+            ? cubit.state.draft.copyWith(clearEnd: true)
+            : cubit.state.draft.copyWith(end: end),
       );
-    }
-  }
+      return true;
+    },
+  );
 
   void _estimate() {
     final days = int.tryParse(_days.text) ?? 0,
@@ -510,33 +495,6 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                           ),
                         ),
                         _field(
-                          'Приоритет',
-                          DropdownButtonFormField<String>(
-                            initialValue: draft.priority,
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'LOW',
-                                child: Text('Низкий'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'MED',
-                                child: Text('Средний'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'HIGH',
-                                child: Text('Высокий'),
-                              ),
-                            ],
-                            onChanged: busy
-                                ? null
-                                : (value) => cubit.change(
-                                    cubit.state.draft.copyWith(
-                                      priority: value ?? 'MED',
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        _field(
                           'Тайминг · необязательно',
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -617,7 +575,12 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                                 ? 'Выберите участников'
                                 : memberNames,
                             icon: LucideIcons.users,
-                            onTap: busy || !ready ? null : _members,
+                            onTap:
+                                busy ||
+                                    state.loadingProjects ||
+                                    draft.workspaceId.isEmpty
+                                ? null
+                                : _members,
                             trailing: const Icon(
                               LucideIcons.plus,
                               size: 16,

@@ -1,3 +1,6 @@
+import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
+import '../../../kanban/presentation/widgets/board_style.dart';
 import '../../../storage/data/storage_models.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_action_menu.dart';
@@ -33,68 +36,97 @@ class ProjectDetailsScreen extends StatelessWidget {
         return Scaffold(
           backgroundColor: Theme.of(context).brightness == Brightness.dark
               ? Theme.of(context).colorScheme.surface
-              : const Color(0xFFFBF8FF),
-          appBar: AppBar(
-            centerTitle: true,
-            backgroundColor: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).colorScheme.surface
-                : Colors.white,
-            surfaceTintColor: Colors.transparent,
-            leading: IconButton(
-              tooltip: 'Назад',
-              onPressed: context.pop,
-              icon: const Icon(
-                LucideIcons.arrowLeft,
-                size: AppIconSizes.standard,
+              : Colors.white,
+          appBar: DashboardAppBar(
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(kToolbarHeight),
+              child: AppBar(
+                primary: false,
+                centerTitle: false,
+                titleTextStyle: AppTypography.title(
+                  context,
+                )?.copyWith(fontSize: BoardStyle.columnTitleSize),
+                shape: Border(
+                  bottom: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                ),
+                backgroundColor: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.surface
+                    : Colors.white,
+                surfaceTintColor: Colors.transparent,
+                leading: IconButton(
+                  tooltip: 'Назад',
+                  onPressed: context.pop,
+                  icon: const Icon(
+                    LucideIcons.arrowLeft,
+                    size: BoardStyle.iconSize,
+                  ),
+                ),
+                actions: [
+                  if (project != null)
+                    IconButton(
+                      tooltip: 'Участники',
+                      icon: const Icon(
+                        LucideIcons.users,
+                        size: BoardStyle.iconSize,
+                      ),
+                      onPressed: () =>
+                          context.push('/projects/${project.id}/participants'),
+                    ),
+                  if (project != null)
+                    IconButton(
+                      tooltip: 'Кладовка',
+                      icon: const Icon(
+                        LucideIcons.database,
+                        size: BoardStyle.iconSize,
+                      ),
+                      onPressed: () => context.push(
+                        '/storage',
+                        extra: StorageScope(
+                          source: StorageSource.project,
+                          id: project.id,
+                          workspaceId: project.workspaceId,
+                          title: project.name,
+                        ),
+                      ),
+                    ),
+                  if (project != null)
+                    IconButton(
+                      tooltip: 'Настройки проекта',
+                      icon: const Icon(
+                        LucideIcons.settings,
+                        size: BoardStyle.iconSize,
+                      ),
+                      onPressed: () async {
+                        final cubit = context.read<ProjectsCubit>();
+                        final result = await context.push<String>(
+                          '/manage/projects/${project.id}',
+                        );
+                        await cubit.loadForWorkspace(
+                          project.workspaceId,
+                          refresh: true,
+                        );
+                        if (context.mounted && result == 'removed') {
+                          context.go('/projects');
+                        }
+                      },
+                    ),
+                ],
+                title: project == null
+                    ? const Text('Проект')
+                    : _ProjectSwitcher(
+                        project: project,
+                        projects: state.projects,
+                      ),
               ),
             ),
-            actions: [
-              if (project != null)
-                IconButton(
-                  tooltip: 'Кладовка',
-                  icon: const Icon(
-                    Icons.inventory_2_outlined,
-                    size: AppIconSizes.standard,
-                  ),
-                  onPressed: () => context.push(
-                    '/storage',
-                    extra: StorageScope(
-                      source: StorageSource.project,
-                      id: project.id,
-                      workspaceId: project.workspaceId,
-                      title: project.name,
-                    ),
-                  ),
-                ),
-              if (project != null)
-                IconButton(
-                  tooltip: 'Настройки проекта',
-                  icon: const Icon(
-                    LucideIcons.settings2,
-                    size: AppIconSizes.standard,
-                  ),
-                  onPressed: () async {
-                    final cubit = context.read<ProjectsCubit>();
-                    final result = await context.push<String>(
-                      '/manage/projects/${project.id}',
-                    );
-                    await cubit.loadForWorkspace(
-                      project.workspaceId,
-                      refresh: true,
-                    );
-                    if (context.mounted && result == 'removed') {
-                      context.go('/projects');
-                    }
-                  },
-                ),
-            ],
-            title: project == null
-                ? const Text('Проект')
-                : _ProjectSwitcher(project: project, projects: state.projects),
           ),
           body: project == null
               ? const _ProjectNotFound()
-              : _ProjectDetails(project: project),
+              : SafeArea(child: _ProjectDetails(project: project)),
         );
       },
     );
@@ -121,10 +153,7 @@ class _ProjectDetails extends StatelessWidget {
       buildWhen: (previous, current) => previous.status != current.status,
       builder: (context, state) => Stack(
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: KanbanBoard(project: project),
-          ),
+          KanbanBoard(project: project),
           if (state.status == KanbanStatus.loading)
             const Positioned(
               top: 0,

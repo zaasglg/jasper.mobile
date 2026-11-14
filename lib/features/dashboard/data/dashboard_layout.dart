@@ -207,7 +207,8 @@ class DashboardLayout extends Equatable {
         : <String, dynamic>{};
     final values = value is List ? value : raw['widgets'];
     if (values is! List) {
-      throw const FormatException('Не удалось прочитать настройки дашборда');
+      // Match the web client's parseSavedConfig fallback for legacy configs.
+      return defaults();
     }
     final ids = <String>{};
     final slots = values

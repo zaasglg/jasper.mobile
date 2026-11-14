@@ -120,11 +120,13 @@ void main() {
         ..chatGate = Completer<List<ChatConversationModel>>();
       final cubit = ChatCubit(repo);
       final pending = cubit.load();
-      cubit.invalidate();
-      cubit.setAutoRefresh(true);
       final gate = repo.chatGate!;
       repo.chatGate = null;
       repo.unread = 7;
+      cubit.invalidate();
+      cubit.setAutoRefresh(true);
+      await t.pump();
+      expect((cubit.state as ChatLoaded).conversations.single.unreadCount, 7);
       gate.complete([conversation.copyWith(unreadCount: 99)]);
       await pending;
       await t.pump();

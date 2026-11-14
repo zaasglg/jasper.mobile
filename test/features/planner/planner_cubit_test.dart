@@ -1,3 +1,4 @@
+import 'package:jospar/features/assistant/data/services/assistant_task_changes.dart';
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/planner/data/models/planner_item_model.dart';
@@ -7,11 +8,44 @@ import 'package:jospar/features/planner/presentation/cubit/planner_cubit.dart';
 
 void main() {
   test(
+    'task invalidation during mutation refreshes after it completes',
+    () async {
+      final repo = _Repository();
+      final cubit = PlannerCubit(repo);
+      addTearDown(cubit.close);
+      await cubit.initialize();
+      final before = repo.loads;
+      final operation = cubit.toggle(cubit.state.items.first);
+      notifyAssistantTaskChanges();
+      expect(repo.loads, before);
+      repo.pending['one']!.complete();
+      await operation;
+      expect(repo.loads, before + 1);
+    },
+  );
+
+  test(
+    'task changes refresh configured planner and listener is removed on close',
+    () async {
+      final repo = _Repository();
+      final cubit = PlannerCubit(repo);
+      await cubit.initialize();
+      final before = repo.loads;
+      notifyAssistantTaskChanges();
+      await Future<void>.delayed(Duration.zero);
+      expect(repo.loads, before + 1);
+      await cubit.close();
+      notifyAssistantTaskChanges();
+      await Future<void>.delayed(Duration.zero);
+      expect(repo.loads, before + 1);
+    },
+  );
+  test(
     'completion rolls back only the failed item while other updates survive',
     () async {
       final repo = _Repository();
       final cubit = PlannerCubit(repo);
-      await cubit.configure('a');
+      await cubit.initialize();
       final first = cubit.toggle(cubit.state.items[0]);
       final second = cubit.toggle(cubit.state.items[1]);
       expect(cubit.state.items.every((e) => e.completed), isTrue);
@@ -27,27 +61,26 @@ void main() {
     },
   );
   test(
-    'a delayed update from previous workspace cannot alter the new workspace',
+    'initialization is idempotent and does not reset pending edits',
     () async {
       final repo = _Repository();
       final cubit = PlannerCubit(repo);
-      await cubit.configure('a');
+      addTearDown(cubit.close);
+      await cubit.initialize();
       final pending = cubit.toggle(cubit.state.items.first);
-      await cubit.configure('b');
-      repo.pending['one']!.completeError(const PlannerException('Ошибка'));
+      await cubit.initialize();
+      expect(repo.loads, 1);
+      expect(cubit.state.items.first.completed, isTrue);
+      repo.pending['one']!.complete();
       await pending;
-      expect(cubit.state.workspaceId, 'b');
-      expect(cubit.state.items.first.completed, isFalse);
-      expect(cubit.state.actionError, isNull);
-      await cubit.close();
+      expect(cubit.state.items.first.completed, isTrue);
     },
   );
-  test('UTC timestamps keep the correct Kazakhstan calendar date', () {
+  test('UTC timestamps use the device calendar and round trip', () {
     final utc = DateTime.parse('2026-10-09T20:30:00Z');
     final local = plannerLocal(utc);
-    expect(local.day, 10);
-    expect(plannerClock(local), '01:30');
-    expect(plannerInstant(DateTime(2026, 10, 10), 1, 30), utc);
+    expect(local, utc.toLocal());
+    expect(plannerInstant(local, local.hour, local.minute), utc);
   });
   test('parses linked project, Inbox and standalone items', () {
     for (final json in [
@@ -82,11 +115,16 @@ void main() {
 
 class _Repository implements PlannerRepository {
   final pending = <String, Completer<void>>{};
+  int loads = 0;
   @override
-  Future<List<PlannerItemModel>> load(String workspaceId) async => const [
-    PlannerItemModel(id: 'one', title: 'First'),
-    PlannerItemModel(id: 'two', title: 'Second'),
-  ];
+  Future<List<PlannerItemModel>> load() async {
+    loads++;
+    return const [
+      PlannerItemModel(id: 'one', title: 'First'),
+      PlannerItemModel(id: 'two', title: 'Second'),
+    ];
+  }
+
   @override
   Future<void> update(
     PlannerItemModel item, {
@@ -99,8 +137,7 @@ class _Repository implements PlannerRepository {
   }
 
   @override
-  Future<PlannerItemModel> create(
-    String workspaceId, {
+  Future<PlannerItemModel> create({
     required String title,
     required DateTime scheduledAt,
     required int durationMinutes,
@@ -113,8 +150,7 @@ class _Repository implements PlannerRepository {
   @override
   Future<void> remove(String itemId) async {}
   @override
-  Future<void> addTask(
-    String workspaceId, {
+  Future<void> addTask({
     String? projectId,
     String? taskId,
     String? inboxTaskId,

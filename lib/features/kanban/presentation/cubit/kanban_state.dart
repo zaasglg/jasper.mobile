@@ -14,6 +14,7 @@ class KanbanState extends Equatable {
     this.tasks = const <ProjectTaskModel>[],
     this.search = '',
     this.priorityFilter,
+    this.epicFilterIds = const <String>{},
     this.movingTaskIds = const <String>{},
     this.errorMessage,
     this.actionErrorMessage,
@@ -26,6 +27,7 @@ class KanbanState extends Equatable {
   final List<ProjectTaskModel> tasks;
   final String search;
   final String? priorityFilter;
+  final Set<String> epicFilterIds;
   final Set<String> movingTaskIds;
   final String? errorMessage;
   final String? actionErrorMessage;
@@ -43,7 +45,9 @@ class KanbanState extends Equatable {
                   task.title.toLowerCase().contains(query) ||
                   task.displayId.toLowerCase().contains(query)) &&
               (priorityFilter == null ||
-                  task.priority.toUpperCase() == priorityFilter),
+                  task.priority.toUpperCase() == priorityFilter) &&
+              (epicFilterIds.isEmpty ||
+                  task.epics.any((epic) => epicFilterIds.contains(epic.id))),
         )
         .toList(growable: false);
   }
@@ -59,6 +63,7 @@ class KanbanState extends Equatable {
     List<KanbanColumnModel>? columns,
     List<ProjectTaskModel>? tasks,
     String? search,
+    Set<String>? epicFilterIds,
     String? priorityFilter,
     bool clearPriorityFilter = false,
     Set<String>? movingTaskIds,
@@ -74,6 +79,7 @@ class KanbanState extends Equatable {
       columns: columns ?? this.columns,
       tasks: tasks ?? this.tasks,
       search: search ?? this.search,
+      epicFilterIds: epicFilterIds ?? this.epicFilterIds,
       priorityFilter: clearPriorityFilter
           ? null
           : priorityFilter ?? this.priorityFilter,
@@ -94,6 +100,7 @@ class KanbanState extends Equatable {
     tasks,
     search,
     priorityFilter,
+    epicFilterIds,
     movingTaskIds,
     errorMessage,
     actionErrorMessage,

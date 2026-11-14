@@ -1,3 +1,5 @@
+import 'package:jospar/features/profile/presentation/cubit/profile_cubit.dart';
+import 'package:jospar/features/profile/presentation/cubit/profile_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,12 @@ import 'package:jospar/features/projects/presentation/screens/projects_screen.da
 import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';
+
+class _Profile extends Cubit<ProfileState> implements ProfileCubit {
+  _Profile() : super(const ProfileInitial());
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class _Projects extends Cubit<ProjectsState> implements ProjectsCubit {
   _Projects()
@@ -67,6 +75,8 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    final profile = _Profile();
+    addTearDown(profile.close);
     final projects = _Projects();
     final workspace = _Workspace();
     addTearDown(projects.close);
@@ -74,6 +84,7 @@ void main() {
     await tester.pumpWidget(
       MultiBlocProvider(
         providers: [
+          BlocProvider<ProfileCubit>.value(value: profile),
           BlocProvider<ProjectsCubit>.value(value: projects),
           BlocProvider<WorkspaceCubit>.value(value: workspace),
         ],
@@ -110,6 +121,28 @@ void main() {
     await tester.tap(find.byTooltip('Очистить поиск'));
     await tester.pump();
     expect(find.text('Ботаника'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    final first = find.byKey(const Key('project-row-1'));
+    final second = find.byKey(const Key('project-row-2'));
+    expect(tester.getTopLeft(first).dy, tester.getTopLeft(second).dy);
+    expect(
+      tester.getTopLeft(second).dx,
+      greaterThan(tester.getTopLeft(first).dx),
+    );
+    // Large system text switches to one column instead of squeezing labels.
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(first).dx, tester.getTopLeft(second).dx);
+    expect(
+      tester.getTopLeft(second).dy,
+      greaterThan(tester.getTopLeft(first).dy),
+    );
+    expect(tester.takeException(), isNull);
+    tester.platformDispatcher.clearTextScaleFactorTestValue();
+    tester.view.physicalSize = const Size(1024, 800);
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(first).dy, tester.getTopLeft(second).dy);
     expect(tester.takeException(), isNull);
   });
 }

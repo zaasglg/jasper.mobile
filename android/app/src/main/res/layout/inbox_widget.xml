@@ -60,7 +60,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Открыть Инбокс  →"
+        android:id="@+id/inbox_widget_add"
+        android:minHeight="48dp"
+        android:gravity="center_vertical"
+        android:text="＋  Добавить задачу"
         android:textColor="#6366F1"
         android:textSize="12sp"
         android:textStyle="bold" />

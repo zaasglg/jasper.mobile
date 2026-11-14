@@ -407,6 +407,9 @@
 							com.apple.Push = {
 								enabled = 1;
 							};
+							com.apple.SignInWithApple = {
+								enabled = 1;
+							};
 						};
 					};
 					BBF0ECE7F44D3E903FEBD4C9 = {

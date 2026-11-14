@@ -81,6 +81,16 @@ void main() {
         await cubit.close();
       },
     );
+    test('Apple login authenticates and cancellation resets loading', () async {
+      final repository = _FakeAuthRepository();
+      final cubit = AuthCubit(repository);
+      await cubit.loginWithApple();
+      expect(cubit.state, const AuthAuthenticated('apple-token'));
+      repository.appleToken = null;
+      await cubit.loginWithApple();
+      expect(cubit.state, const AuthInitial());
+      await cubit.close();
+    });
     test('rejects an invalid email without calling repository', () async {
       final repository = _FakeAuthRepository();
       final cubit = AuthCubit(repository);
@@ -130,8 +140,13 @@ void main() {
   });
 }
 
-class _FakeAuthRepository implements AuthRepository, GoogleLoginRepository {
+class _FakeAuthRepository
+    implements AuthRepository, GoogleLoginRepository, AppleLoginRepository {
   String? googleToken = 'google-token';
+  String? appleToken = 'apple-token';
+
+  @override
+  Future<String?> loginWithApple() async => appleToken;
   @override
   Future<String?> loginWithGoogle() async => googleToken;
   int calls = 0;

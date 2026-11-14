@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:file_picker/file_picker.dart';
@@ -677,12 +678,12 @@ class _StorageBodyState extends State<_StorageBody> {
           /* Show the file icon for damaged thumbnails. */
         }
       } else if (data != null && Uri.tryParse(data)?.scheme == 'https') {
-        preview = Image.network(
-          data,
+        preview = CachedNetworkImage(
+          imageUrl: data,
           fit: BoxFit.cover,
           width: double.infinity,
-          cacheWidth: 400,
-          errorBuilder: (_, _, _) => Icon(icon, size: 20),
+          memCacheWidth: 400,
+          errorWidget: (_, _, _) => Icon(icon, size: 20),
         );
       }
     }

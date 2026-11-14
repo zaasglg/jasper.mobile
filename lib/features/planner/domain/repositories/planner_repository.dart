@@ -1,9 +1,8 @@
 import '../../data/models/planner_item_model.dart';
 
 abstract interface class PlannerRepository {
-  Future<List<PlannerItemModel>> load(String workspaceId);
-  Future<PlannerItemModel> create(
-    String workspaceId, {
+  Future<List<PlannerItemModel>> load();
+  Future<PlannerItemModel> create({
     required String title,
     required DateTime scheduledAt,
     required int durationMinutes,
@@ -16,8 +15,7 @@ abstract interface class PlannerRepository {
     bool? completed,
   });
   Future<void> remove(String itemId);
-  Future<void> addTask(
-    String workspaceId, {
+  Future<void> addTask({
     String? projectId,
     String? taskId,
     String? inboxTaskId,

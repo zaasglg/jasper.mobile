@@ -1,3 +1,4 @@
+import 'planner_test_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,17 +22,19 @@ void main() {
     final workspace = _WorkspaceCubit();
     addTearDown(workspace.close);
     await tester.pumpWidget(
-      BlocProvider<WorkspaceCubit>.value(
-        value: workspace,
-        child: const MaterialApp(
-          home: Scaffold(
-            body: TaskCard(
-              task: ProjectTaskModel(
-                id: 'original-task',
-                projectId: 'original-project',
-                title: 'Задача проекта',
-                status: 'TODO',
-                order: 0,
+      PlannerTestApp(
+        child: BlocProvider<WorkspaceCubit>.value(
+          value: workspace,
+          child: const MaterialApp(
+            home: Scaffold(
+              body: TaskCard(
+                task: ProjectTaskModel(
+                  id: 'original-task',
+                  projectId: 'original-project',
+                  title: 'Задача проекта',
+                  status: 'TODO',
+                  order: 0,
+                ),
               ),
             ),
           ),
@@ -53,17 +56,56 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'personal planner survives workspace changes and creates without selection',
+    (tester) async {
+      final repository = _Repository();
+      final cubit = PlannerCubit(repository);
+      final workspace = _WorkspaceCubit();
+      addTearDown(cubit.close);
+      addTearDown(workspace.close);
+      await tester.pumpWidget(
+        PlannerTestApp(
+          child: MultiBlocProvider(
+            providers: [
+              BlocProvider<PlannerCubit>.value(value: cubit),
+              BlocProvider<WorkspaceCubit>.value(value: workspace),
+            ],
+            child: const MaterialApp(home: PlannerScreen()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(repository.loadCount, 1);
+      expect(find.text('Ежедневник'), findsOneWidget);
+      expect(find.text('Команда'), findsNothing);
+      workspace.clearSelection();
+      await tester.pumpAndSettle();
+      expect(repository.loadCount, 1);
+      expect(find.text('Подготовить презентацию'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('planner-add')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Личная запись');
+      await tester.tap(find.text('Сохранить'));
+      await tester.pumpAndSettle();
+      expect(repository.createdTitle, 'Личная запись');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('pulling down refreshes day, week and month views', (
     tester,
   ) async {
     final repository = _Repository();
     final cubit = PlannerCubit(repository);
     addTearDown(cubit.close);
-    await cubit.configure('workspace');
+    await cubit.initialize();
     await tester.pumpWidget(
-      BlocProvider.value(
-        value: cubit,
-        child: const MaterialApp(home: PlannerScreen()),
+      PlannerTestApp(
+        child: BlocProvider.value(
+          value: cubit,
+          child: const MaterialApp(home: PlannerScreen()),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -98,11 +140,13 @@ void main() {
       final repository = _Repository();
       final cubit = PlannerCubit(repository);
       addTearDown(cubit.close);
-      await cubit.configure('workspace');
+      await cubit.initialize();
       await tester.pumpWidget(
-        BlocProvider.value(
-          value: cubit,
-          child: MaterialApp(home: const PlannerScreen()),
+        PlannerTestApp(
+          child: BlocProvider.value(
+            value: cubit,
+            child: MaterialApp(home: const PlannerScreen()),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -144,11 +188,13 @@ void main() {
     final repository = _Repository(late: true);
     final cubit = PlannerCubit(repository);
     addTearDown(cubit.close);
-    await cubit.configure('workspace');
+    await cubit.initialize();
     await tester.pumpWidget(
-      BlocProvider.value(
-        value: cubit,
-        child: const MaterialApp(home: PlannerScreen()),
+      PlannerTestApp(
+        child: BlocProvider.value(
+          value: cubit,
+          child: const MaterialApp(home: PlannerScreen()),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -180,7 +226,7 @@ class _Repository implements PlannerRepository {
       ),
   ];
   @override
-  Future<List<PlannerItemModel>> load(String workspaceId) async {
+  Future<List<PlannerItemModel>> load() async {
     loadCount++;
     return items;
   }
@@ -197,8 +243,7 @@ class _Repository implements PlannerRepository {
   }
 
   @override
-  Future<PlannerItemModel> create(
-    String workspaceId, {
+  Future<PlannerItemModel> create({
     required String title,
     required DateTime scheduledAt,
     required int durationMinutes,
@@ -215,8 +260,7 @@ class _Repository implements PlannerRepository {
   @override
   Future<void> remove(String itemId) async {}
   @override
-  Future<void> addTask(
-    String workspaceId, {
+  Future<void> addTask({
     String? projectId,
     String? taskId,
     String? inboxTaskId,
@@ -236,6 +280,9 @@ class _WorkspaceCubit extends Cubit<WorkspaceState> implements WorkspaceCubit {
           selected: WorkspaceModel(id: 'workspace', name: 'Команда'),
         ),
       );
+
+  void clearSelection() =>
+      emit(const WorkspaceLoaded(workspaces: [], selected: null));
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

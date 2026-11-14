@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "JosparBee channel conversation redesign: loaded chat with incoming/outgoing messages, replies, file and voice attachment; target 851x1849, native render 1320x2868",
+  "platform": "ios",
+  "sources": [
+    {
+      "path": "../../../lib/features/chat/presentation/screens/conversation_screen.dart",
+      "sha256": "a984eb99731651a22dc2514b8eeb1cb39b5aabbe320232e60a4fff7d52b44544"
+    },
+    {
+      "path": "../../../lib/core/theme/app_theme.dart",
+      "sha256": "d8811f3aebf563c42e530d506c1cf6250a92e5e85854c7784c6a81f5a3f9e308"
+    },
+    {
+      "path": "../../../lib/core/theme/app_ui_tokens.dart",
+      "sha256": "d3303995e363aee133827696db8353867694c693526ee1d0cfb5a1c75d235ee2"
+    }
+  ],
+  "comparison": "target",
+  "target": {
+    "path": "/Users/erdaulettojbekov/.codex/generated_images/01a1d522-118b-7040-9ddd-68e51c4c8551/exec-e81331ff-0dfc-405c-b4ff-026f33eaf2a4.png",
+    "kind": "image",
+    "sha256": "aec09b1c9aac30dc8bab0b62e6772f402c808eff208966610373f67179199de7"
+  },
+  "requiredChecks": [
+    {
+      "id": "ios-loaded-conversation",
+      "kind": "visual"
+    }
+  ],
+  "checks": [
+    {
+      "id": "ios-loaded-conversation",
+      "status": "pass",
+      "state": "Channel loaded with grouped messages, date dividers, replies, DOCX attachment and a three-second voice message",
+      "environment": {
+        "kind": "simulator",
+        "name": "iPhone 17 Pro Max, iOS 26.2",
+        "width": 1320,
+        "height": 2868
+      },
+      "observed": "Inspected the native render against the constrained direction. Header and sections are compact, no message is clipped beneath the tabs, date separators remain subordinate, avatars align with incoming groups, replies and the DOCX attachment remain readable, outgoing bubbles keep one violet tint, the voice message remains visible, and the composer clears the bottom safe area. Target and simulator differ in pixel dimensions, so this is a structural comparison rather than a 1:1 claim.",
+      "artifacts": [
+        {
+          "path": "ios-chat-final.png",
+          "kind": "image",
+          "sha256": "66af09b590ad8249bece2808587de7cc1348e3589dcef8872c647b2ee82d7ef3"
+        }
+      ]
+    }
+  ],
+  "unresolved": []
+}

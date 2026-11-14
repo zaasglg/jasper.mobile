@@ -4,6 +4,7 @@ import 'app_input_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 abstract final class AppColors {
+  static const Color canvas = Color(0xFFFFFFFF);
   static const Color ink = Color(0xFF252531);
   static const Color muted = Color(0xFF85879F);
   static const Color border = Color(0xFFE6E6E3);
@@ -15,6 +16,10 @@ abstract final class AppColors {
   static const Color badgeSurface = Color(0xFFF5F5F3);
   static const Color skeleton = Color(0xFFEDEDEA);
   static const Color skeletonTrack = Color(0xFFF4F4F2);
+  static const Color onAccent = Color(0xFFFFFFFF);
+  static const Color chatCanvas = Color(0xFFF3F4F7);
+  static const Color outgoingMessage = Color(0xFFF0ECFF);
+  static const Color quoteSurface = Color(0xFFF7F7FA);
 }
 
 abstract final class AppTheme {

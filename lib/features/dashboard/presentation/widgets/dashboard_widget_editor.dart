@@ -304,23 +304,36 @@ class DashboardEditActions extends StatelessWidget {
       ReorderableDragStartListener(
         index: index,
         enabled: !cubit.state.saving,
-        child: const SizedBox(
-          width: 44,
-          height: 44,
-          child: Tooltip(
-            message: 'Перетащить виджет',
-            child: Icon(
-              LucideIcons.gripVertical,
-              size: 16,
-              color: AppColors.muted,
+        key: ValueKey('dashboard_drag_${slot.instanceId}'),
+        child: const ColoredBox(
+          color: Colors.transparent,
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Tooltip(
+              message: 'Перетащить виджет',
+              child: Icon(
+                LucideIcons.gripVertical,
+                size: 16,
+                color: AppColors.muted,
+              ),
             ),
           ),
         ),
       ),
       Expanded(
-        child: Text(
-          slot.definition?.title ?? slot.id,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        child: ReorderableDelayedDragStartListener(
+          index: index,
+          enabled: !cubit.state.saving,
+          child: Container(
+            color: Colors.transparent,
+            alignment: Alignment.centerLeft,
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Text(
+              slot.definition?.title ?? slot.id,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
         ),
       ),
       AppActionMenuButton<String>(
@@ -333,6 +346,12 @@ class DashboardEditActions extends StatelessWidget {
               label: 'Настройки',
               icon: LucideIcons.slidersHorizontal,
             ),
+            if (slot.definition?.duplicable ?? false)
+              const AppMenuAction(
+                value: 'duplicate',
+                label: 'Добавить ещё такой',
+                icon: LucideIcons.copy,
+              ),
             AppMenuAction(
               value: 'up',
               label: 'Выше',
@@ -356,6 +375,8 @@ class DashboardEditActions extends StatelessWidget {
         ],
         onSelected: (value) async {
           switch (value) {
+            case 'duplicate':
+              cubit.add(slot.id);
             case 'settings':
               await showDashboardWidgetSettings(context, cubit, slot, projects);
             case 'hide':

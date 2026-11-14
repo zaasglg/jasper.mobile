@@ -148,9 +148,20 @@ class TaskCreationCubit extends Cubit<TaskCreationState> {
       ),
     );
     try {
-      final projects = await repository.projects(id);
+      final results = await Future.wait<Object>([
+        repository.projects(id),
+        repository.members(id),
+      ]);
       if (isClosed || revision != _revision) return;
-      emit(state.copyWith(projects: projects, loadingProjects: false));
+      final projects = results[0] as List<ProjectModel>;
+      final members = results[1] as List<TaskAssigneeModel>;
+      emit(
+        state.copyWith(
+          projects: projects,
+          options: state.options.copyWith(members: members),
+          loadingProjects: false,
+        ),
+      );
       if (projects.length == 1) await selectProject(projects.single.id);
     } catch (error) {
       if (!isClosed && revision == _revision) {

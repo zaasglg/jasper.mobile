@@ -5,8 +5,8 @@ class CreateProjectRequest extends Equatable {
     required this.code,
     required this.name,
     required this.workspaceId,
-    required this.start,
-    required this.end,
+    this.start,
+    this.end,
     this.description,
     this.progress = 0,
     this.parentId,
@@ -19,8 +19,8 @@ class CreateProjectRequest extends Equatable {
       name: json['name']?.toString() ?? '',
       description: _optional(json['description']),
       workspaceId: json['workspaceId']?.toString() ?? '',
-      start: DateTime.parse(json['start'].toString()),
-      end: DateTime.parse(json['end'].toString()),
+      start: DateTime.tryParse(json['start']?.toString() ?? ''),
+      end: DateTime.tryParse(json['end']?.toString() ?? ''),
       progress: (json['progress'] as num?)?.toDouble() ?? 0,
       parentId: _optional(json['parentId']),
       isPinned: json['isPinned'] as bool? ?? false,
@@ -31,8 +31,8 @@ class CreateProjectRequest extends Equatable {
   final String name;
   final String? description;
   final String workspaceId;
-  final DateTime start;
-  final DateTime end;
+  final DateTime? start;
+  final DateTime? end;
   final double progress;
   final String? parentId;
   final bool isPinned;
@@ -47,8 +47,8 @@ class CreateProjectRequest extends Equatable {
       'code': code.trim(),
       'name': name.trim(),
       'workspaceId': workspaceId,
-      'start': start.toUtc().toIso8601String(),
-      'end': end.toUtc().toIso8601String(),
+      if (start != null) 'start': start!.toUtc().toIso8601String(),
+      if (end != null) 'end': end!.toUtc().toIso8601String(),
       'progress': progress,
       'isPinned': isPinned,
     };

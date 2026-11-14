@@ -13,12 +13,13 @@ class DashboardLayoutState extends Equatable {
     this.loading = false,
     this.editing = false,
     this.saving = false,
+    this.readOnly = false,
     this.error,
     this.revision = 0,
   });
   final String workspaceId, userId;
   final DashboardLayout? layout, draft;
-  final bool loading, editing, saving;
+  final bool loading, editing, saving, readOnly;
   final String? error;
   final int revision;
   DashboardLayout? get current => editing ? draft : layout;
@@ -30,6 +31,7 @@ class DashboardLayoutState extends Equatable {
     bool? loading,
     bool? editing,
     bool? saving,
+    bool? readOnly,
     String? error,
     int? revision,
   }) => DashboardLayoutState(
@@ -40,6 +42,7 @@ class DashboardLayoutState extends Equatable {
     loading: loading ?? this.loading,
     editing: editing ?? this.editing,
     saving: saving ?? this.saving,
+    readOnly: readOnly ?? this.readOnly,
     error: error,
     revision: revision ?? this.revision,
   );
@@ -52,6 +55,7 @@ class DashboardLayoutState extends Equatable {
     loading,
     editing,
     saving,
+    readOnly,
     error,
     revision,
   ];
@@ -65,9 +69,6 @@ class DashboardLayoutCubit extends Cubit<DashboardLayoutState> {
   final Map<String, Future<dynamic>> _data = {};
   static String message(Object error) {
     if (error is DashboardException) return error.message;
-    if (error is DioException && error.response?.statusCode == 403) {
-      return 'Нет доступа к дашборду этого workspace';
-    }
     return 'Не удалось сохранить или загрузить дашборд. Повторите попытку.';
   }
 
@@ -102,11 +103,23 @@ class DashboardLayoutCubit extends Cubit<DashboardLayoutState> {
     try {
       final layout = await repository.load(workspaceId, cancelToken: token);
       if (!isClosed && generation == _generation) {
-        emit(state.copyWith(layout: layout, loading: false));
+        emit(state.copyWith(layout: layout, loading: false, readOnly: false));
       }
     } catch (error) {
       if (!isClosed && generation == _generation) {
-        emit(state.copyWith(loading: false, error: message(error)));
+        if (error is DioException && error.response?.statusCode == 403) {
+          // Workspace guests can use its projects even when the server does
+          // not allow them to read or persist the owner's dashboard config.
+          emit(
+            state.copyWith(
+              layout: DashboardLayout.defaults(),
+              loading: false,
+              readOnly: true,
+            ),
+          );
+        } else {
+          emit(state.copyWith(loading: false, error: message(error)));
+        }
       }
     }
   }
@@ -134,7 +147,12 @@ class DashboardLayoutCubit extends Cubit<DashboardLayoutState> {
   }
 
   void enterEdit() {
-    if (state.layout == null || state.loading || state.saving) return;
+    if (state.layout == null ||
+        state.loading ||
+        state.saving ||
+        state.readOnly) {
+      return;
+    }
     emit(state.copyWith(draft: state.layout, editing: true));
   }
 

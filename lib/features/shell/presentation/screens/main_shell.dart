@@ -14,6 +14,7 @@ import '../../../workspaces/presentation/cubit/workspace_state.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_bottom_navigation.dart';
+import '../../../profile/presentation/cubit/profile_cubit.dart';
 
 /// Root shell that hosts the bottom navigation bar and the active tab's
 /// content (provided by [child], typically a go_router StatefulNavigationShell).
@@ -290,6 +291,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
     return MultiBlocProvider(
       providers: [
+        BlocProvider<ProfileCubit>(create: (_) => sl<ProfileCubit>()..load()),
         BlocProvider<WorkspaceCubit>.value(value: _workspaceCubit),
         BlocProvider<ProjectsCubit>.value(value: _projectsCubit),
       ],

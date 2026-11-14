@@ -1,4 +1,5 @@
 import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../projects/data/models/project_task_model.dart';
@@ -54,6 +55,7 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
   }
 
   Future<void> _save() async {
+    if (_saving || _loading) return;
     setState(() {
       _saving = true;
       _error = null;
@@ -89,94 +91,207 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
     return PopScope(
       canPop: !_saving,
       child: SafeArea(
+        top: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
-            20,
+            AppSpacing.md,
             0,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom + 16,
+            AppSpacing.md,
+            MediaQuery.viewInsetsOf(context).bottom + AppSpacing.md,
           ),
-          child: SizedBox(
-            height: MediaQuery.sizeOf(context).height * 0.58,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Исполнители',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _search,
-                  enabled: !_saving,
-                  decoration: const InputDecoration(
-                    hintText: 'Поиск по имени',
-                    prefixIcon: Icon(Icons.search, size: AppIconSizes.standard),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-                TextButton(
-                  onPressed: _saving || _loading
-                      ? null
-                      : () => setState(_selected.clear),
-                  child: const Text('Снять всех'),
-                ),
-                if (_error != null)
+          child: LayoutBuilder(
+            builder: (context, constraints) => SizedBox(
+              height: (MediaQuery.sizeOf(context).height * 0.58).clamp(
+                0.0,
+                constraints.maxHeight,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   Row(
                     children: [
                       Expanded(
                         child: Text(
-                          _error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
+                          'Исполнители',
+                          style: AppTypography.title(context),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Закрыть выбор исполнителей',
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.pop(context),
+                        icon: const Icon(
+                          Icons.close,
+                          size: AppIconSizes.standard,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: _search,
+                    enabled: !_saving,
+                    decoration: InputDecoration(
+                      hintText: 'Поиск по имени',
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        size: AppIconSizes.standard,
+                      ),
+                      filled: true,
+                      fillColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: BorderSide.none,
+                      ),
+                      suffixIcon: query.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Очистить поиск',
+                              onPressed: _saving
+                                  ? null
+                                  : () => setState(_search.clear),
+                              icon: const Icon(
+                                Icons.close,
+                                size: AppIconSizes.standard,
+                              ),
+                            ),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Выбрано: ${_selected.length}',
+                          style: AppTypography.caption(context)?.copyWith(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
                       TextButton(
-                        onPressed: _saving ? null : _load,
-                        child: const Text('Повторить'),
+                        onPressed: _saving || _loading || _selected.isEmpty
+                            ? null
+                            : () => setState(_selected.clear),
+                        child: const Text('Снять всех'),
                       ),
                     ],
                   ),
-                Expanded(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : visible.isEmpty
-                      ? const Center(child: Text('Участники не найдены'))
-                      : ListView.builder(
-                          itemCount: visible.length,
-                          itemBuilder: (context, index) {
-                            final user = visible[index];
-                            return CheckboxListTile(
-                              value: _selected.contains(user.userId),
-                              title: Text(
-                                user.name.isEmpty ? 'Пользователь' : user.name,
-                              ),
-                              secondary: UserAvatar(
-                                name: user.name,
-                                avatarUrl: user.avatarUrl,
-                                size: 32,
-                              ),
-                              onChanged: _saving
-                                  ? null
-                                  : (checked) => setState(() {
-                                      if (checked == true) {
-                                        _selected.add(user.userId);
-                                      } else {
-                                        _selected.remove(user.userId);
-                                      }
-                                    }),
-                            );
-                          },
+                  Divider(
+                    height: 1,
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                  if (_error != null)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _error!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
                         ),
-                ),
-                FilledButton(
-                  onPressed: _saving || _loading || _error != null
-                      ? null
-                      : _save,
-                  child: Text(_saving ? 'Сохранение…' : 'Сохранить'),
-                ),
-              ],
+                        TextButton(
+                          onPressed: _saving ? null : _load,
+                          child: const Text('Повторить'),
+                        ),
+                      ],
+                    ),
+                  Expanded(
+                    child: _loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : visible.isEmpty
+                        ? const Center(child: Text('Участники не найдены'))
+                        : ListView.builder(
+                            itemCount: visible.length,
+                            itemBuilder: (context, index) {
+                              final user = visible[index];
+                              final selected = _selected.contains(user.userId);
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: AppSpacing.xxs,
+                                ),
+                                child: CheckboxListTile(
+                                  key: ValueKey('assignee-${user.userId}'),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.sm,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.md,
+                                    ),
+                                  ),
+                                  tileColor: selected
+                                      ? Theme.of(context)
+                                            .colorScheme
+                                            .primaryContainer
+                                            .withValues(alpha: .35)
+                                      : null,
+                                  checkboxShape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.xs,
+                                    ),
+                                  ),
+                                  value: _selected.contains(user.userId),
+                                  title: Text(
+                                    user.name.isEmpty
+                                        ? 'Пользователь'
+                                        : user.name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.body(context)
+                                        ?.copyWith(
+                                          fontWeight: selected
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                        ),
+                                  ),
+                                  secondary: UserAvatar(
+                                    name: user.name,
+                                    avatarUrl: user.avatarUrl,
+                                    size: AppSpacing.xl + AppSpacing.sm,
+                                  ),
+                                  onChanged: _saving
+                                      ? null
+                                      : (checked) => setState(() {
+                                          if (checked == true) {
+                                            _selected.add(user.userId);
+                                          } else {
+                                            _selected.remove(user.userId);
+                                          }
+                                        }),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  const SizedBox(height: AppSpacing.smMd),
+                  FilledButton(
+                    key: const Key('save-assignees'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(
+                        AppSpacing.touchTarget,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                    ),
+                    onPressed: _saving || _loading || _error != null
+                        ? null
+                        : _save,
+                    child: Text(_saving ? 'Сохранение…' : 'Сохранить'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

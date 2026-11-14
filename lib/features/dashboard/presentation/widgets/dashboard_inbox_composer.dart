@@ -1,5 +1,6 @@
 import '../../../../core/theme/app_icon_sizes.dart';
-import '../../../../core/theme/dashboard_surface.dart';
+import '../../../../core/theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
@@ -19,7 +20,16 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
   final FocusNode _focusNode = FocusNode();
 
   @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChanged);
+  }
+
+  void _onFocusChanged() => setState(() {});
+
+  @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -67,12 +77,13 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
           key: const Key('dashboard-inbox-composer'),
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: colors.surface,
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.white
+                : colors.surface,
             borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
               color: colors.outlineVariant.withValues(alpha: .5),
             ),
-            boxShadow: DashboardSurface.shadows,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,24 +94,29 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
                     width: AppSpacing.touchTarget,
                     height: AppSpacing.touchTarget,
                     decoration: BoxDecoration(
-                      color: colors.primaryContainer,
+                      color: colors.primary.withValues(alpha: .08),
                       borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
+                    alignment: Alignment.center,
                     child: Icon(
-                      Icons.inbox_rounded,
-                      size: AppIconSizes.standard,
-                      color: colors.onPrimaryContainer,
+                      LucideIcons.inbox,
+                      size: AppSpacing.lg,
+                      color: colors.primary,
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.sm + AppSpacing.xs),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
                           'Быстро в Инбокс',
-                          style: AppTypography.title(context),
+                          style: AppTypography.body(context)?.copyWith(
+                            color: colors.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           'Запишите сейчас, разберите позже',
                           style: AppTypography.caption(
@@ -116,7 +132,14 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
-                  color: colors.surfaceContainerLow,
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? AppColors.subtleSurface
+                      : colors.surfaceContainerLow,
+                  border: Border.all(
+                    color: _focusNode.hasFocus
+                        ? colors.primary
+                        : colors.outlineVariant.withValues(alpha: .5),
+                  ),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Row(
@@ -156,7 +179,9 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
                           borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         backgroundColor: colors.primary,
-                        disabledBackgroundColor: colors.surfaceContainerHighest,
+                        disabledBackgroundColor: colors.onSurface.withValues(
+                          alpha: .05,
+                        ),
                         foregroundColor: colors.onPrimary,
                         disabledForegroundColor: colors.onSurfaceVariant,
                       ),
@@ -168,10 +193,7 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
                                 color: colors.onSurfaceVariant,
                               ),
                             )
-                          : const Icon(
-                              Icons.add_rounded,
-                              size: AppIconSizes.standard,
-                            ),
+                          : const Icon(LucideIcons.plus, size: AppSpacing.lg),
                     ),
                   ],
                 ),

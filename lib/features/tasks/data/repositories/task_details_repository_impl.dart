@@ -1,3 +1,4 @@
+import '../models/task_label_catalog.dart';
 import 'package:dio/dio.dart';
 
 import '../../domain/repositories/task_details_repository.dart';
@@ -8,15 +9,80 @@ import '../../../projects/data/models/project_task_model.dart';
 class TaskDetailsRepositoryImpl
     implements
         TaskDetailsRepository,
+        TaskResourceCreationRepository,
+        TaskLabelCatalogRepository,
+        TaskDatesRepository,
+        TaskResourceOperationsRepository,
         TaskAdvancedRepository,
         TaskTitleRepository,
         TaskExtrasRepository,
+        ProjectEpicCreationRepository,
         TaskAssigneesRepository,
         TaskTimingRepository,
         TaskTimerRepository {
   const TaskDetailsRepositoryImpl(this._dio);
 
   final Dio _dio;
+
+  @override
+  Future<void> createEpic({
+    required String projectId,
+    required String name,
+    required String color,
+  }) async {
+    final title = name.trim();
+    if (title.isEmpty) {
+      throw const TaskDetailsException('Введите название эпика.');
+    }
+    try {
+      await _dio.post<dynamic>(
+        'epics',
+        data: {'projectId': projectId, 'name': title, 'color': color},
+      );
+    } on DioException catch (e) {
+      throw TaskDetailsException(_messageFor(e, 'создать эпик'));
+    }
+  }
+
+  @override
+  Future<TaskDetailsPayload> updateDates(
+    String taskId,
+    DateTime? start,
+    DateTime? end,
+  ) => _patch(taskId, {
+    'start': start?.toUtc().toIso8601String(),
+    'end': end?.toUtc().toIso8601String(),
+  });
+
+  @override
+  Future<void> patchResource(String id, Map<String, Object?> changes) async {
+    try {
+      await _dio.patch<Object?>(
+        'resources/${Uri.encodeComponent(id)}',
+        data: changes,
+      );
+    } on DioException {
+      throw const TaskDetailsException(
+        'Не удалось изменить ресурс. Повторите попытку.',
+      );
+    }
+  }
+
+  @override
+  Future<Map<String, Object?>> resourceHistory(
+    String id, {
+    String? cursor,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        'resources/${Uri.encodeComponent(id)}/history',
+        queryParameters: {'take': 20, 'cursor': ?cursor},
+      );
+      return Map<String, Object?>.from(response.data ?? {});
+    } on DioException {
+      throw const TaskDetailsException('Не удалось загрузить историю ресурса.');
+    }
+  }
 
   @override
   Future<TaskDetailsPayload> updateStart(String taskId, DateTime? start) =>
@@ -57,6 +123,18 @@ class TaskDetailsRepositoryImpl
   }
 
   @override
+  Future<TaskLabelCatalog> getLabelCatalog(String taskId) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        'project-tasks/${Uri.encodeComponent(taskId)}/label-catalog',
+      );
+      return TaskLabelCatalog.fromJson(_object(response.data));
+    } on DioException catch (e) {
+      throw TaskDetailsException(_messageFor(e, 'загрузить метки'));
+    }
+  }
+
+  @override
   Future<List<TaskEpicModel>> getEpics(String projectId) async {
     try {
       final response = await _dio.get<dynamic>(
@@ -84,6 +162,35 @@ class TaskDetailsRepositoryImpl
   Future<TaskDetailsPayload> updateEpics(String taskId, List<String> ids) =>
       _patch(taskId, {'epicIds': ids});
   @override
+  Future<TaskResourceModel> createResource(
+    String taskId,
+    TaskResourceModel resource,
+  ) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        'tasks/${Uri.encodeComponent(taskId)}/resources',
+        data: {
+          'name': resource.name,
+          'planValue': resource.planValue.toStringAsFixed(4),
+          'factValue': resource.factValue.toStringAsFixed(4),
+        },
+      );
+      final body = _object(response.data);
+      final model = TaskResourceModel.fromJson(
+        body['data'] is Map
+            ? Map<String, dynamic>.from(body['data'] as Map)
+            : body,
+      );
+      if (model.id.isEmpty) {
+        throw const TaskDetailsException('Сервер не вернул ID ресурса.');
+      }
+      return model;
+    } on DioException {
+      throw const TaskDetailsException('Не удалось создать ресурс.');
+    }
+  }
+
+  @override
   Future<void> saveResource(
     String taskId,
     TaskResourceModel resource, {
@@ -91,8 +198,8 @@ class TaskDetailsRepositoryImpl
   }) async {
     final data = <String, dynamic>{
       'name': resource.name,
-      'planValue': resource.planValue.toString(),
-      'factValue': resource.factValue.toString(),
+      'planValue': resource.planValue.toStringAsFixed(4),
+      'factValue': resource.factValue.toStringAsFixed(4),
     };
     try {
       if (create) {
@@ -332,8 +439,15 @@ class TaskDetailsRepositoryImpl
         return 'Нет подключения к интернету.';
       case DioExceptionType.badResponse:
         final code = error.response?.statusCode;
-        if (code == 401 || code == 403) {
-          return 'Сессия истекла. Войдите снова.';
+        if (code == 401) return 'Сессия истекла. Войдите снова.';
+        if (code == 403) return 'Недостаточно прав для этого действия.';
+        if (code == 400 || code == 409) {
+          final body = error.response?.data;
+          final message = body is Map ? body['message'] : null;
+          if (message is String && message.trim().isNotEmpty) return message;
+          if (message is List && message.every((e) => e is String)) {
+            return message.join('\n');
+          }
         }
         if (code == 404) return 'Задача не найдена.';
         return 'Не удалось $action.';

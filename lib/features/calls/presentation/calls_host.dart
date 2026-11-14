@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
+import '../data/call_events.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,7 +9,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../core/storage/auth_token_storage.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/user_avatar.dart';
+import 'incoming_call_screen.dart';
 import 'call_cubit.dart';
 import '../data/system_incoming_calls.dart';
 import 'system_call_controller.dart';
@@ -30,10 +32,10 @@ class CallsHost extends StatefulWidget {
 }
 
 class _CallsHostState extends State<CallsHost> with WidgetsBindingObserver {
-  Timer? _timer;
+  late final CallEvents _events;
   AudioPlayer? _ringtone;
   String? _ringingId;
-  bool _foreground = true, _checking = false;
+  bool _foreground = true, _checking = false, _pendingCheck = false;
   late final SystemCallController _system;
   CallCubit get cubit => sl<CallCubit>();
   @override
@@ -48,8 +50,10 @@ class _CallsHostState extends State<CallsHost> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     authSession.addListener(_authChanged);
     widget.routeChanges.addListener(_routeChanged);
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _check());
-    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+    _events = CallEvents(sl<Dio>(), _check);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_startEvents());
+    });
   }
 
   void _systemChanged() {
@@ -69,12 +73,30 @@ class _CallsHostState extends State<CallsHost> with WidgetsBindingObserver {
 
   void _authChanged() {
     if (authSession.requiresLogin) {
+      _events.stop();
       _stopRinging();
       cubit.reset();
+    } else if (_foreground) {
+      unawaited(_startEvents());
+    }
+  }
+
+  Future<void> _startEvents() async {
+    final token = await sl<AuthTokenStorage>().read();
+    if (mounted &&
+        _foreground &&
+        !authSession.requiresLogin &&
+        token != null &&
+        token.isNotEmpty) {
+      _events.start();
     }
   }
 
   Future<void> _check() async {
+    if (_checking) {
+      _pendingCheck = true;
+      return;
+    }
     if ((!_foreground && !_system.presenting && !cubit.state.busy) ||
         _checking ||
         !mounted) {
@@ -95,6 +117,10 @@ class _CallsHostState extends State<CallsHost> with WidgetsBindingObserver {
       if (mounted && _foreground) await _syncRinging(cubit.state);
     } finally {
       _checking = false;
+      if (_pendingCheck && mounted && _foreground) {
+        _pendingCheck = false;
+        unawaited(_check());
+      }
     }
   }
 
@@ -137,8 +163,9 @@ class _CallsHostState extends State<CallsHost> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
     if (_foreground) {
-      _check();
+      unawaited(_startEvents());
     } else {
+      _events.stop();
       _stopRinging();
     }
   }
@@ -148,7 +175,7 @@ class _CallsHostState extends State<CallsHost> with WidgetsBindingObserver {
     _system.removeListener(_systemChanged);
     _system.dispose();
     widget.routeChanges.removeListener(_routeChanged);
-    _timer?.cancel();
+    _events.stop();
     authSession.removeListener(_authChanged);
     WidgetsBinding.instance.removeObserver(this);
     _stopRinging();
@@ -165,103 +192,19 @@ class _CallsHostState extends State<CallsHost> with WidgetsBindingObserver {
         children: [
           widget.child,
           if (incoming != null && !state.busy)
-            Positioned(
-              top: 0,
-              left: 12,
-              right: 12,
-              child: SafeArea(
-                child: Material(
-                  elevation: 8,
-                  color: Colors.white,
-                  shadowColor: Colors.black26,
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            UserAvatar(
-                              size: 44,
-                              userId: incoming.callerId,
-                              name: incoming.callerName,
-                              avatarUrl: incoming.callerAvatar,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    incoming.callerName.isEmpty
-                                        ? 'Входящий звонок'
-                                        : incoming.callerName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    incoming.video
-                                        ? 'Видеозвонок'
-                                        : 'Аудиозвонок',
-                                    style: const TextStyle(
-                                      color: AppColors.muted,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (state.error != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              state.error!,
-                              style: const TextStyle(
-                                color: AppColors.error,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: state.controlsBusy
-                                    ? null
-                                    : () => cubit.decline(incoming),
-                                child: const Text(
-                                  'Отклонить',
-                                  style: TextStyle(color: AppColors.error),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: state.controlsBusy
-                                    ? null
-                                    : () async {
-                                        await _stopRinging();
-                                        await _system.answer(incoming);
-                                      },
-                                child: const Text('Принять'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+            Positioned.fill(
+              child: IncomingCallScreen(
+                room: incoming,
+                busy: state.controlsBusy,
+                error: state.error,
+                onDecline: () async {
+                  await _stopRinging();
+                  await cubit.decline(incoming);
+                },
+                onAccept: () async {
+                  await _stopRinging();
+                  await _system.answer(incoming);
+                },
               ),
             ),
           if (state.busy && !widget.onCallPage())

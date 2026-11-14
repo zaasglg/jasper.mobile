@@ -172,6 +172,25 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('transient inactive state does not truncate recording', (
+    tester,
+  ) async {
+    final recorder = _Recorder();
+    await tester.pumpWidget(screen(recorder));
+    await tester.tap(find.byKey(const Key('voice-record')));
+    await tester.pump();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+
+    expect(recorder.stopCalls, 0);
+    expect(find.text('Идёт запись…'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.tap(find.byKey(const Key('voice-cancel')));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('microphone permission denial leaves composer usable', (
     tester,
   ) async {

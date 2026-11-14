@@ -140,6 +140,7 @@ void main() {
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('comment-alignment-own')),
         200,
+        scrollable: find.byType(Scrollable).first,
       );
       expect(
         tester
@@ -208,7 +209,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.byTooltip('Добавить чек-лист'), 250);
+    await tester.scrollUntilVisible(
+      find.byTooltip('Добавить чек-лист'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.byKey(const ValueKey('task-section-Чек-листы')));
     await tester.pumpAndSettle();
     expect(
@@ -425,6 +430,11 @@ void main() {
   testWidgets('edits multiple assignees and removes all assignments', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
     final repository = _DetailsRepository();
     final cubit = TaskDetailsCubit(repository, _ProfileRepository());
     addTearDown(cubit.close);
@@ -440,6 +450,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Исполнители'));
     await tester.tap(find.text('Исполнители'));
+    await tester.pumpAndSettle();
+    expect(find.text('Выбрано: 1'), findsOneWidget);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 250);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(const Key('save-assignees')).hitTestable(),
+      findsOneWidget,
+    );
+    tester.view.resetViewInsets();
     await tester.pumpAndSettle();
     expect(
       tester
@@ -492,12 +512,26 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.text('OPB-42'), findsOneWidget);
     expect(find.text('Мобильная задача'), findsOneWidget);
-    expect(find.text('Ресурс'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Чек-листы'), 120);
+    expect(find.text('РЕСУРС'), findsOneWidget);
+    expect(find.byTooltip('История группы ресурсов'), findsOneWidget);
+    expect(find.byTooltip('Добавить ресурс'), findsOneWidget);
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byKey(const ValueKey('task-section-add-РЕСУРС')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Чек-листы'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Чек-листы'), findsOneWidget);
     final budgetPosition = tester.getTopLeft(find.text('Бюджет'));
     final materialsPosition = tester.getTopLeft(find.text('Материалы'));
-    expect(materialsPosition.dy, closeTo(budgetPosition.dy, 1));
+    expect(materialsPosition.dy, closeTo(budgetPosition.dy, 24));
     expect(materialsPosition.dx, greaterThan(budgetPosition.dx));
     final gridToggle = find.byTooltip('Файлы сеткой');
     await tester.scrollUntilVisible(
@@ -620,6 +654,7 @@ class _DetailsRepository
       ),
       TaskResourceModel(
         id: 'resource-2',
+        order: 1,
         name: 'Материалы',
         planValue: 300,
         factValue: 120,

@@ -93,13 +93,15 @@ class _VoiceComposerState extends State<VoiceComposer>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden ||
+    // iOS briefly reports `inactive` while changing the audio session or
+    // showing system UI. Stopping there truncates a valid recording before the
+    // user releases the microphone button. Only an actual background/exit
+    // transition should finish the draft.
+    if (state == AppLifecycleState.inactive) return;
+    if (state == AppLifecycleState.hidden ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      // Permission dialogs can briefly make the visible app inactive. An
-      // actual background transition also cancels a pending permission wait.
-      if (_starting || (_busy && state != AppLifecycleState.inactive)) {
+      if (_starting || _busy) {
         _pauseRequested = true;
       }
       if (_recording) _finish(send: false);
@@ -402,6 +404,7 @@ class _VoiceComposerState extends State<VoiceComposer>
                       voice || widget.hasText
                           ? LucideIcons.sendHorizontal
                           : LucideIcons.mic,
+                      color: Colors.white,
                       size: AppIconSizes.standard,
                     ),
             ),

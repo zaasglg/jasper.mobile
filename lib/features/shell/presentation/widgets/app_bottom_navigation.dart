@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 
 class AppBottomNavigation extends StatelessWidget {
   const AppBottomNavigation({
@@ -7,104 +9,66 @@ class AppBottomNavigation extends StatelessWidget {
     required this.onSelected,
     super.key,
   });
-
   final List<NavigationDestination> destinations;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.white,
-    child: SafeArea(
-      top: false,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final fontSize = width >= 600
-              ? 15.0
-              : width >= 420
-              ? 14.0
-              : width >= 375
-              ? 13.0
-              : 12.0;
-          final spacious = width >= 420;
-          return Row(
-            children: [
-              for (var index = 0; index < destinations.length; index++)
-                Expanded(
-                  child: Semantics(
-                    label: destinations[index].label,
-                    selected: index == selectedIndex,
-                    button: true,
-                    child: Tooltip(
-                      message: destinations[index].label,
-                      child: InkWell(
-                        key: ValueKey('navigation-tab-$index'),
-                        onTap: () => onSelected(index),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 3,
-                            vertical: 8,
-                          ),
-                          child: ExcludeSemantics(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  height: spacious ? 38 : 32,
-                                  width: spacious ? 64 : 56,
-                                  decoration: BoxDecoration(
-                                    color: index == selectedIndex
-                                        ? Theme.of(context).colorScheme.primary
-                                              .withValues(alpha: .12)
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Transform.scale(
-                                    scale: spacious ? 1.15 : 1,
-                                    child: index == selectedIndex
-                                        ? destinations[index].selectedIcon ??
-                                              destinations[index].icon
-                                        : destinations[index].icon,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      destinations[index].label,
-                                      maxLines: 1,
-                                      softWrap: false,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .labelMedium
-                                          ?.copyWith(
-                                            fontSize: fontSize,
-                                            fontWeight: index == selectedIndex
-                                                ? FontWeight.w600
-                                                : FontWeight.w500,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.onSurfaceVariant,
-                                          ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return FTheme(
+      data: theme.brightness == Brightness.dark
+          ? FTheme.neutral.dark.touch
+          : FTheme.neutral.light.touch,
+      child: FBottomNavigationBar(
+        safeAreaBottom: true,
+        index: selectedIndex,
+        onChange: onSelected,
+        children: [
+          for (final (index, destination) in destinations.indexed)
+            FBottomNavigationBarItem(
+              key: ValueKey('navigation-tab-$index'),
+              semanticsLabel: destination.label,
+              icon: SizedBox(
+                height: AppSpacing.touchTarget,
+                width: AppSpacing.touchTarget,
+                child: Center(
+                  child: IconTheme(
+                    data: IconThemeData(
+                      size: AppSpacing.lg,
+                      color: index == selectedIndex
+                          ? colors.primary
+                          : colors.onSurfaceVariant,
                     ),
+                    child: destination.icon is Icon
+                        ? Icon(
+                            (destination.icon as Icon).icon,
+                            size: AppSpacing.lg,
+                            color: index == selectedIndex
+                                ? colors.primary
+                                : colors.onSurfaceVariant,
+                          )
+                        : destination.icon,
                   ),
                 ),
-            ],
-          );
-        },
+              ),
+              label: Text(
+                destination.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: index == selectedIndex
+                      ? colors.primary
+                      : colors.onSurfaceVariant,
+                  fontWeight: index == selectedIndex
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                ),
+              ),
+            ),
+        ],
       ),
-    ),
-  );
+    );
+  }
 }

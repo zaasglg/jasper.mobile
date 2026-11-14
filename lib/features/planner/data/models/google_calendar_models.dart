@@ -92,7 +92,11 @@ class GoogleCalendarEvent extends Equatable {
       day = DateTime(day.year, day.month, day.day + 1)
     ) {
       final midnight = plannerInstant(day, 0, 0);
-      final next = midnight.add(const Duration(days: 1));
+      final next = plannerInstant(
+        DateTime(day.year, day.month, day.day + 1),
+        0,
+        0,
+      );
       if (!start.isBefore(next) || !end.isAfter(midnight)) continue;
       final sliceStart = start.isAfter(midnight) ? start : midnight;
       final sliceEnd = end.isBefore(next) ? end : next;

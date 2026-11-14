@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "Compact task time selection replacing nested 96-slot list",
+  "platform": "ios",
+  "comparison": "existing-system",
+  "sources": [
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/lib/features/tasks/presentation/widgets/task_dates_sheet.dart",
+      "sha256": "091453f159021ba2c72e484815e3d4a707200784a7233e130c3d4e41575a06ce"
+    },
+    {
+      "path": "/Users/erdaulettojbekov/Developer/jospar/test/features/tasks/task_dates_sheet_test.dart",
+      "sha256": "91b39fb57deeba828061e12932061c0ab3aa9a3a2918b9c05b6867cc2bb19ebe"
+    }
+  ],
+  "requiredChecks": [
+    {
+      "id": "native-time-picker",
+      "kind": "visual"
+    }
+  ],
+  "checks": [
+    {
+      "id": "native-time-picker",
+      "status": "blocked",
+      "observed": "Native app flow was not launched or captured. Widget tests verify interactions and narrow layout; native appearance and keyboard remain unverified."
+    }
+  ],
+  "unresolved": [
+    "Native visual inspection and keyboard verification not performed."
+  ]
+}

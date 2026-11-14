@@ -7,10 +7,11 @@ import '../../../tasks/data/models/task_creation_models.dart';
 import '../../../tasks/presentation/cubit/my_tasks_state.dart';
 import '../../../projects/data/models/project_model.dart';
 import 'dart:async';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../data/dashboard_layout.dart';
 import '../cubit/dashboard_layout_cubit.dart';
 import '../widgets/dashboard_widget_editor.dart';
+import '../widgets/dashboard_edit_toolbar.dart';
+import '../widgets/dashboard_collapsible_widget.dart';
 import '../widgets/dashboard_widget_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -167,7 +168,12 @@ class _DashboardView extends StatelessWidget {
       final projects = context.watch<ProjectsCubit>().state.projects;
       final slots =
           state.current?.ordered
-              .where((e) => e.visible && e.definition?.available == true)
+              .where(
+                (e) =>
+                    e.visible &&
+                    e.definition?.available == true &&
+                    !(state.readOnly && e.id == 'activity'),
+              )
               .toList() ??
           <DashboardWidgetSlot>[];
       return PopScope(
@@ -188,7 +194,8 @@ class _DashboardView extends StatelessWidget {
                       state.layout == null ||
                           state.loading ||
                           state.editing ||
-                          state.saving
+                          state.saving ||
+                          state.readOnly
                       ? null
                       : cubit.enterEdit,
                   onCreate: state.saving
@@ -223,76 +230,15 @@ class _DashboardView extends StatelessWidget {
                 ),
               ),
               if (state.editing)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      const SizedBox(
-                        width: double.infinity,
-                        child: Text(
-                          'Редактирование виджетов',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: state.saving ? null : cubit.cancelEdit,
-                        child: const Text(
-                          'Отмена',
-                          style: TextStyle(fontSize: 13),
-                        ),
-                      ),
-                      FilledButton(
-                        onPressed: state.saving ? null : cubit.save,
-                        child: Text(
-                          state.saving ? 'Сохранение…' : 'Сохранить',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
+                DashboardEditToolbar(
+                  saving: state.saving,
+                  onCancel: cubit.cancelEdit,
+                  onSave: cubit.save,
+                  onAdd: () => showDashboardWidgetPicker(context, cubit),
+                  onReset: () => confirmDashboardReset(context, cubit),
                 ),
               if (state.loading || state.saving)
                 const LinearProgressIndicator(minHeight: 2),
-              if (state.editing)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: state.saving
-                                ? null
-                                : () =>
-                                      showDashboardWidgetPicker(context, cubit),
-                            icon: const Icon(LucideIcons.plus, size: 16),
-                            label: const Text(
-                              'Добавить виджет',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Сбросить виджеты',
-                        onPressed: state.saving
-                            ? null
-                            : () => confirmDashboardReset(context, cubit),
-                        icon: const Icon(LucideIcons.rotateCcw, size: 16),
-                      ),
-                    ],
-                  ),
-                ),
               Expanded(
                 child: Container(
                   decoration: const BoxDecoration(
@@ -344,24 +290,23 @@ class _DashboardView extends StatelessWidget {
                           itemBuilder: (context, index) => Padding(
                             key: ValueKey(slots[index].instanceId),
                             padding: const EdgeInsets.only(bottom: 14),
-                            child: Column(
-                              children: [
-                                DashboardEditActions(
-                                  slot: slots[index],
-                                  cubit: cubit,
-                                  projects: projects,
-                                  index: index,
-                                  count: slots.length,
+                            child: Material(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: Column(
+                                  children: [
+                                    DashboardEditActions(
+                                      slot: slots[index],
+                                      cubit: cubit,
+                                      projects: projects,
+                                      index: index,
+                                      count: slots.length,
+                                    ),
+                                  ],
                                 ),
-                                IgnorePointer(
-                                  child: _widget(
-                                    context,
-                                    slots[index],
-                                    state,
-                                    projects,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
                         )
@@ -399,7 +344,22 @@ class _DashboardView extends StatelessWidget {
                               return Padding(
                                 key: ValueKey(slot.instanceId),
                                 padding: const EdgeInsets.only(bottom: 20),
-                                child: _widget(context, slot, state, projects),
+                                child: DashboardCollapsibleWidget(
+                                  key: ValueKey('collapse-${slot.instanceId}'),
+                                  title: switch (slot.id) {
+                                    'kpi-group' => 'Общие данные',
+                                    'daily-motivation' => 'AI рекомендации',
+                                    'activity' => 'Последняя активность',
+                                    _ => slot.definition?.title ?? slot.id,
+                                  },
+                                  icon: dashboardWidgetIcon(slot.id),
+                                  child: _widget(
+                                    context,
+                                    slot,
+                                    state,
+                                    projects,
+                                  ),
+                                ),
                               );
                             },
                           ),

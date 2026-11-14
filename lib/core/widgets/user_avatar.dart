@@ -1,6 +1,7 @@
+import '../network/api_constants.dart';
+import 'cached_svg_image.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../di/service_locator.dart';
 import '../network/user_avatar_repository.dart';
@@ -13,7 +14,7 @@ String? resolveUserAvatarUrl(String? value) {
   if (source.startsWith('data:image/')) return source;
   final uri = Uri.tryParse(source);
   if (uri == null) return null;
-  final resolved = Uri.parse('https://jospar.me/').resolveUri(uri);
+  final resolved = ApiConstants.origin.resolveUri(uri);
   return ['https', 'http'].contains(resolved.scheme)
       ? resolved.toString()
       : null;
@@ -111,7 +112,7 @@ class _UserAvatarState extends State<UserAvatar> {
     final token = sl.isRegistered<AuthTokenStorage>()
         ? sl<AuthTokenStorage>().cachedToken
         : null;
-    final sameOrigin = url != null && Uri.tryParse(url)?.host == 'jospar.me';
+    final sameOrigin = url != null && ApiConstants.isSameOrigin(url);
     final headers = sameOrigin && token != null && token.isNotEmpty
         ? <String, String>{'Authorization': 'Bearer $token'}
         : <String, String>{};
@@ -129,17 +130,18 @@ class _UserAvatarState extends State<UserAvatar> {
           content = _fallback();
         }
       } else if (Uri.parse(url).path.toLowerCase().endsWith('.svg')) {
-        content = SvgPicture.network(
-          url,
+        content = CachedSvgImage(
+          url: url,
           headers: headers,
           fit: BoxFit.cover,
-          placeholderBuilder: (_) => _fallback(),
-          errorBuilder: (_, _, _) => _fallback(),
+          fallback: _fallback(),
         );
       } else {
         content = CachedNetworkImage(
           imageUrl: url,
           httpHeaders: headers,
+          fadeInDuration: Duration.zero,
+          fadeOutDuration: Duration.zero,
           fit: BoxFit.cover,
           placeholder: (_, _) => _fallback(),
           errorWidget: (_, _, _) => _fallback(),

@@ -86,7 +86,7 @@ class MyTasksCubit extends Cubit<MyTasksState> {
   }
 
   Future<void> refresh({bool showLoading = false}) async {
-    if (_userId.isEmpty) return;
+    if (_userId.isEmpty || state.updatingTaskIds.isNotEmpty) return;
     final revision = ++_loadRevision;
     if (state.selectedScopeProjectIds.isEmpty) {
       emit(
@@ -168,6 +168,7 @@ class MyTasksCubit extends Cubit<MyTasksState> {
 
   Future<void> toggleTask(ProjectTaskModel task) async {
     if (state.updatingTaskIds.contains(task.id)) return;
+    ++_loadRevision;
     final oldTasks = state.tasks;
     final targetProgress = task.isDone ? 0 : 100;
     final optimisticTask = task.copyWith(

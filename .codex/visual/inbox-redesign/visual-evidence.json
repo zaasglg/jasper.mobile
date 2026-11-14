@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "JosparBee Inbox redesign: success state with two tasks; generated target 851x1849 and native iPhone 17 Pro Max render 1320x2868",
+  "platform": "ios",
+  "sources": [
+    {
+      "path": "../../../lib/features/inbox/presentation/screens/inbox_screen.dart",
+      "sha256": "ecb0fa5eb1e4ef1c88406ecfb8adac9c1b6bc24b78a1b9326a5399df870a40d3"
+    },
+    {
+      "path": "../../../lib/core/theme/app_ui_tokens.dart",
+      "sha256": "f56e98745002c0e23d0b8551b473bb75d0f087794302ab312e0f3f6c41531dd9"
+    },
+    {
+      "path": "../../../lib/core/theme/app_theme.dart",
+      "sha256": "d0c09074dfc0da5b204432c2f5a4391af8111b453729676719853fdede6d293b"
+    }
+  ],
+  "comparison": "target",
+  "target": {
+    "path": "/Users/erdaulettojbekov/.codex/generated_images/01a1d522-118b-7040-9ddd-68e51c4c8551/exec-afd6dd40-5381-4518-8f53-5ca5ccee3821.png",
+    "kind": "image",
+    "sha256": "96da3d3f12786a2edba749201a805166dfb47bafc9140034891c3c05d8c6f1d5"
+  },
+  "requiredChecks": [
+    {
+      "id": "ios-success-state",
+      "kind": "visual"
+    }
+  ],
+  "checks": [
+    {
+      "id": "ios-success-state",
+      "status": "pass",
+      "state": "Inbox loaded with two unassigned tasks",
+      "environment": {
+        "kind": "simulator",
+        "name": "iPhone 17 Pro Max, iOS 26.2",
+        "width": 1320,
+        "height": 2868
+      },
+      "observed": "Inspected the native render against the generated direction. Header hierarchy, compact rows, separators, task controls, metadata grouping, pinned composer, safe areas, and bottom navigation are present without clipping. The target used different pixel dimensions, so this is a structural visual comparison rather than a 1:1 claim.",
+      "artifacts": [
+        {
+          "path": "ios-inbox-final.png",
+          "kind": "image",
+          "sha256": "7fb131a0f8a91f83194f214ef5797c7b1b0efd433004ad724912c4fb775ee374"
+        }
+      ]
+    }
+  ],
+  "unresolved": []
+}

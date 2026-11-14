@@ -1,3 +1,5 @@
+import '../../../core/theme/app_ui_tokens.dart';
+import '../../../core/widgets/app_color_picker.dart';
 import '../../../core/widgets/app_dialog.dart';
 import 'dart:convert';
 import 'dart:ui' as ui;
@@ -15,6 +17,7 @@ import '../../../core/widgets/app_form_surface.dart';
 import '../data/collaboration_models.dart';
 import '../domain/collaboration_repository.dart';
 import 'collaboration_cubit.dart';
+import 'workspace_participants_panel.dart';
 
 class SpaceManagementScreen extends StatelessWidget {
   const SpaceManagementScreen({
@@ -46,6 +49,9 @@ class _ManagementBody extends StatelessWidget {
       final cubit = context.read<CollaborationCubit>();
       final space = state.space;
       return Scaffold(
+        backgroundColor: cubit.kind == SpaceKind.project
+            ? Theme.of(context).colorScheme.surfaceContainerLow
+            : null,
         appBar: AppBar(
           title: Text(
             'Настройки ${cubit.kind == SpaceKind.project ? 'проекта' : 'workspace'}',
@@ -60,186 +66,239 @@ class _ManagementBody extends StatelessWidget {
                         child: const Text('Повторить загрузку'),
                       ),
               )
-            : AppFormSurface(
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    if (state.loading || state.saving)
-                      const LinearProgressIndicator(minHeight: 2),
-                    _SpaceFields(
-                      key: ValueKey(space),
-                      space: space,
-                      kind: cubit.kind,
-                      saving: state.saving,
-                      onSave: (changes) => cubit.run(
-                        () => cubit.repository.updateSpace(
-                          cubit.kind,
-                          cubit.id,
-                          changes,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Участники · ${state.members.length}',
-                            style: GoogleFonts.manrope(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
+            : SafeArea(
+                top: false,
+                child: AppFormSurface(
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppSpacing.mdLg),
+                    children: [
+                      if (state.loading || state.saving)
+                        const LinearProgressIndicator(minHeight: 2),
+                      _SettingsSection(
+                        enabled: cubit.kind == SpaceKind.project,
+                        child: _SpaceFields(
+                          key: ValueKey(space),
+                          space: space,
+                          kind: cubit.kind,
+                          saving: state.saving,
+                          onSave: (changes) => cubit.run(
+                            () => cubit.repository.updateSpace(
+                              cubit.kind,
+                              cubit.id,
+                              changes,
                             ),
                           ),
                         ),
-                        IconButton(
-                          tooltip: 'Добавить участника',
-                          onPressed: state.saving
-                              ? null
-                              : () => _addMember(context, cubit, state),
-                          icon: const Icon(
-                            LucideIcons.userPlus,
-                            size: AppIconSizes.standard,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      if (cubit.kind == SpaceKind.project)
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.xs,
                           ),
+                          leading: const Icon(LucideIcons.users),
+                          title: const Text('Участники'),
+                          subtitle: Text(
+                            'Пользователей с доступом: ${state.members.length}',
+                          ),
+                          trailing: const Icon(LucideIcons.chevronRight),
+                          onTap: () async {
+                            await context.push(
+                              '/projects/${cubit.id}/participants',
+                            );
+                            if (!cubit.isClosed) await cubit.load();
+                          },
+                        )
+                      else ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Участники · ${state.members.length}',
+                                style: GoogleFonts.manrope(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Добавить участника',
+                              onPressed: state.saving
+                                  ? null
+                                  : () => _addMember(context, cubit, state),
+                              icon: const Icon(
+                                LucideIcons.userPlus,
+                                size: AppIconSizes.standard,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (state.error != null && state.members.isEmpty)
+                          TextButton(
+                            onPressed: cubit.load,
+                            child: const Text('Повторить загрузку участников'),
+                          ),
+                        WorkspaceParticipantsPanel(
+                          members: state.members,
+                          actions: (member) =>
+                              member.role == 'OWNER' || member.isWorkspaceOwner
+                              ? null
+                              : AppActionMenuButton<String>(
+                                  title: member.name,
+                                  tooltip: 'Действия участника',
+                                  groups: [
+                                    [
+                                      for (final role in memberRoles.entries)
+                                        AppMenuAction(
+                                          value: role.key,
+                                          label: role.value,
+                                          icon: LucideIcons.shield,
+                                          selected: role.key == member.role,
+                                        ),
+                                    ],
+                                    [
+                                      const AppMenuAction(
+                                        value: 'remove',
+                                        label: 'Удалить из участников',
+                                        icon: LucideIcons.userMinus,
+                                        destructive: true,
+                                      ),
+                                    ],
+                                  ],
+                                  onSelected: (value) async {
+                                    if (state.saving) return;
+                                    if (value == 'remove') {
+                                      if (!await showAppConfirmation(
+                                        context,
+                                        'Удалить участника?',
+                                        '${member.name} потеряет доступ к этому разделу.',
+                                        confirmLabel: 'Удалить',
+                                        destructive: true,
+                                      )) {
+                                        return;
+                                      }
+                                      await cubit.run(
+                                        () => cubit.repository.removeMember(
+                                          cubit.kind,
+                                          cubit.id,
+                                          member.userId,
+                                        ),
+                                      );
+                                    } else {
+                                      await cubit.run(
+                                        () => cubit.repository.updateRole(
+                                          cubit.kind,
+                                          cubit.id,
+                                          member.userId,
+                                          value,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
                         ),
                       ],
-                    ),
-                    if (state.error != null && state.members.isEmpty)
-                      TextButton(
-                        onPressed: cubit.load,
-                        child: const Text('Повторить загрузку участников'),
-                      ),
-                    for (final member in state.members)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          member.name.isEmpty ? member.email : member.name,
+                      const SizedBox(height: 24),
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: AppSpacing.md,
+                          bottom: AppSpacing.sm,
                         ),
-                        subtitle: Text(memberRoleLabel(member.role)),
-                        trailing: member.role == 'OWNER'
-                            ? null
-                            : AppActionMenuButton<String>(
-                                title: member.name,
-                                tooltip: 'Действия участника',
-                                groups: [
-                                  [
-                                    for (final role in memberRoles.entries)
-                                      AppMenuAction(
-                                        value: role.key,
-                                        label: role.value,
-                                        icon: LucideIcons.shield,
-                                        selected: role.key == member.role,
-                                      ),
-                                  ],
-                                  [
-                                    const AppMenuAction(
-                                      value: 'remove',
-                                      label: 'Удалить из участников',
-                                      icon: LucideIcons.userMinus,
-                                      destructive: true,
-                                    ),
-                                  ],
-                                ],
-                                onSelected: (value) async {
-                                  if (state.saving) return;
-                                  if (value == 'remove') {
-                                    if (!await showAppConfirmation(
-                                      context,
-                                      'Удалить участника?',
-                                      '${member.name} потеряет доступ к этому разделу.',
-                                      confirmLabel: 'Удалить',
-                                      destructive: true,
-                                    )) {
-                                      return;
-                                    }
-                                    await cubit.run(
-                                      () => cubit.repository.removeMember(
-                                        cubit.kind,
-                                        cubit.id,
-                                        member.userId,
-                                      ),
-                                    );
-                                  } else {
-                                    await cubit.run(
-                                      () => cubit.repository.updateRole(
-                                        cubit.kind,
-                                        cubit.id,
-                                        member.userId,
-                                        value,
-                                      ),
-                                    );
-                                  }
-                                },
+                        child: Text(
+                          'Управление',
+                          style: AppTypography.caption(context)?.copyWith(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      _ManagementActionsGroup(
+                        child: Column(
+                          children: [
+                            ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                                vertical: AppSpacing.xs,
                               ),
+                              leading: const Icon(
+                                LucideIcons.archive,
+                                size: AppIconSizes.standard,
+                              ),
+                              title: const Text('Архивировать'),
+                              onTap: state.saving
+                                  ? null
+                                  : () async {
+                                      if (!await showAppConfirmation(
+                                        context,
+                                        'Архивировать ${cubit.kind.label.toLowerCase()}?',
+                                        'Вы сможете восстановить его из архива.',
+                                        confirmLabel: 'Архивировать',
+                                        destructive: false,
+                                      )) {
+                                        return;
+                                      }
+                                      if (await cubit.run(
+                                            () => cubit.repository.archive(
+                                              cubit.kind,
+                                              cubit.id,
+                                            ),
+                                            reload: false,
+                                          ) &&
+                                          context.mounted) {
+                                        context.pop('removed');
+                                      }
+                                    },
+                            ),
+                            const Divider(
+                              height: 1,
+                              indent: AppSpacing.touchTarget + AppSpacing.md,
+                              endIndent: AppSpacing.md,
+                            ),
+                            ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                                vertical: AppSpacing.xs,
+                              ),
+                              leading: const Icon(
+                                LucideIcons.trash2,
+                                size: AppIconSizes.standard,
+                                color: AppColors.error,
+                              ),
+                              title: const Text(
+                                'Удалить',
+                                style: TextStyle(color: AppColors.error),
+                              ),
+                              onTap: state.saving
+                                  ? null
+                                  : () async {
+                                      if (!await showAppConfirmation(
+                                        context,
+                                        'Удалить ${cubit.kind.label.toLowerCase()}?',
+                                        'Это действие нельзя отменить. Связанные данные могут быть удалены.',
+                                        confirmLabel: 'Удалить',
+                                        destructive: true,
+                                      )) {
+                                        return;
+                                      }
+                                      if (await cubit.run(
+                                            () => cubit.repository.delete(
+                                              cubit.kind,
+                                              cubit.id,
+                                            ),
+                                            reload: false,
+                                          ) &&
+                                          context.mounted) {
+                                        context.pop('removed');
+                                      }
+                                    },
+                            ),
+                          ],
+                        ),
                       ),
-                    const SizedBox(height: 24),
-                    const Divider(),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        LucideIcons.archive,
-                        size: AppIconSizes.standard,
-                      ),
-                      title: const Text('Архивировать'),
-                      onTap: state.saving
-                          ? null
-                          : () async {
-                              if (!await showAppConfirmation(
-                                context,
-                                'Архивировать ${cubit.kind.label.toLowerCase()}?',
-                                'Вы сможете восстановить его из архива.',
-                                confirmLabel: 'Архивировать',
-                                destructive: false,
-                              )) {
-                                return;
-                              }
-                              if (await cubit.run(
-                                    () => cubit.repository.archive(
-                                      cubit.kind,
-                                      cubit.id,
-                                    ),
-                                    reload: false,
-                                  ) &&
-                                  context.mounted) {
-                                context.pop('removed');
-                              }
-                            },
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        LucideIcons.trash2,
-                        size: AppIconSizes.standard,
-                        color: AppColors.error,
-                      ),
-                      title: const Text(
-                        'Удалить',
-                        style: TextStyle(color: AppColors.error),
-                      ),
-                      onTap: state.saving
-                          ? null
-                          : () async {
-                              if (!await showAppConfirmation(
-                                context,
-                                'Удалить ${cubit.kind.label.toLowerCase()}?',
-                                'Это действие нельзя отменить. Связанные данные могут быть удалены.',
-                                confirmLabel: 'Удалить',
-                                destructive: true,
-                              )) {
-                                return;
-                              }
-                              if (await cubit.run(
-                                    () => cubit.repository.delete(
-                                      cubit.kind,
-                                      cubit.id,
-                                    ),
-                                    reload: false,
-                                  ) &&
-                                  context.mounted) {
-                                context.pop('removed');
-                              }
-                            },
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
       );
@@ -335,14 +394,9 @@ class _SpaceFieldsState extends State<_SpaceFields> {
   late final _logo = TextEditingController(
     text: widget.space.raw['logoUrl']?.toString() ?? '',
   );
-  late DateTime? _start = DateTime.tryParse(
-    widget.space.raw['start']?.toString() ?? '',
-  );
-  late DateTime? _end = DateTime.tryParse(
-    widget.space.raw['end']?.toString() ?? '',
-  );
   late bool _pinned = widget.space.raw['isPinned'] == true;
   bool _pickingLogo = false;
+  int _logoRequest = 0;
   String? _error;
   @override
   void dispose() {
@@ -361,6 +415,8 @@ class _SpaceFieldsState extends State<_SpaceFields> {
       AppFormField(
         label: 'Название',
         child: TextField(
+          key: const Key('project_settings_name'),
+          textInputAction: TextInputAction.next,
           controller: _name,
           enabled: !widget.saving,
           decoration: InputDecoration(errorText: _error),
@@ -370,11 +426,15 @@ class _SpaceFieldsState extends State<_SpaceFields> {
         const SizedBox(height: 16),
         AppFormField(
           label: 'Код проекта',
-          child: TextField(controller: _code, enabled: !widget.saving),
+          child: TextField(
+            key: const Key('project_settings_code'),
+            controller: _code,
+            enabled: !widget.saving,
+          ),
         ),
         const SizedBox(height: 16),
         AppFormField(
-          label: 'Описание',
+          label: 'Описание · необязательно',
           child: TextField(
             controller: _description,
             enabled: !widget.saving,
@@ -382,34 +442,12 @@ class _SpaceFieldsState extends State<_SpaceFields> {
             maxLines: 5,
           ),
         ),
-        const SizedBox(height: 12),
-        for (final isStart in [true, false])
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(
-              LucideIcons.calendar,
-              size: AppIconSizes.standard,
-            ),
-            title: Text(isStart ? 'Начало проекта' : 'Окончание проекта'),
-            subtitle: Text(_formatDate(isStart ? _start : _end)),
-            onTap: widget.saving ? null : () => _pickDate(isStart),
-            trailing: IconButton(
-              tooltip: 'Убрать дату',
-              onPressed: widget.saving
-                  ? null
-                  : () => setState(() {
-                      if (isStart) {
-                        _start = null;
-                      } else {
-                        _end = null;
-                      }
-                    }),
-              icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
-            ),
-          ),
+        const SizedBox(height: AppSpacing.md),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
+          secondary: const Icon(LucideIcons.pin, size: AppIconSizes.standard),
           title: const Text('Закрепить проект'),
+          subtitle: const Text('Показывать в начале списка'),
           value: _pinned,
           activeTrackColor: AppColors.accent,
           onChanged: widget.saving
@@ -419,8 +457,12 @@ class _SpaceFieldsState extends State<_SpaceFields> {
       ] else ...[
         const SizedBox(height: 16),
         AppFormField(
-          label: 'Цвет (#RRGGBB)',
-          child: TextField(controller: _color, enabled: !widget.saving),
+          label: 'Цвет',
+          child: AppColorPicker(
+            value: _color.text,
+            enabled: !widget.saving,
+            onChanged: (value) => setState(() => _color.text = value),
+          ),
         ),
         const SizedBox(height: 12),
         Row(
@@ -441,10 +483,19 @@ class _SpaceFieldsState extends State<_SpaceFields> {
                 ),
               ),
             ),
-            if (_logo.text.isNotEmpty)
+            if (_logo.text.isNotEmpty || _pickingLogo)
               IconButton(
-                tooltip: 'Убрать логотип',
-                onPressed: widget.saving ? null : () => setState(_logo.clear),
+                tooltip: _pickingLogo ? 'Отменить загрузку' : 'Убрать логотип',
+                onPressed: widget.saving
+                    ? null
+                    : () => setState(() {
+                        _logoRequest++;
+                        if (_pickingLogo) {
+                          _pickingLogo = false;
+                        } else {
+                          _logo.clear();
+                        }
+                      }),
                 icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
               ),
           ],
@@ -454,6 +505,7 @@ class _SpaceFieldsState extends State<_SpaceFields> {
         Text(_error!, style: const TextStyle(color: AppColors.error)),
       const SizedBox(height: 20),
       AppFormButton(
+        key: const Key('project_settings_save'),
         onPressed: widget.saving || _pickingLogo
             ? null
             : () async {
@@ -468,12 +520,6 @@ class _SpaceFieldsState extends State<_SpaceFields> {
                   setState(() => _error = 'Укажите цвет в формате #RRGGBB');
                   return;
                 }
-                if (_start != null && _end != null && _end!.isBefore(_start!)) {
-                  setState(
-                    () => _error = 'Окончание должно быть после начала проекта',
-                  );
-                  return;
-                }
                 setState(() => _error = null);
                 await widget.onSave({
                   'name': _name.text.trim(),
@@ -481,8 +527,6 @@ class _SpaceFieldsState extends State<_SpaceFields> {
                     'code': _code.text.trim(),
                     'description': _description.text.trim(),
                     'isPinned': _pinned,
-                    'start': _start?.toUtc().toIso8601String(),
-                    'end': _end?.toUtc().toIso8601String(),
                   },
                   if (widget.kind == SpaceKind.workspace) ...{
                     'color': _color.text.trim(),
@@ -492,35 +536,25 @@ class _SpaceFieldsState extends State<_SpaceFields> {
                   },
                 });
               },
-        child: Text(widget.saving ? 'Сохранение…' : 'Сохранить'),
+        child: Text(
+          widget.saving ? 'Сохранение…' : 'Сохранить',
+          style: AppTypography.body(context)?.copyWith(
+            color: Theme.of(context).colorScheme.onPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     ],
   );
-  String _formatDate(DateTime? date) => date == null
-      ? 'Не указана'
-      : '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
-  Future<void> _pickDate(bool isStart) async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: (isStart ? _start : _end) ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (date != null && mounted) {
-      setState(() {
-        if (isStart) {
-          _start = date;
-        } else {
-          _end = date;
-        }
-      });
-    }
-  }
-
   Future<void> _pickLogo() async {
-    setState(() => _pickingLogo = true);
+    final request = ++_logoRequest;
+    setState(() {
+      _pickingLogo = true;
+      _error = null;
+    });
     try {
       final files = await FilePicker.pickFiles(type: FileType.image);
+      if (!mounted || request != _logoRequest) return;
       if (files.isEmpty) return;
       if ((await files.first.length() ?? 0) > 20 * 1024 * 1024) {
         throw const FormatException('Выберите изображение размером до 20 МБ');
@@ -537,7 +571,7 @@ class _SpaceFieldsState extends State<_SpaceFields> {
           final data = await frame.image.toByteData(
             format: ui.ImageByteFormat.png,
           );
-          if (data != null && mounted) {
+          if (data != null && mounted && request == _logoRequest) {
             setState(
               () => _logo.text =
                   'data:image/png;base64,${base64Encode(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes))}',
@@ -550,14 +584,60 @@ class _SpaceFieldsState extends State<_SpaceFields> {
         codec.dispose();
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && request == _logoRequest) {
         setState(
           () => _error =
               'Не удалось прочитать логотип. Выберите другое изображение.',
         );
       }
     } finally {
-      if (mounted) setState(() => _pickingLogo = false);
+      if (mounted && request == _logoRequest) {
+        setState(() => _pickingLogo = false);
+      }
     }
   }
+}
+
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({required this.child, required this.enabled});
+  final Widget child;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: Material(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ManagementActionsGroup extends StatelessWidget {
+  const _ManagementActionsGroup({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Theme.of(context).colorScheme.surfaceContainerLowest,
+    borderRadius: BorderRadius.circular(AppRadius.lg),
+    clipBehavior: Clip.antiAlias,
+    child: ListTileTheme(
+      data: ListTileTheme.of(context).copyWith(
+        shape: const RoundedRectangleBorder(),
+        tileColor: Colors.transparent,
+      ),
+      child: child,
+    ),
+  );
 }

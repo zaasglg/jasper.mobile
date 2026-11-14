@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../projects/data/models/project_model.dart';
 import 'dashboard_task_list_sheet.dart';
 import 'dashboard_widget_panel.dart'
@@ -40,6 +41,63 @@ class DashboardResourceWidget extends StatefulWidget {
   @override
   State<DashboardResourceWidget> createState() =>
       _DashboardResourceWidgetState();
+}
+
+class ResourceEmptyState extends StatelessWidget {
+  const ResourceEmptyState({
+    super.key,
+    required this.title,
+    required this.description,
+  });
+
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xl,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: AppSpacing.touchTarget,
+            height: AppSpacing.touchTarget,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: const Icon(
+              LucideIcons.archive,
+              size: AppSpacing.lg,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: AppTypography.title(context)?.copyWith(color: AppColors.ink),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 300),
+            child: Text(
+              description,
+              textAlign: TextAlign.center,
+              style: AppTypography.body(
+                context,
+              )?.copyWith(color: AppColors.muted, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
@@ -741,15 +799,15 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
             ?widget.trailing,
           ],
         ),
-        const SizedBox(height: 10),
+        const Divider(height: AppSpacing.xxs, color: AppColors.border),
         if (items.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 30),
-            child: Text(
-              _mode == 'tasks' ? 'Нет задач с ресурсами' : 'Нет данных ресурса',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: AppColors.muted),
-            ),
+          ResourceEmptyState(
+            title: _mode == 'tasks'
+                ? 'Нет задач с ресурсами'
+                : 'Нет данных ресурса',
+            description: _projectId == 'all'
+                ? 'Выберите проект или измените фильтры, чтобы увидеть данные.'
+                : 'В выбранном проекте пока нет данных для этих метрик.',
           ),
         LayoutBuilder(
           builder: (context, constraints) {

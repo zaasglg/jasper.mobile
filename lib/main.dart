@@ -8,6 +8,7 @@ import 'core/voice/assistant_launch_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'core/di/service_locator.dart';
@@ -55,9 +56,25 @@ void main() async {
 StreamSubscription<Uri?>? _widgetLinkSubscription;
 
 Future<void> _listenForInboxWidgetLaunches() async {
+  Uri? pending;
+  void tryOpen() {
+    final uri = pending;
+    if (uri == null) return;
+    final path = appRouter.routerDelegate.currentConfiguration.uri.path;
+    if (path == '/' || path == '/splash' || path == '/login') return;
+    pending = null;
+    appRouter.go(
+      uri.queryParameters['action'] == 'add'
+          ? '/inbox?compose=${DateTime.now().microsecondsSinceEpoch}'
+          : '/inbox',
+    );
+  }
+
+  appRouter.routerDelegate.addListener(tryOpen);
   void openInbox(Uri? uri) {
     if (uri?.scheme == 'jospar' && uri?.host == 'inbox') {
-      appRouter.go('/inbox');
+      pending = uri;
+      tryOpen();
     }
   }
 
@@ -77,16 +94,31 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'josparbee',
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      supportedLocales: [
+        const Locale('en'),
+        for (final language in kMaterialSupportedLanguages)
+          if (language != 'en') Locale(language),
+      ],
       builder: (context, child) => CallsHost(
         routeChanges: appRouter.routerDelegate,
         onOpen: () {
-          if (appRouter.routerDelegate.currentConfiguration.uri.path !=
+          if (appRouter
+                  .routerDelegate
+                  .currentConfiguration
+                  .last
+                  .matchedLocation !=
               '/call') {
             appRouter.push('/call');
           }
         },
         onCallPage: () =>
-            appRouter.routerDelegate.currentConfiguration.uri.path == '/call',
+            appRouter
+                .routerDelegate
+                .currentConfiguration
+                .last
+                .matchedLocation ==
+            '/call',
         child: child ?? const SizedBox(),
       ),
       theme: AppTheme.light,

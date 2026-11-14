@@ -1,6 +1,7 @@
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_widget_skeleton.dart';
 import '../../../../core/theme/dashboard_surface.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import '../../data/mentions_read_storage.dart';
 import 'dashboard_mentions_widget.dart';
 import 'dashboard_resource_widget.dart';
@@ -103,10 +104,7 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
   void _load() {
     final kind = widget.slot.id;
     if (kind == 'calendar') {
-      _future = cubit.data(
-        _dataKey,
-        () => sl<PlannerRepository>().load(widget.workspaceId),
-      );
+      _future = cubit.data(_dataKey, () => sl<PlannerRepository>().load());
     } else if (['activity', 'mentions'].contains(kind)) {
       _future = cubit.data(_dataKey, () async {
         final result = await cubit.repository.widgetData(
@@ -622,7 +620,7 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
                   child: AppWidgetHeading(
                     icon: dashboardWidgetIcon(widget.slot.id),
                     title: widget.slot.id == 'daily-motivation'
-                        ? 'AI РЕКОМЕНДАЦИИ'
+                        ? 'AI рекомендации'
                         : widget.slot.definition?.title ?? widget.slot.id,
                     iconColor: widget.slot.id == 'daily-motivation'
                         ? AppColors.accent
@@ -739,7 +737,8 @@ class _AiRecommendations extends StatelessWidget {
       children: [
         for (var index = 0; index < items.length; index++) ...[
           _AiRecommendationCard(item: items[index]),
-          if (index != items.length - 1) const SizedBox(height: 8),
+          if (index != items.length - 1)
+            const Divider(height: AppSpacing.md, color: AppColors.border),
         ],
       ],
     );
@@ -751,85 +750,59 @@ class _AiRecommendationCard extends StatelessWidget {
 
   final _AiRecommendationData item;
 
-  static const _danger = Color(0xFFC43D3D);
-  static const _dangerSurface = Color(0xFFFFF4F3);
-  static const _warning = Color(0xFF9A5B10);
-  static const _warningSurface = Color(0xFFFFF7E8);
-  static const _ink = Color(0xFF20202F);
-
   @override
   Widget build(BuildContext context) {
-    final tone = item.isOverdue ? _danger : _warning;
-    final surface = item.isOverdue ? _dangerSurface : _warningSurface;
+    final colors = Theme.of(context).colorScheme;
+    final tone = item.isOverdue ? colors.error : colors.primary;
     final status = item.isOverdue
         ? '${item.count} ${_taskWord(item.count, short: true)}'
         : '${item.count} активных';
     final detail = item.isOverdue
-        ? 'отстаёт по срокам. Проверьте приоритеты и помогите пересмотреть дедлайны.'
-        : 'нагрузка выше средней (${item.average}). Стоит перераспределить задачи.';
+        ? 'Пересмотрите сроки и приоритеты задач.'
+        : 'Перераспределите задачи: средняя нагрузка — ${item.average}.';
 
     return Semantics(
       container: true,
       label: '${item.name}. $status. $detail',
-      child: Container(
+      child: SizedBox(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(12),
-        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             UserAvatar(
-              size: 34,
+              size: AppSpacing.lg + AppSpacing.sm,
               userId: item.userId,
               name: item.name,
               avatarUrl: item.avatarUrl,
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.muted,
+              backgroundColor: colors.surfaceContainerHighest,
+              foregroundColor: colors.onSurfaceVariant,
             ),
-            const SizedBox(width: 11),
+            const SizedBox(width: AppSpacing.sm + AppSpacing.xs),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: _ink,
-                            fontSize: 13,
-                            height: 1.25,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _StatusBadge(
-                        label: status,
-                        color: tone,
-                        icon: item.isOverdue
-                            ? LucideIcons.triangleAlert
-                            : LucideIcons.gauge,
-                      ),
-                    ],
+                  Text(
+                    item.name,
+                    style: AppTypography.body(context)?.copyWith(
+                      color: colors.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: AppSpacing.xs),
+                  _StatusBadge(
+                    label: status,
+                    color: tone,
+                    icon: item.isOverdue
+                        ? LucideIcons.triangleAlert
+                        : LucideIcons.gauge,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     detail,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF68697A),
-                      fontSize: 11.5,
-                      height: 1.38,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: AppTypography.caption(
+                      context,
+                    )?.copyWith(color: colors.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -865,28 +838,20 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ExcludeSemantics(
-      child: Container(
-        padding: const EdgeInsetsDirectional.fromSTEB(6, 4, 7, 4),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.82),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: color),
-            const SizedBox(width: 4),
-            Text(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: AppSpacing.md, color: color),
+          const SizedBox(width: AppSpacing.xs),
+          Flexible(
+            child: Text(
               label,
-              style: TextStyle(
-                color: color,
-                fontSize: 10.5,
-                height: 1,
-                fontWeight: FontWeight.w700,
-              ),
+              style: AppTypography.caption(
+                context,
+              )?.copyWith(color: color, fontWeight: FontWeight.w500),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

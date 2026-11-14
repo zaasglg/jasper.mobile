@@ -6,6 +6,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/tasks/data/repositories/task_details_repository_impl.dart';
 
 void main() {
+  test('creates project epic with trimmed name and selected color', () async {
+    final adapter = _TaskDetailsAdapter();
+    final repository = TaskDetailsRepositoryImpl(
+      Dio(BaseOptions(baseUrl: 'https://example.test/api/'))
+        ..httpClientAdapter = adapter,
+    );
+    await repository.createEpic(
+      projectId: 'project-1',
+      name: '  Запуск  ',
+      color: '#2563EB',
+    );
+    expect(adapter.epicBody, {
+      'projectId': 'project-1',
+      'name': 'Запуск',
+      'color': '#2563EB',
+    });
+    await expectLater(
+      repository.createEpic(
+        projectId: 'project-1',
+        name: '   ',
+        color: '#2563EB',
+      ),
+      throwsA(isA<Exception>()),
+    );
+  });
   test('rename patches only the trimmed title', () async {
     final adapter = _TaskDetailsAdapter();
     final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/'))
@@ -53,6 +78,7 @@ void main() {
 }
 
 class _TaskDetailsAdapter implements HttpClientAdapter {
+  Map<String, dynamic>? epicBody;
   Map<String, dynamic>? titlePatch;
   String? updatedDescription;
   num? updatedEstimate;
@@ -65,6 +91,10 @@ class _TaskDetailsAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    if (options.path == 'epics' && options.method == 'POST') {
+      epicBody = Map<String, dynamic>.from(options.data as Map);
+      return _jsonResponse('{}', statusCode: 201);
+    }
     if (options.path == 'kanban-columns') {
       expect(options.queryParameters['projectId'], 'project-1');
       return _jsonResponse(

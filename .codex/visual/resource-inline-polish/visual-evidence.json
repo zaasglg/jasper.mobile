@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "Resource paired inline inputs: explicit outlined fields, integrated calculators, compact consumption badge and shared history action",
+  "platform": "ios",
+  "sources": [{"path": "../../../lib/features/tasks/presentation/widgets/task_resource_pairs.dart", "sha256": "7c1f7357d9f9cbbab0171dae58aeddf39c54c7d47516ed4ab17e33cb489d6b65"}],
+  "comparison": "existing-system",
+  "requiredChecks": [{"id": "native-resource-visual", "kind": "visual"}],
+  "checks": [{"id": "native-resource-visual", "status": "blocked", "state": "Plan 400, fact 0; mobile component rendered at 390 logical pixels wide", "observed": "The widget-test capture was inspected and rejected because test fonts rendered as missing glyphs. Layout and interaction tests are separate evidence; this is not a native visual pass. No usable native capture was obtained.", "artifacts": []}],
+  "unresolved": ["Native iOS visual verification with loaded application fonts remains outstanding."]
+}

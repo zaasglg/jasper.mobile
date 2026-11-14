@@ -104,11 +104,11 @@ private struct InboxWidgetView: View {
                 Spacer(minLength: 6)
             }
 
-            Text("Открыть  →")
+            Text("＋ Добавить задачу")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(Color(red: 0.39, green: 0.40, blue: 0.95))
         }
-        .widgetURL(URL(string: "jospar://inbox?homeWidget"))
+        .widgetURL(URL(string: "jospar://inbox?homeWidget&action=add"))
         .widgetBackground(Color.white)
     }
 }

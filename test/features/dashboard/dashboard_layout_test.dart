@@ -77,14 +77,14 @@ void main() {
     }
   });
 
-  test('invalid non-empty dashboard config still fails', () {
+  test('legacy dashboard configs use web defaults', () {
+    expect(() => DashboardLayout.parse('{broken'), throwsFormatException);
     for (final value in <dynamic>[
-      '{broken',
       {},
       {'layout': {}},
       {'widgets': 'invalid'},
     ]) {
-      expect(() => DashboardLayout.parse(value), throwsFormatException);
+      expect(DashboardLayout.parse(value), DashboardLayout.defaults());
     }
     expect(DashboardLayout.parse(jsonEncode(fixture().extra)), fixture());
   });
@@ -114,19 +114,38 @@ void main() {
     },
   );
 
-  test('HTTP errors do not fall back to a default dashboard', () async {
-    final adapter = DashboardAdapter()..configResponseBody = '';
+  test(
+    'workspace guests get a read-only default dashboard on HTTP 403',
+    () async {
+      final adapter = DashboardAdapter()..configResponseBody = '';
+      final cubit = DashboardLayoutCubit(
+        DashboardRepositoryImpl(Dio()..httpClientAdapter = adapter),
+      );
+      addTearDown(cubit.close);
+      adapter.configStatusCode = 403;
+      await cubit.configure('u', 'guest-workspace');
+      expect(cubit.state.layout, DashboardLayout.defaults());
+      expect(cubit.state.loading, false);
+      expect(cubit.state.readOnly, true);
+      expect(cubit.state.error, isNull);
+
+      cubit.enterEdit();
+      expect(cubit.state.editing, false);
+    },
+  );
+
+  test('server errors do not fall back to a default dashboard', () async {
+    final adapter = DashboardAdapter()
+      ..configResponseBody = ''
+      ..configStatusCode = 500;
     final cubit = DashboardLayoutCubit(
       DashboardRepositoryImpl(Dio()..httpClientAdapter = adapter),
     );
     addTearDown(cubit.close);
-    for (final status in [403, 500]) {
-      adapter.configStatusCode = status;
-      await cubit.configure('u', 'w', refresh: true);
-      expect(cubit.state.layout, isNull);
-      expect(cubit.state.loading, false);
-      expect(cubit.state.error, isNotNull);
-    }
+    await cubit.configure('u', 'w');
+    expect(cubit.state.layout, isNull);
+    expect(cubit.state.loading, false);
+    expect(cubit.state.error, isNotNull);
   });
 
   test(
@@ -154,10 +173,7 @@ void main() {
       expect(legacy.widgets.first.instanceId, 'my-tasks');
       expect(legacy.widgets.first.visible, false);
       expect(legacy.widgets.any((e) => e.id == 'daily-motivation'), true);
-      expect(
-        () => DashboardLayout.parse({'layout': {}}),
-        throwsFormatException,
-      );
+      expect(DashboardLayout.parse({'layout': {}}), DashboardLayout.defaults());
     },
   );
   test(

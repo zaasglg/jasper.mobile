@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/auth/data/models/login_request.dart';
@@ -8,6 +9,7 @@ import 'package:jospar/features/auth/presentation/screens/login_screen.dart';
 
 void main() {
   testWidgets('login form validates empty fields locally', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     await tester.pumpWidget(
       MaterialApp(
         home: BlocProvider<AuthCubit>(
@@ -17,8 +19,9 @@ void main() {
       ),
     );
 
-    expect(find.text('С возвращением'), findsOneWidget);
+    expect(find.text('Войти в JosparBee'), findsOneWidget);
     expect(find.byKey(const Key('google_login_button')), findsOneWidget);
+    expect(find.byKey(const Key('apple_login_button')), findsOneWidget);
     expect(find.text('Войти'), findsOneWidget);
 
     final submitButton = find.byKey(const Key('login_submit_button'));
@@ -28,6 +31,8 @@ void main() {
 
     expect(find.text('Введите email'), findsOneWidget);
     expect(find.text('Введите пароль'), findsWidgets);
+    await tester.pump(const Duration(milliseconds: 1100));
+    debugDefaultTargetPlatformOverride = null;
   });
 }
 

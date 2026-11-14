@@ -1,3 +1,4 @@
+import 'task_labels_editor.dart';
 import '../../data/services/task_file_picker.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import 'dart:typed_data';
@@ -17,6 +18,12 @@ import '../cubit/task_details_cubit.dart';
 import '../cubit/task_details_state.dart';
 
 enum TaskExtraTab { labels, epics, resources, files }
+
+Future<double?> showResourceCalculator(BuildContext context, double current) =>
+    showAppDialog<double>(
+      context: context,
+      builder: (_) => _ResourceCalculator(current: current),
+    );
 
 Future<void> showTaskExtras(BuildContext context, TaskExtraTab tab) =>
     showModalBottomSheet<void>(
@@ -56,260 +63,176 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
       final busy = state.isSaving || _picking;
       return AppFormSurface(
         child: SafeArea(
-          child: SizedBox(
-            height: MediaQuery.sizeOf(context).height * .7,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 4,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          switch (widget.tab) {
-                            TaskExtraTab.labels => 'Метки',
-                            TaskExtraTab.epics => 'Эпики',
-                            TaskExtraTab.resources => 'Ресурсы',
-                            TaskExtraTab.files => 'Файлы',
-                          },
-                          style: GoogleFonts.manrope(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Закрыть',
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(
-                          LucideIcons.x,
-                          size: AppIconSizes.standard,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (busy) const LinearProgressIndicator(minHeight: 2),
-                if (state.actionErrorMessage != null)
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight:
+                    (MediaQuery.sizeOf(context).height * .82 -
+                            MediaQuery.viewInsetsOf(context).bottom)
+                        .clamp(120.0, double.infinity),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      state.actionErrorMessage!,
-                      style: const TextStyle(color: AppColors.error),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 4,
                     ),
-                  ),
-                Expanded(
-                  child: switch (widget.tab) {
-                    TaskExtraTab.labels => _labels(state, cubit, busy),
-                    TaskExtraTab.epics => _EpicsEditor(),
-                    TaskExtraTab.resources => ListView(
-                      padding: const EdgeInsets.all(20),
+                    child: Row(
                       children: [
-                        for (final resource in state.resources)
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(resource.name),
-                            subtitle: Text(
-                              'План: ${resource.planValue} · Факт: ${resource.factValue}',
-                            ),
-                            onTap: busy
-                                ? null
-                                : () => _editResource(cubit, resource),
-                            trailing: IconButton(
-                              tooltip: 'Удалить ресурс',
-                              onPressed: busy
-                                  ? null
-                                  : () async {
-                                      if (await showAppConfirmation(
-                                        context,
-                                        'Удалить ресурс?',
-                                        resource.name,
-                                        confirmLabel: 'Удалить',
-                                        destructive: true,
-                                      )) {
-                                        await cubit.deleteResource(resource.id);
-                                      }
-                                    },
-                              icon: const Icon(
-                                LucideIcons.trash2,
-                                size: AppIconSizes.standard,
-                              ),
+                        Expanded(
+                          child: Text(
+                            switch (widget.tab) {
+                              TaskExtraTab.labels => 'Метки',
+                              TaskExtraTab.epics => 'Эпики',
+                              TaskExtraTab.resources => 'Ресурсы',
+                              TaskExtraTab.files => 'Файлы',
+                            },
+                            style: GoogleFonts.manrope(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        if (state.resources.isEmpty) const Text('Нет ресурсов'),
-                        TextButton.icon(
+                        ),
+                        IconButton(
+                          tooltip: 'Закрыть',
                           onPressed: busy
                               ? null
-                              : () => _editResource(cubit, null),
+                              : () => Navigator.maybePop(context),
                           icon: const Icon(
-                            LucideIcons.plus,
+                            LucideIcons.x,
                             size: AppIconSizes.standard,
                           ),
-                          label: const Text('Добавить ресурс'),
                         ),
                       ],
                     ),
-                    TaskExtraTab.files => ListView(
-                      padding: const EdgeInsets.all(20),
-                      children: [
-                        for (final file in state.detail.files)
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(file.name),
-                            subtitle: Text('${(file.size / 1024).ceil()} КБ'),
-                            leading: const Icon(
-                              LucideIcons.paperclip,
-                              size: AppIconSizes.standard,
-                            ),
-                            onTap: () => _download(file),
-                            trailing: IconButton(
-                              tooltip: 'Удалить файл',
-                              onPressed: busy
+                  ),
+                  if (busy) const LinearProgressIndicator(minHeight: 2),
+                  if (state.actionErrorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        state.actionErrorMessage!,
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                    ),
+                  Flexible(
+                    child: switch (widget.tab) {
+                      TaskExtraTab.labels => const TaskLabelsEditor(),
+                      TaskExtraTab.epics => _EpicsEditor(),
+                      TaskExtraTab.resources => ListView(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.all(20),
+                        children: [
+                          for (final resource in state.resources)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(resource.name),
+                              subtitle: Text(
+                                'План: ${resource.planValue} · Факт: ${resource.factValue}',
+                              ),
+                              onTap: busy
                                   ? null
-                                  : () async {
-                                      if (await showAppConfirmation(
-                                        context,
-                                        'Удалить файл?',
-                                        file.name,
-                                        confirmLabel: 'Удалить',
-                                        destructive: true,
-                                      )) {
-                                        await cubit.removeFile(file.id);
-                                      }
-                                    },
-                              icon: const Icon(
-                                LucideIcons.trash2,
-                                size: AppIconSizes.standard,
+                                  : () => _editResource(cubit, resource),
+                              trailing: IconButton(
+                                tooltip: 'Удалить ресурс',
+                                onPressed: busy
+                                    ? null
+                                    : () async {
+                                        if (await showAppConfirmation(
+                                          context,
+                                          'Удалить ресурс?',
+                                          resource.name,
+                                          confirmLabel: 'Удалить',
+                                          destructive: true,
+                                        )) {
+                                          await cubit.deleteResource(
+                                            resource.id,
+                                          );
+                                        }
+                                      },
+                                icon: const Icon(
+                                  LucideIcons.trash2,
+                                  size: AppIconSizes.standard,
+                                ),
                               ),
                             ),
+                          if (state.resources.isEmpty)
+                            const Text('Нет ресурсов'),
+                          TextButton.icon(
+                            onPressed: busy
+                                ? null
+                                : () => _editResource(cubit, null),
+                            icon: const Icon(
+                              LucideIcons.plus,
+                              size: AppIconSizes.standard,
+                            ),
+                            label: const Text('Добавить ресурс'),
                           ),
-                        if (state.detail.files.isEmpty)
-                          const Text('Нет файлов'),
-                        TextButton.icon(
-                          onPressed: busy ? null : () => _pickFiles(cubit),
-                          icon: const Icon(
-                            LucideIcons.plus,
-                            size: AppIconSizes.standard,
+                        ],
+                      ),
+                      TaskExtraTab.files => ListView(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.all(20),
+                        children: [
+                          for (final file in state.detail.files)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(file.name),
+                              subtitle: Text('${(file.size / 1024).ceil()} КБ'),
+                              leading: const Icon(
+                                LucideIcons.paperclip,
+                                size: AppIconSizes.standard,
+                              ),
+                              onTap: () => _download(file),
+                              trailing: IconButton(
+                                tooltip: 'Удалить файл',
+                                onPressed: busy
+                                    ? null
+                                    : () async {
+                                        if (await showAppConfirmation(
+                                          context,
+                                          'Удалить файл?',
+                                          file.name,
+                                          confirmLabel: 'Удалить',
+                                          destructive: true,
+                                        )) {
+                                          await cubit.removeFile(file.id);
+                                        }
+                                      },
+                                icon: const Icon(
+                                  LucideIcons.trash2,
+                                  size: AppIconSizes.standard,
+                                ),
+                              ),
+                            ),
+                          if (state.detail.files.isEmpty)
+                            const Text('Нет файлов'),
+                          TextButton.icon(
+                            onPressed: busy ? null : () => _pickFiles(cubit),
+                            icon: const Icon(
+                              LucideIcons.plus,
+                              size: AppIconSizes.standard,
+                            ),
+                            label: const Text('Добавить файлы'),
                           ),
-                          label: const Text('Добавить файлы'),
-                        ),
-                      ],
-                    ),
-                  },
-                ),
-              ],
+                        ],
+                      ),
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       );
     },
   );
-
-  Widget _labels(TaskDetailsState state, TaskDetailsCubit cubit, bool busy) {
-    final raw = state.detail.raw['personalLabels'];
-    final userId = state.currentUser?.id;
-    final personalMap = raw is Map
-        ? Map<String, dynamic>.from(raw)
-        : <String, dynamic>{};
-    final personalRaw = personalMap[userId];
-    final personal = personalRaw is List
-        ? personalRaw
-              .whereType<Map>()
-              .map(
-                (e) => TaskLabelModel.fromJson(
-                  Map<String, dynamic>.from(e),
-                ).copyWith(isPersonal: true),
-              )
-              .toList()
-        : <TaskLabelModel>[];
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        for (final isPersonal in [false, true]) ...[
-          Text(
-            isPersonal ? 'Личные метки' : 'Метки проекта',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          for (final label in isPersonal ? personal : state.detail.labels)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(label.text),
-              onTap: busy ? null : () => _editLabel(cubit, label, isPersonal),
-              trailing: IconButton(
-                tooltip: 'Убрать метку',
-                onPressed: busy
-                    ? null
-                    : () => isPersonal
-                          ? cubit.updatePersonalLabels(
-                              personal.where((e) => e.id != label.id).toList(),
-                            )
-                          : cubit.updateLabels(
-                              state.detail.labels
-                                  .where((e) => e.id != label.id)
-                                  .toList(),
-                            ),
-                icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
-              ),
-            ),
-          TextButton.icon(
-            onPressed: busy || (isPersonal && userId == null)
-                ? null
-                : () => _editLabel(cubit, null, isPersonal),
-            icon: const Icon(LucideIcons.plus, size: AppIconSizes.standard),
-            label: const Text('Добавить метку'),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ],
-    );
-  }
-
-  Future<void> _editLabel(
-    TaskDetailsCubit cubit,
-    TaskLabelModel? label,
-    bool personal,
-  ) async {
-    final result = await showAppDialog<List<String>>(
-      context: context,
-      builder: (_) => _ValuesDialog(
-        title: label == null ? 'Новая метка' : 'Изменить метку',
-        labels: const ['Название', 'Цвет (#RRGGBB)'],
-        values: [label?.text ?? '', label?.color ?? '#6D5FE0'],
-        colorField: true,
-      ),
-    );
-    if (result == null || cubit.isClosed) return;
-    final updated =
-        (label ??
-                TaskLabelModel(
-                  id: 'label_${DateTime.now().microsecondsSinceEpoch}',
-                  text: '',
-                ))
-            .copyWith(text: result[0], color: result[1]);
-    final raw = cubit.state.detail.raw['personalLabels'];
-    final currentRaw = raw is Map ? raw[cubit.state.currentUser?.id] : null;
-    final current = personal
-        ? currentRaw is List
-              ? currentRaw
-                    .whereType<Map>()
-                    .map(
-                      (e) =>
-                          TaskLabelModel.fromJson(Map<String, dynamic>.from(e)),
-                    )
-                    .toList()
-              : <TaskLabelModel>[]
-        : cubit.state.detail.labels;
-    final labels = [...current.where((e) => e.id != updated.id), updated];
-    if (personal) {
-      await cubit.updatePersonalLabels(labels);
-    } else {
-      await cubit.updateLabels(labels);
-    }
-  }
 
   Future<void> _editResource(
     TaskDetailsCubit cubit,
@@ -332,6 +255,8 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
     await cubit.saveResource(
       TaskResourceModel(
         id: resource?.id ?? '',
+        unit: resource?.unit ?? ResourceUnit.pieces,
+        customUnit: resource?.customUnit ?? '',
         name: result[0],
         planValue: double.parse(result[1].replaceAll(',', '.')),
         factValue: double.parse(result[2].replaceAll(',', '.')),
@@ -419,26 +344,38 @@ class _EpicsEditorState extends State<_EpicsEditor> {
     future: _future,
     builder: (context, snapshot) {
       if (snapshot.connectionState != ConnectionState.done) {
-        return const Center(child: CircularProgressIndicator());
+        return const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(heightFactor: 1, child: CircularProgressIndicator()),
+        );
       }
       if (snapshot.hasError) {
         return Center(
+          heightFactor: 1,
           child: TextButton(
-            onPressed: () => setState(
-              () => _future = context.read<TaskDetailsCubit>().getEpics(),
-            ),
+            onPressed: () => setState(() {
+              _future = context.read<TaskDetailsCubit>().getEpics();
+            }),
             child: const Text('Повторить загрузку эпиков'),
           ),
         );
       }
       final cubit = context.read<TaskDetailsCubit>();
-      final ids = cubit.state.task!.epics.map((e) => e.id).toSet();
-      if (snapshot.data!.isEmpty) {
-        return const Center(child: Text('В проекте нет эпиков'));
+      final linked = cubit.state.task?.epics ?? <TaskEpicModel>[];
+      final ids = linked.map((e) => e.id).toSet();
+      final available = {
+        for (final epic in [...snapshot.data!, ...linked]) epic.id: epic,
+      }.values.toList();
+      if (available.isEmpty) {
+        return const Padding(
+          padding: EdgeInsets.all(20),
+          child: Text('В проекте нет эпиков'),
+        );
       }
       return ListView(
+        shrinkWrap: true,
         children: [
-          for (final epic in snapshot.data!)
+          for (final epic in available)
             CheckboxListTile(
               title: Text(epic.name),
               value: ids.contains(epic.id),
@@ -466,11 +403,10 @@ class _ValuesDialog extends StatefulWidget {
     required this.labels,
     required this.values,
     this.numericFields = false,
-    this.colorField = false,
   });
   final String title;
   final List<String> labels, values;
-  final bool numericFields, colorField;
+  final bool numericFields;
   @override
   State<_ValuesDialog> createState() => _ValuesDialogState();
 }
@@ -503,6 +439,31 @@ class _ValuesDialogState extends State<_ValuesDialog> {
                   label: widget.labels[i],
                   child: TextField(
                     controller: _controllers[i],
+                    decoration: InputDecoration(
+                      suffixIcon: widget.numericFields && i > 0
+                          ? IconButton(
+                              tooltip: 'Калькулятор',
+                              icon: const Icon(LucideIcons.calculator),
+                              onPressed: () async {
+                                final current =
+                                    double.tryParse(
+                                      _controllers[i].text.replaceAll(',', '.'),
+                                    ) ??
+                                    0;
+                                final result = await showAppDialog<double>(
+                                  context: context,
+                                  builder: (_) =>
+                                      _ResourceCalculator(current: current),
+                                );
+                                if (!mounted || result == null) return;
+                                _controllers[i].text =
+                                    result == result.roundToDouble()
+                                    ? result.toInt().toString()
+                                    : result.toString();
+                              },
+                            )
+                          : null,
+                    ),
                     keyboardType: widget.numericFields && i > 0
                         ? const TextInputType.numberWithOptions(decimal: true)
                         : TextInputType.text,
@@ -527,11 +488,6 @@ class _ValuesDialogState extends State<_ValuesDialog> {
             setState(() => _error = 'Введите название');
             return;
           }
-          if (widget.colorField &&
-              !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(values[1])) {
-            setState(() => _error = 'Укажите цвет в формате #RRGGBB');
-            return;
-          }
           if (widget.numericFields &&
               values.skip(1).any((e) {
                 final n = double.tryParse(e.replaceAll(',', '.'));
@@ -543,6 +499,102 @@ class _ValuesDialogState extends State<_ValuesDialog> {
           Navigator.pop(context, values);
         },
         child: const Text('Сохранить'),
+      ),
+    ],
+  );
+}
+
+class _ResourceCalculator extends StatefulWidget {
+  const _ResourceCalculator({required this.current});
+  final double current;
+
+  @override
+  State<_ResourceCalculator> createState() => _ResourceCalculatorState();
+}
+
+class _ResourceCalculatorState extends State<_ResourceCalculator> {
+  final _operand = TextEditingController();
+  String _operation = '+';
+  String? _error;
+
+  @override
+  void dispose() {
+    _operand.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AppDialog(
+    title: const Text('Калькулятор'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Текущее значение: ${widget.current}',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 16),
+        SegmentedButton<String>(
+          segments: [
+            for (final operation in ['+', '−', '×', '÷'])
+              ButtonSegment(value: operation, label: Text(operation)),
+          ],
+          selected: {_operation},
+          showSelectedIcon: false,
+          onSelectionChanged: (value) => setState(() {
+            _operation = value.first;
+            _error = null;
+          }),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _operand,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+            signed: true,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Введите число',
+            errorText: _error,
+          ),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Отмена'),
+      ),
+      FilledButton(
+        onPressed: () {
+          final operand = double.tryParse(
+            _operand.text.trim().replaceAll(',', '.'),
+          );
+          if (operand == null || !operand.isFinite) {
+            setState(() => _error = 'Введите корректное число');
+            return;
+          }
+          if (_operation == '÷' && operand == 0) {
+            setState(() => _error = 'Нельзя делить на ноль');
+            return;
+          }
+          final result = switch (_operation) {
+            '+' => widget.current + operand,
+            '−' => widget.current - operand,
+            '×' => widget.current * operand,
+            _ => widget.current / operand,
+          };
+          if (!result.isFinite || result < 0) {
+            setState(
+              () => _error = 'Результат должен быть конечным числом от 0',
+            );
+            return;
+          }
+          Navigator.pop(context, result);
+        },
+        child: const Text('Применить'),
       ),
     ],
   );

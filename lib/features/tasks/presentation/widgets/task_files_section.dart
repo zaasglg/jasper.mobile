@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -69,13 +70,13 @@ class TaskFilesSection extends StatelessWidget {
           /* Keep the format icon for malformed image data. */
         }
       } else if (['http', 'https'].contains(Uri.tryParse(url)?.scheme)) {
-        child = Image.network(
-          url,
+        child = CachedNetworkImage(
+          imageUrl: url,
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
-          cacheWidth: small ? 100 : 420,
-          errorBuilder: (_, _, _) => fallback(),
+          memCacheWidth: small ? 100 : 420,
+          errorWidget: (_, _, _) => fallback(),
         );
       }
     }

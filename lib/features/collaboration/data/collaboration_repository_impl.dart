@@ -104,14 +104,38 @@ class CollaborationRepositoryImpl implements CollaborationRepository {
     await dio.delete<dynamic>('${kind.path}/${Uri.encodeComponent(id)}');
   });
   @override
-  Future<List<SpaceMember>> members(SpaceKind kind, String id) => _request(
-    () async => _list(
-      (await dio.get<dynamic>(
-        '${kind.path}/${Uri.encodeComponent(id)}/members',
-      )).data,
-      SpaceMember.fromJson,
-    ),
-  );
+  Future<List<SpaceMember>> members(SpaceKind kind, String id) =>
+      _request(() async {
+        final data = (await dio.get<dynamic>(
+          '${kind.path}/${Uri.encodeComponent(id)}/members',
+        )).data;
+        final members = _list(data, SpaceMember.fromJson);
+        if (kind == SpaceKind.workspace && data is Map) {
+          if (data['guests'] is List) {
+            for (final guest in (data['guests'] as List).whereType<Map>()) {
+              final member = SpaceMember.fromJson({
+                ...Map<String, dynamic>.from(guest),
+                'access': 'GUEST',
+              });
+              if (!members.any((m) => m.userId == member.userId)) {
+                members.add(member);
+              }
+            }
+          }
+          if (data['pendingInvites'] is List) {
+            for (final invite
+                in (data['pendingInvites'] as List).whereType<Map>()) {
+              members.add(
+                SpaceMember.fromJson({
+                  ...Map<String, dynamic>.from(invite),
+                  'access': 'INVITATION',
+                }),
+              );
+            }
+          }
+        }
+        return members;
+      });
   @override
   Future<List<SpaceMember>> candidates(String workspaceId) => _request(
     () async => _list(
