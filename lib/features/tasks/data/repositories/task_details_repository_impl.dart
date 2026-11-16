@@ -363,8 +363,15 @@ class TaskDetailsRepositoryImpl
   }
 
   @override
-  Future<TaskDetailsPayload> updateProgress(String taskId, int progress) {
-    return _patch(taskId, <String, dynamic>{'progress': progress});
+  Future<TaskDetailsPayload> updateProgress(
+    String taskId,
+    int progress, {
+    String? status,
+  }) {
+    return _patch(taskId, <String, dynamic>{
+      'progress': progress,
+      'status': ?status,
+    });
   }
 
   @override

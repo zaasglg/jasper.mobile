@@ -5,6 +5,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../domain/repositories/google_calendar_repository.dart';
 import '../cubit/google_calendar_cubit.dart';
 import '../widgets/google_calendar_settings.dart';
+import '../widgets/planner_day_agenda.dart';
+import '../widgets/task_schedule_sheet.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_form_surface.dart';
@@ -19,6 +21,7 @@ import '../../../projects/data/models/project_task_model.dart';
 import '../../../inbox/domain/repositories/inbox_repository.dart';
 import '../../../inbox/data/models/inbox_task_model.dart';
 import '../../data/models/planner_item_model.dart';
+import '../../data/planner_changes.dart';
 import '../../domain/utils/planner_dates.dart';
 import '../cubit/planner_cubit.dart';
 import '../cubit/planner_state.dart';
@@ -466,7 +469,10 @@ class _PlannerScreenState extends State<PlannerScreen>
                                 ),
                               ),
                             ),
-                            _dueLane(due),
+                            if (_view != _View.day ||
+                                due.isNotEmpty ||
+                                _taskError != null)
+                              _dueLane(due),
                             if (items.any(
                               (e) =>
                                   e.allDay &&
@@ -516,37 +522,50 @@ class _PlannerScreenState extends State<PlannerScreen>
                                     .toList(),
                               ),
                             Expanded(
-                              child: _DayTimeline(
-                                key: ValueKey(_selectedDate),
-                                selectedDate: _selectedDate,
-                                items: items
-                                    .where(
-                                      (e) =>
-                                          !e.allDay &&
-                                          e.scheduledAt != null &&
-                                          samePlannerDay(
-                                            plannerLocal(e.scheduledAt!),
-                                            _selectedDate,
-                                          ),
+                              child: _view == _View.day
+                                  ? PlannerDayAgenda(
+                                      key: ValueKey('agenda-$_selectedDate'),
+                                      selectedDate: _selectedDate,
+                                      now: plannerNow(),
+                                      items: items,
+                                      busyIds: state.busyIds,
+                                      onCreate: () => _edit(),
+                                      onEdit: (item) => _edit(item: item),
+                                      onToggle: (item) => _cubit?.toggle(item),
                                     )
-                                    .toList(),
-                                busyIds: state.busyIds,
-                                onCreate: (hour) => _edit(hour: hour),
-                                onEdit: (item) => _edit(item: item),
-                                onToggle: (item) {
-                                  if (!item.external) _cubit?.toggle(item);
-                                },
-                                onMove: (item, hour) => _cubit?.save(
-                                  item: item,
-                                  title: item.title,
-                                  scheduledAt: plannerInstant(
-                                    _selectedDate,
-                                    hour,
-                                    0,
-                                  ),
-                                  durationMinutes: item.durationMinutes,
-                                ),
-                              ),
+                                  : _DayTimeline(
+                                      key: ValueKey(_selectedDate),
+                                      selectedDate: _selectedDate,
+                                      items: items
+                                          .where(
+                                            (e) =>
+                                                !e.allDay &&
+                                                e.scheduledAt != null &&
+                                                samePlannerDay(
+                                                  plannerLocal(e.scheduledAt!),
+                                                  _selectedDate,
+                                                ),
+                                          )
+                                          .toList(),
+                                      busyIds: state.busyIds,
+                                      onCreate: (hour) => _edit(hour: hour),
+                                      onEdit: (item) => _edit(item: item),
+                                      onToggle: (item) {
+                                        if (!item.external) {
+                                          _cubit?.toggle(item);
+                                        }
+                                      },
+                                      onMove: (item, hour) => _cubit?.save(
+                                        item: item,
+                                        title: item.title,
+                                        scheduledAt: plannerInstant(
+                                          _selectedDate,
+                                          hour,
+                                          0,
+                                        ),
+                                        durationMinutes: item.durationMinutes,
+                                      ),
+                                    ),
                             ),
                           ],
                         ),
@@ -638,16 +657,24 @@ class _PlannerScreenState extends State<PlannerScreen>
         for (final item in items)
           Padding(
             padding: const EdgeInsets.only(right: 6),
-            child: ActionChip(
-              avatar: item.inboxTaskId == null
-                  ? null
-                  : const Icon(
-                      Icons.inbox_outlined,
-                      size: AppIconSizes.standard,
-                      color: AppColors.accent,
-                    ),
-              label: Text(item.displayTitle, overflow: TextOverflow.ellipsis),
-              onPressed: () => _edit(item: item),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: (MediaQuery.sizeOf(context).width - 140)
+                    .clamp(120, 400)
+                    .toDouble(),
+              ),
+              child: ActionChip(
+                key: ValueKey('planner-unscheduled-${item.id}'),
+                avatar: item.inboxTaskId == null
+                    ? null
+                    : const Icon(
+                        Icons.inbox_outlined,
+                        size: AppIconSizes.standard,
+                        color: AppColors.accent,
+                      ),
+                label: Text(item.displayTitle, overflow: TextOverflow.ellipsis),
+                onPressed: () => _edit(item: item),
+              ),
             ),
           ),
       ],
@@ -1172,35 +1199,41 @@ Future<void> _showScheduleTask(
   ProjectTaskModel? task,
   InboxTaskModel? inboxTask,
 }) async {
-  final saved = await showModalBottomSheet<bool>(
+  final saved = await showModalBottomSheet<TaskScheduleResult>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
+    useSafeArea: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
     builder: (_) => BlocProvider(
       create: (_) => sl<PlannerCubit>()..initialize(),
-      child: BlocListener<PlannerCubit, PlannerState>(
-        listenWhen: (previous, current) =>
-            previous.actionRevision != current.actionRevision,
-        listener: (context, state) {
-          if (state.actionError != null) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.actionError!)));
-          }
-        },
-        child: _PlannerEditor(
-          initialTask: task,
-          initialInboxTask: inboxTask,
-          initialDate: plannerDate(plannerNow()),
-          hour: 9,
-          tasks: [?task],
-        ),
+      child: TaskScheduleSheet(
+        title: task?.title ?? inboxTask!.title,
+        source: task == null
+            ? 'Инбокс'
+            : task.displayId.isEmpty
+            ? 'Задача проекта'
+            : task.displayId,
+        projectId: task?.projectId,
+        taskId: task?.id,
+        inboxTaskId: inboxTask?.id,
       ),
     ),
   );
-  if (saved == true && context.mounted) {
+  if (saved != null) {
+    notifyPlannerChanges();
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Задача добавлена в ежедневник')),
+      SnackBar(
+        content: Text(
+          saved == TaskScheduleResult.added
+              ? 'Задача добавлена в ежедневник'
+              : 'Время в ежедневнике обновлено',
+        ),
+      ),
     );
   }
 }
@@ -1208,15 +1241,11 @@ Future<void> _showScheduleTask(
 class _PlannerEditor extends StatefulWidget {
   const _PlannerEditor({
     this.item,
-    this.initialTask,
-    this.initialInboxTask,
     required this.initialDate,
     required this.hour,
     required this.tasks,
   });
   final PlannerItemModel? item;
-  final ProjectTaskModel? initialTask;
-  final InboxTaskModel? initialInboxTask;
   final DateTime initialDate;
   final int hour;
   final List<ProjectTaskModel> tasks;
@@ -1232,12 +1261,12 @@ class _PlannerEditorState extends State<_PlannerEditor> {
   ProjectTaskModel? _task;
   InboxTaskModel? _inbox;
   String? _validation;
+  String? _removeError;
+  bool _removing = false;
   bool _picking = false;
   @override
   void initState() {
     super.initState();
-    _task = widget.initialTask;
-    _inbox = widget.initialInboxTask;
     _title = TextEditingController(
       text: widget.item?.title ?? _task?.title ?? _inbox?.title ?? '',
     );
@@ -1350,10 +1379,32 @@ class _PlannerEditorState extends State<_PlannerEditor> {
     if (mounted && success) Navigator.pop(context, true);
   }
 
+  Future<void> _remove() async {
+    final item = widget.item;
+    if (item == null || _removing) return;
+    final cubit = context.read<PlannerCubit>();
+    setState(() {
+      _removing = true;
+      _removeError = null;
+    });
+    final removed = await cubit.remove(item);
+    if (!mounted) return;
+    if (removed) {
+      Navigator.pop(context);
+    } else {
+      setState(() {
+        _removing = false;
+        _removeError =
+            cubit.state.actionError ??
+            'Не удалось убрать запись из ежедневника. Повторите попытку.';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) => BlocBuilder<PlannerCubit, PlannerState>(
     builder: (context, state) {
-      final saving = state.isSaving;
+      final saving = state.isSaving || _removing;
       final item = widget.item;
       return AppFormSurface(
         child: SafeArea(
@@ -1396,9 +1447,7 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                       minLines: 1,
                     ),
                   ),
-                  if (item == null &&
-                      widget.initialTask == null &&
-                      widget.initialInboxTask == null)
+                  if (item == null)
                     TextButton.icon(
                       onPressed: saving || _picking ? null : _pickTask,
                       icon: const Icon(
@@ -1409,9 +1458,7 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                         _picking ? 'Загрузка…' : 'Из проекта или Инбокса',
                       ),
                     ),
-                  if (widget.initialTask == null &&
-                      widget.initialInboxTask == null &&
-                      (_task != null || _inbox != null))
+                  if (_task != null || _inbox != null)
                     TextButton(
                       onPressed: saving
                           ? null
@@ -1511,22 +1558,27 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                             },
                       child: const Text('Открыть задачу проекта'),
                     ),
+                  if (item != null && _removeError != null)
+                    Semantics(
+                      liveRegion: true,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(
+                          _removeError!,
+                          key: const Key('planner-remove-error'),
+                          style: const TextStyle(color: AppColors.error),
+                        ),
+                      ),
+                    ),
                   if (item != null)
                     TextButton(
+                      key: const Key('planner-remove'),
                       onPressed: saving || state.busyIds.contains(item.id)
                           ? null
-                          : () async {
-                              await context.read<PlannerCubit>().remove(item);
-                              if (context.mounted &&
-                                  !context.read<PlannerCubit>().state.items.any(
-                                    (e) => e.id == item.id,
-                                  )) {
-                                Navigator.pop(context);
-                              }
-                            },
-                      child: const Text(
-                        'Убрать из ежедневника',
-                        style: TextStyle(color: AppColors.error),
+                          : _remove,
+                      child: Text(
+                        _removing ? 'Удаление…' : 'Убрать из ежедневника',
+                        style: const TextStyle(color: AppColors.error),
                       ),
                     ),
                 ],

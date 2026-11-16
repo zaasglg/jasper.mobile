@@ -694,9 +694,16 @@ class _DetailsRepository
   }
 
   @override
-  Future<TaskDetailsPayload> updateProgress(String taskId, int progress) async {
+  Future<TaskDetailsPayload> updateProgress(
+    String taskId,
+    int progress, {
+    String? status,
+  }) async {
     return payload.copyWith(
-      task: payload.task.copyWith(progress: progress.toDouble()),
+      task: payload.task.copyWith(
+        progress: progress.toDouble(),
+        status: status,
+      ),
     );
   }
 }

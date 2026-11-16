@@ -98,7 +98,11 @@ class _Repository implements MyTasksRepository {
   }
 
   @override
-  Future<void> updateProgress(String taskId, int progress) async {}
+  Future<void> updateProgress(
+    String taskId,
+    int progress, {
+    String? status,
+  }) async {}
 }
 
 class _Storage implements MyTaskFieldsStorage {

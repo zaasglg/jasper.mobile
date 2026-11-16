@@ -363,7 +363,7 @@ class TaskMetadata extends StatelessWidget {
         }
         return Row(
           children: <Widget>[
-            project,
+            Flexible(child: project),
             const SizedBox(width: AppSpacing.sm),
             badge,
           ],

@@ -9,5 +9,5 @@ abstract interface class MyTasksRepository {
 
   Future<List<KanbanColumnModel>> getKanbanColumns(String projectId);
 
-  Future<void> updateProgress(String taskId, int progress);
+  Future<void> updateProgress(String taskId, int progress, {String? status});
 }

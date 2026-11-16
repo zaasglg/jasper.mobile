@@ -46,8 +46,10 @@ void main() {
     await tester.tap(find.text('В ежедневник'));
     await tester.pumpAndSettle();
     expect(find.text('Добавить в ежедневник'), findsOneWidget);
-    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
-    await tester.tap(find.text('Сохранить'));
+    expect(find.text('Задача проекта'), findsWidgets);
+    expect(find.byType(TextField), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('schedule-confirm')));
+    await tester.tap(find.byKey(const Key('schedule-confirm')));
     await tester.pumpAndSettle();
     expect(repository.addedTaskId, 'original-task');
     expect(repository.addedProjectId, 'original-project');
@@ -156,6 +158,16 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('planner-complete-first')));
       await tester.pumpAndSettle();
       expect(cubit.state.items.first.completed, isTrue);
+      expect(find.byKey(const Key('planner-hour-11')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('planner-open-first')));
+      await tester.pumpAndSettle();
+      expect(find.text('Задача ежедневника'), findsOneWidget);
+      expect(find.text('Длительность'), findsOneWidget);
+      await tester.tap(find.text('Сохранить'));
+      await tester.pumpAndSettle();
+      // The weekly view retains its time grid and drag-to-reschedule behavior.
+      await tester.tap(find.text('Неделя'));
+      await tester.pumpAndSettle();
       final gesture = await tester.startGesture(
         tester.getCenter(find.text('Подготовить презентацию')),
       );

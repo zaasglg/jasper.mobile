@@ -101,9 +101,37 @@ class PlannerRepositoryImpl implements PlannerRepository {
   });
 
   @override
-  Future<void> remove(String itemId) => _request(() async {
-    await _dio.delete<dynamic>('project-planner/items/$itemId');
-  });
+  Future<void> remove(String itemId) async {
+    try {
+      await _dio.delete<dynamic>(
+        'project-planner/items/${Uri.encodeComponent(itemId)}',
+      );
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      final data = error.response?.data;
+      final raw = data is Map ? data['message'] : null;
+      final message = raw is String
+          ? raw.trim()
+          : raw is List
+          ? raw.whereType<String>().join(' ').trim()
+          : '';
+      final reason = switch (status) {
+        401 => 'Сессия истекла. Войдите снова.',
+        403 => 'Нет прав убрать эту запись из ежедневника.',
+        404 => 'Сервер не нашёл запись ежедневника. Обновите список.',
+        400 ||
+        409 ||
+        422 => message.isEmpty ? 'Сервер отклонил удаление записи.' : message,
+        _ =>
+          error.type == DioExceptionType.connectionError
+              ? 'Нет подключения к интернету. Запись не удалена.'
+              : 'Не удалось убрать запись из ежедневника. Повторите попытку.',
+      };
+      throw PlannerException(
+        status == null ? reason : '$reason (HTTP $status)',
+      );
+    }
+  }
 
   @override
   Future<void> addTask({

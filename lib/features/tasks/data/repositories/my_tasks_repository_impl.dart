@@ -69,11 +69,15 @@ class MyTasksRepositoryImpl implements MyTasksRepository {
   }
 
   @override
-  Future<void> updateProgress(String taskId, int progress) async {
+  Future<void> updateProgress(
+    String taskId,
+    int progress, {
+    String? status,
+  }) async {
     try {
       await _dio.patch<dynamic>(
         'project-tasks/$taskId',
-        data: <String, dynamic>{'progress': progress},
+        data: <String, dynamic>{'progress': progress, 'status': ?status},
       );
     } on DioException catch (error) {
       throw MyTasksException(_messageFor(error, action: 'обновить задачу'));

@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/data/models/kanban_column_model.dart';
+import '../../../tasks/domain/utils/task_completion.dart';
 import '../../domain/entities/kanban_board_data.dart';
 import '../../domain/entities/kanban_board_cache.dart';
 import '../../domain/repositories/kanban_repository.dart';
@@ -181,12 +182,8 @@ class KanbanCubit extends Cubit<KanbanState> {
     final operationRevision = _beginTaskOperation();
     final projectId = state.projectId;
     final progress = task.isDone ? 0 : 100;
-    final reopenedStatus = task.isDone && task.status.toUpperCase() == 'DONE'
-        ? (state.columns
-                  .where((column) => column.statusMap.toUpperCase() != 'DONE')
-                  .firstOrNull
-                  ?.statusMap ??
-              'TODO')
+    final reopenedStatus = task.isDone
+        ? reopenedTaskStatus(task, state.columns)
         : null;
     final updated = task.copyWith(
       progress: progress.toDouble(),

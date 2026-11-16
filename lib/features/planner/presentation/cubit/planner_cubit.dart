@@ -1,12 +1,14 @@
 import '../../../assistant/data/services/assistant_task_changes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/models/planner_item_model.dart';
+import '../../data/planner_changes.dart';
 import '../../domain/repositories/planner_repository.dart';
 import 'planner_state.dart';
 
 class PlannerCubit extends Cubit<PlannerState> {
   PlannerCubit(this._repository) : super(const PlannerState()) {
     assistantTaskChanges.addListener(_onTasksChanged);
+    plannerChanges.addListener(_onTasksChanged);
   }
 
   void _onTasksChanged() {
@@ -16,6 +18,7 @@ class PlannerCubit extends Cubit<PlannerState> {
   @override
   Future<void> close() {
     assistantTaskChanges.removeListener(_onTasksChanged);
+    plannerChanges.removeListener(_onTasksChanged);
     return super.close();
   }
 
@@ -105,15 +108,42 @@ class PlannerCubit extends Cubit<PlannerState> {
     () => _repository.update(item, completed: !item.completed),
     item.copyWith(completed: !item.completed),
   );
-  Future<void> remove(PlannerItemModel item) =>
-      _mutate(item, () => _repository.remove(item.id), null);
-  Future<void> _mutate(
+  Future<bool> remove(PlannerItemModel item) async {
+    if (isClosed ||
+        item.external ||
+        state.busyIds.contains(item.id) ||
+        state.isSaving) {
+      return false;
+    }
+    // Reconcile with the server instead of confirming an optimistic disappearance.
+    _refreshPending = true;
+    final removed = await _mutate(
+      item,
+      () => _repository.remove(item.id),
+      null,
+    );
+    if (!removed || isClosed) return false;
+    if (state.items.any((current) => current.id == item.id)) {
+      _failure(
+        const PlannerException(
+          'Сервер снова вернул запись после удаления. Обновите ежедневник и повторите попытку.',
+        ),
+      );
+      return false;
+    }
+    return true;
+  }
+
+  Future<bool> _mutate(
     PlannerItemModel item,
     Future<void> Function() request,
     PlannerItemModel? updated,
   ) async {
-    if (item.external || state.busyIds.contains(item.id) || state.isSaving) {
-      return;
+    if (isClosed ||
+        item.external ||
+        state.busyIds.contains(item.id) ||
+        state.isSaving) {
+      return false;
     }
     ++_revision;
     emit(
@@ -127,15 +157,16 @@ class PlannerCubit extends Cubit<PlannerState> {
     );
     try {
       await request();
-      if (isClosed) return;
+      if (isClosed) return false;
       emit(
         state.copyWith(
           status: PlannerStatus.success,
           busyIds: {...state.busyIds}..remove(item.id),
         ),
       );
+      return true;
     } catch (e) {
-      if (isClosed) return;
+      if (isClosed) return false;
       final items = [...state.items];
       final index = items.indexWhere((e) => e.id == item.id);
       if (index < 0) {
@@ -150,6 +181,7 @@ class PlannerCubit extends Cubit<PlannerState> {
         ),
       );
       _failure(e);
+      return false;
     } finally {
       if (!isClosed && _refreshPending && state.busyIds.isEmpty) {
         await refresh();

@@ -315,6 +315,7 @@ final appRouter = GoRouter(
                   builder: (context, state) {
                     final projectId = state.pathParameters['projectId'] ?? '';
                     return BlocProvider<KanbanCubit>(
+                      key: ValueKey(projectId),
                       create: (_) => sl<KanbanCubit>()..load(projectId),
                       child: ProjectDetailsScreen(
                         projectId: projectId,

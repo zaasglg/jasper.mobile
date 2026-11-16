@@ -8,6 +8,7 @@ import '../../data/repositories/my_tasks_repository_impl.dart';
 import '../../domain/entities/task_extra_field.dart';
 import '../../domain/repositories/my_task_fields_storage.dart';
 import '../../domain/repositories/my_tasks_repository.dart';
+import '../../domain/utils/task_completion.dart';
 import 'my_tasks_state.dart';
 
 class MyTasksCubit extends Cubit<MyTasksState> {
@@ -36,6 +37,7 @@ class MyTasksCubit extends Cubit<MyTasksState> {
   String _userId = '';
   String _configurationKey = '';
   int _loadRevision = 0;
+  bool _refreshPending = false;
 
   Future<void> initializeFields() async {
     try {
@@ -86,8 +88,17 @@ class MyTasksCubit extends Cubit<MyTasksState> {
   }
 
   Future<void> refresh({bool showLoading = false}) async {
-    if (_userId.isEmpty || state.updatingTaskIds.isNotEmpty) return;
+    if (isClosed || _userId.isEmpty) return;
     final revision = ++_loadRevision;
+    if (state.updatingTaskIds.isNotEmpty) {
+      // Keep the latest scope and reload once all optimistic edits settle.
+      _refreshPending = true;
+      if (showLoading || state.tasks.isEmpty) {
+        emit(state.copyWith(status: MyTasksStatus.loading, clearError: true));
+      }
+      return;
+    }
+    _refreshPending = false;
     if (state.selectedScopeProjectIds.isEmpty) {
       emit(
         state.copyWith(
@@ -167,15 +178,19 @@ class MyTasksCubit extends Cubit<MyTasksState> {
   }
 
   Future<void> toggleTask(ProjectTaskModel task) async {
-    if (state.updatingTaskIds.contains(task.id)) return;
+    if (isClosed || state.updatingTaskIds.contains(task.id)) return;
     ++_loadRevision;
     final oldTasks = state.tasks;
     final targetProgress = task.isDone ? 0 : 100;
+    final status = task.isDone
+        ? reopenedTaskStatus(
+            task,
+            state.columnsByProjectId[task.projectId] ?? const [],
+          )
+        : null;
     final optimisticTask = task.copyWith(
       progress: targetProgress.toDouble(),
-      status: targetProgress == 0 && task.status.toUpperCase() == 'DONE'
-          ? 'TODO'
-          : task.status,
+      status: status,
     );
     emit(
       state.copyWith(
@@ -188,7 +203,7 @@ class MyTasksCubit extends Cubit<MyTasksState> {
     );
 
     try {
-      await _repository.updateProgress(task.id, targetProgress);
+      await _repository.updateProgress(task.id, targetProgress, status: status);
       if (isClosed) return;
       final updatingIds = Set<String>.from(state.updatingTaskIds)
         ..remove(task.id);
@@ -199,6 +214,10 @@ class MyTasksCubit extends Cubit<MyTasksState> {
     } catch (_) {
       if (isClosed) return;
       _rollbackTask(task, 'Не удалось обновить задачу.');
+    } finally {
+      if (!isClosed && _refreshPending && state.updatingTaskIds.isEmpty) {
+        await refresh();
+      }
     }
   }
 

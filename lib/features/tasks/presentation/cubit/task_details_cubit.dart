@@ -6,6 +6,7 @@ import '../../../profile/domain/repositories/profile_repository.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../data/models/task_detail_model.dart';
 import '../../domain/repositories/task_details_repository.dart';
+import '../../domain/utils/task_completion.dart';
 import 'task_details_state.dart';
 
 class TaskDetailsCubit extends Cubit<TaskDetailsState> {
@@ -159,18 +160,25 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
     if (task == null || state.isSaving) return;
     final oldTask = task;
     final progress = task.isDone ? 0 : 100;
+    final status = task.isDone ? reopenedTaskStatus(task, state.columns) : null;
     emit(
       state.copyWith(
-        task: task.copyWith(progress: progress.toDouble()),
+        task: task.copyWith(progress: progress.toDouble(), status: status),
         isSaving: true,
         clearActionError: true,
       ),
     );
     try {
-      final payload = await _repository.updateProgress(task.id, progress);
+      final payload = await _repository.updateProgress(
+        task.id,
+        progress,
+        status: status,
+      );
       _applyPayload(payload);
     } on TaskDetailsException catch (error) {
       _rollback(error.message, task: oldTask);
+    } catch (_) {
+      _rollback('Не удалось обновить завершение задачи.', task: oldTask);
     }
   }
 

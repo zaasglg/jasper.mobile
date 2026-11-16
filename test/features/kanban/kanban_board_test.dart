@@ -1,5 +1,11 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jospar/core/di/service_locator.dart';
+import 'package:jospar/core/theme/app_theme.dart';
 import 'package:jospar/features/kanban/data/storage/card_view_storage.dart';
 import 'package:jospar/features/kanban/data/models/card_view_settings.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +20,49 @@ import 'package:jospar/features/kanban/domain/utils/kanban_utils.dart';
 import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/data/models/kanban_column_model.dart';
+import 'package:jospar/features/planner/data/models/planner_item_model.dart';
+import 'package:jospar/features/planner/domain/repositories/planner_repository.dart';
+import 'package:jospar/features/planner/presentation/cubit/planner_cubit.dart';
+
+const _capture = bool.fromEnvironment('CAPTURE_PLANNER_PREVIEWS');
+final _previewKey = GlobalKey();
+
+class _BoardPlanner implements PlannerRepository {
+  final added = <String>[];
+
+  @override
+  Future<List<PlannerItemModel>> load() async => [];
+
+  @override
+  Future<void> addTask({
+    String? projectId,
+    String? taskId,
+    String? inboxTaskId,
+    required DateTime scheduledAt,
+    required int durationMinutes,
+  }) async {
+    added.add('$projectId/$taskId');
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+Future<void> _captureDrag(WidgetTester tester, String name) async {
+  if (!_capture) return;
+  final boundary =
+      _previewKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+  await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 2);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    final dir = Directory('.dart_tool/planner_previews')
+      ..createSync(recursive: true);
+    await File(
+      '${dir.path}/$name.png',
+    ).writeAsBytes(bytes!.buffer.asUint8List());
+  });
+}
 
 class _BoardCubit extends Cubit<KanbanState> implements KanbanCubit {
   _BoardCubit()
@@ -126,6 +175,147 @@ class _BoardCubit extends Cubit<KanbanState> implements KanbanCubit {
 }
 
 void main() {
+  setUpAll(() async {
+    if (!_capture) return;
+    final text = await rootBundle.load(
+      'packages/forui/assets/fonts/inter/Inter.ttf',
+    );
+    for (final family in [
+      'Manrope',
+      for (final weight in [400, 500, 600, 700, 800]) 'Manrope_$weight',
+    ]) {
+      await (FontLoader(family)..addFont(Future.value(text))).load();
+    }
+    await (FontLoader('packages/lucide_icons_flutter/Lucide')..addFont(
+          rootBundle.load('packages/lucide_icons_flutter/assets/lucide.ttf'),
+        ))
+        .load();
+    await (FontLoader(
+      'MaterialIcons',
+    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+  });
+
+  for (final narrow in [false, true]) {
+    testWidgets(
+      'whole-card planner drop is explicit and cancellable (narrow=$narrow)',
+      (tester) async {
+        GoogleFonts.config.allowRuntimeFetching = false;
+        tester.view.physicalSize = narrow
+            ? const Size(320, 568)
+            : const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final cubit = _BoardCubit();
+        addTearDown(cubit.close);
+        final repository = _BoardPlanner();
+        sl.registerFactory<PlannerCubit>(() => PlannerCubit(repository));
+        addTearDown(() => sl.unregister<PlannerCubit>());
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: _previewKey,
+            child: MaterialApp(
+              theme: AppTheme.light,
+              debugShowCheckedModeBanner: false,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(narrow ? 1.6 : 1)),
+                child: child!,
+              ),
+              home: Scaffold(
+                appBar: AppBar(title: const Text('Проект')),
+                body: BlocProvider<KanbanCubit>.value(
+                  value: cubit,
+                  child: const KanbanBoard(
+                    project: ProjectModel(
+                      id: 'p',
+                      code: 'P',
+                      name: 'Проект',
+                      workspaceId: 'w',
+                      start: null,
+                      end: null,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        Future<TestGesture> hold() async {
+          final gesture = await tester.startGesture(
+            tester.getCenter(find.text('Первая задача')),
+          );
+          await tester.pump(const Duration(milliseconds: 600));
+          expect(find.text('Архивировать'), findsOneWidget);
+          expect(find.text('Переместить'), findsOneWidget);
+          expect(find.byKey(const Key('kanban-planner-drop')), findsOneWidget);
+          expect(
+            find.byKey(const Key('planning-schedule-action')),
+            findsNothing,
+          );
+          expect(find.byKey(const ValueKey('task-drag-a')), findsNothing);
+          return gesture;
+        }
+
+        // Crossing the zone and cancelling a pointer must never open a sheet.
+        var gesture = await hold();
+        await gesture.moveTo(tester.getCenter(find.text('В ежедневник')));
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(find.byKey(const Key('schedule-confirm')), findsNothing);
+        await gesture.cancel();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('schedule-confirm')), findsNothing);
+        expect(repository.added, isEmpty);
+        expect(cubit.moves, isEmpty);
+
+        // A filtered board still offers actions, while avoiding hidden-row sorting.
+        cubit.setSearch('Первая');
+        await tester.pumpAndSettle();
+        gesture = await hold();
+        final drop = tester.getCenter(find.text('В ежедневник'));
+        await gesture.moveTo(drop);
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.pump(const Duration(milliseconds: 200));
+        await _captureDrag(tester, narrow ? 'drag-narrow' : 'drag-planner');
+        await gesture.moveTo(const Offset(150, 300));
+        await tester.pump(const Duration(milliseconds: 200));
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('schedule-confirm')), findsNothing);
+        expect(cubit.moves, isEmpty);
+
+        // Dropping only asks for date/time. Cancelling leaves the project untouched.
+        gesture = await hold();
+        await gesture.moveTo(tester.getCenter(find.text('В ежедневник')));
+        await tester.pump(const Duration(milliseconds: 200));
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('schedule-confirm')), findsOneWidget);
+        expect(repository.added, isEmpty);
+        Navigator.of(
+          tester.element(find.byKey(const Key('schedule-confirm'))),
+        ).pop();
+        await tester.pumpAndSettle();
+        expect(repository.added, isEmpty);
+
+        gesture = await hold();
+        await gesture.moveTo(tester.getCenter(find.text('В ежедневник')));
+        await tester.pump(const Duration(milliseconds: 200));
+        await gesture.up();
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('schedule-confirm')));
+        await tester.pumpAndSettle();
+        expect(repository.added, ['p/a']);
+        expect(cubit.moves, isEmpty);
+        expect(cubit.archived, isEmpty);
+        expect(cubit.state.tasks.any((task) => task.id == 'a'), isTrue);
+      },
+    );
+  }
+
   testWidgets('board shows multiple fixed-width columns on desktop', (
     tester,
   ) async {
@@ -445,11 +635,11 @@ void main() {
       final second = find.byKey(const ValueKey('b'));
       final width = tester.getSize(first).width;
       final secondY = tester.getTopLeft(second).dy;
-      final start = tester.getCenter(first);
+      final start = tester.getCenter(find.byKey(const ValueKey('a')));
       final target = tester.getCenter(find.byKey(const ValueKey('c')));
       final gesture = await tester.startGesture(start);
       await tester.pump(const Duration(milliseconds: 600));
-      expect(find.text('Архив'), findsOneWidget);
+      expect(find.text('Архивировать'), findsOneWidget);
       for (var step = 1; step <= 12; step++) {
         await gesture.moveTo(Offset.lerp(start, target, step / 12)!);
         await tester.pump(const Duration(milliseconds: 32));
@@ -467,7 +657,7 @@ void main() {
         cubit.state.tasksFor(cubit.state.columns.first).map((task) => task.id),
         ['b', 'c', 'a'],
       );
-      final upStart = tester.getCenter(first);
+      final upStart = tester.getCenter(find.byKey(const ValueKey('a')));
       final upTarget = tester.getTopLeft(second) + const Offset(80, 12);
       final upward = await tester.startGesture(upStart);
       await tester.pump(const Duration(milliseconds: 600));
@@ -486,14 +676,16 @@ void main() {
         cubit.state.tasksFor(cubit.state.columns.first).map((task) => task.id),
         ['a', 'b', 'c'],
       );
-      final moveDrag = await tester.startGesture(tester.getCenter(first));
+      final moveDrag = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('a'))),
+      );
       await tester.pump(const Duration(milliseconds: 600));
-      expect(find.text('Архив'), findsOneWidget);
+      expect(find.text('Архивировать'), findsOneWidget);
       await moveDrag.moveTo(tester.getCenter(find.text('Переместить')));
       await tester.pump(const Duration(milliseconds: 200));
       final rightPosition = tester.getCenter(first);
       final moveTarget = tester.getCenter(find.text('Переместить'));
-      final archiveTarget = tester.getCenter(find.text('Архив'));
+      final archiveTarget = tester.getCenter(find.text('Архивировать'));
       await moveDrag.moveTo(archiveTarget);
       await tester.pump(const Duration(milliseconds: 200));
       final leftPosition = tester.getCenter(first);
@@ -513,9 +705,11 @@ void main() {
       Navigator.of(tester.element(find.text('Переместить задачу'))).pop();
       await tester.pumpAndSettle();
       expect(cubit.moves, [2, 0]);
-      final archiveDrag = await tester.startGesture(tester.getCenter(first));
+      final archiveDrag = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('a'))),
+      );
       await tester.pump(const Duration(milliseconds: 600));
-      await archiveDrag.moveTo(tester.getCenter(find.text('Архив')));
+      await archiveDrag.moveTo(tester.getCenter(find.text('Архивировать')));
       await tester.pump(const Duration(milliseconds: 200));
       await archiveDrag.up();
       await tester.pump(const Duration(milliseconds: 350));
@@ -523,7 +717,9 @@ void main() {
       expect(cubit.archived, ['a']);
       expect(find.text('Первая задача'), findsNothing);
       expect(cubit.moves, [2, 0]);
-      final changeColumn = await tester.startGesture(tester.getCenter(second));
+      final changeColumn = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('b'))),
+      );
       await tester.pump(const Duration(milliseconds: 600));
       await changeColumn.moveTo(tester.getCenter(find.text('Переместить')));
       await tester.pump(const Duration(milliseconds: 200));

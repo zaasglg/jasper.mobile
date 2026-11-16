@@ -189,7 +189,11 @@ class _Tasks implements MyTasksRepository {
   Future<List<KanbanColumnModel>> getKanbanColumns(String projectId) async =>
       [];
   @override
-  Future<void> updateProgress(String taskId, int progress) async {}
+  Future<void> updateProgress(
+    String taskId,
+    int progress, {
+    String? status,
+  }) async {}
 }
 
 class _Fields implements MyTaskFieldsStorage {

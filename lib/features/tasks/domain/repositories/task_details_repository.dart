@@ -70,7 +70,11 @@ abstract interface class TaskDetailsRepository {
 
   Future<List<KanbanColumnModel>> getColumns(String projectId);
 
-  Future<TaskDetailsPayload> updateProgress(String taskId, int progress);
+  Future<TaskDetailsPayload> updateProgress(
+    String taskId,
+    int progress, {
+    String? status,
+  });
 
   Future<TaskDetailsPayload> updateDetail(
     String taskId,

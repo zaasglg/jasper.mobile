@@ -4,7 +4,7 @@ import '../../../../core/theme/app_theme.dart';
 
 /// Surface roles and geometry for the project board.
 abstract final class BoardStyle {
-  static const canvas = Color(0xFFF3F4F8);
+  static const canvas = AppColors.canvas;
   static const column = Color(0xFFE8E9EF);
   static const counter = Color(0xFFDDDFE7);
   static const ink = Color(0xFF20212C);

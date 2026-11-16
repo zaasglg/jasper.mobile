@@ -31,10 +31,12 @@ abstract final class AppTheme {
       iconTheme: const IconThemeData(size: AppIconSizes.standard),
       inputDecorationTheme: AppInputTheme.light,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: Colors.white,
+      scaffoldBackgroundColor: AppColors.canvas,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.accent,
         brightness: Brightness.light,
+        surface: AppColors.canvas,
+        surfaceTint: Colors.transparent,
       ),
       textTheme: textTheme,
       primaryTextTheme: textTheme,
@@ -141,7 +143,9 @@ abstract final class AppTheme {
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         titleTextStyle: GoogleFonts.manrope(
           fontSize: 20,
           fontWeight: FontWeight.w600,
