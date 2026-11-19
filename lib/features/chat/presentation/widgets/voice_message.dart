@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:io';
 import 'dart:async';
@@ -172,7 +173,9 @@ class _VoiceMessageState extends State<VoiceMessage> {
   }
 
   void _error() => ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
+    appSnackBar(
+      context: context,
+      tone: AppSnackBarTone.error,
       content: Text('Не удалось воспроизвести запись. Попробуйте ещё раз.'),
     ),
   );

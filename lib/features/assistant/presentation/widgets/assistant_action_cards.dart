@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../data/services/assistant_task_changes.dart';
 import 'package:mime/mime.dart';
 import 'package:flutter/material.dart';
@@ -143,7 +144,11 @@ class AssistantActionCards extends StatelessWidget {
                 } catch (_) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Не удалось открыть файл.')),
+                      appSnackBar(
+                        context: context,
+                        tone: AppSnackBarTone.error,
+                        content: Text('Не удалось открыть файл.'),
+                      ),
                     );
                   }
                 }

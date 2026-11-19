@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
@@ -135,7 +136,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
     if (widget.currentIndex == 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.info,
           content: Text(
             'Откройте Дашборд или Ежедневник для голосового вызова.',
           ),
@@ -179,9 +182,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       _wakeArmed = false;
       _setWakeListening(false);
       if (event.kind == VoiceEventKind.error) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(event.text)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
+            content: Text(event.text),
+          ),
+        );
       }
     }
   }

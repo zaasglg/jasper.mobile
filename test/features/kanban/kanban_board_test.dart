@@ -38,7 +38,8 @@ class _BoardPlanner implements PlannerRepository {
     String? projectId,
     String? taskId,
     String? inboxTaskId,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   }) async {
     added.add('$projectId/$taskId');
@@ -139,6 +140,7 @@ class _BoardCubit extends Cubit<KanbanState> implements KanbanCubit {
   }
 
   final moves = <int>[];
+  final transfers = <(String, String, int)>[];
   final archived = <String>[];
   @override
   Future<void> archiveTask(ProjectTaskModel task) async {
@@ -151,12 +153,13 @@ class _BoardCubit extends Cubit<KanbanState> implements KanbanCubit {
   }
 
   @override
-  Future<void> moveTask(
+  Future<bool> moveTask(
     ProjectTaskModel task,
     String status,
     int position,
   ) async {
     moves.add(position);
+    transfers.add((task.id, status, position));
     emit(
       state.copyWith(
         tasks: moveKanbanTask(
@@ -168,10 +171,56 @@ class _BoardCubit extends Cubit<KanbanState> implements KanbanCubit {
         ),
       ),
     );
+    return true;
   }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+Future<void> _showDragBoard(
+  WidgetTester tester,
+  _BoardCubit cubit, {
+  Size size = const Size(1100, 800),
+}) async {
+  GoogleFonts.config.allowRuntimeFetching = false;
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  addTearDown(cubit.close);
+  await tester.pumpWidget(
+    RepaintBoundary(
+      key: _previewKey,
+      child: MaterialApp(
+        theme: AppTheme.light,
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          appBar: AppBar(title: const Text('Проект')),
+          body: BlocProvider<KanbanCubit>.value(
+            value: cubit,
+            child: const KanbanBoard(
+              project: ProjectModel(
+                id: 'p',
+                code: 'P',
+                name: 'Проект',
+                workspaceId: 'w',
+                start: null,
+                end: null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<TestGesture> _holdTask(WidgetTester tester, String title) async {
+  final gesture = await tester.startGesture(tester.getCenter(find.text(title)));
+  await tester.pump(const Duration(milliseconds: 600));
+  return gesture;
 }
 
 void main() {
@@ -194,6 +243,403 @@ void main() {
       'MaterialIcons',
     )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
   });
+
+  testWidgets(
+    'dropping into an empty column saves its status only after release',
+    (tester) async {
+      final cubit = _BoardCubit();
+      await _showDragBoard(tester, cubit);
+      final gesture = await _holdTask(tester, 'Первая задача');
+      final target = tester.getRect(
+        find.byKey(const ValueKey('kanban-column-done')),
+      );
+      await gesture.moveTo(Offset(target.center.dx, target.top + 150));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byKey(const ValueKey('kanban-insert-done')), findsOneWidget);
+      expect(cubit.transfers, isEmpty);
+      await _captureDrag(tester, 'drag-between-columns');
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(cubit.transfers, [('a', 'DONE', 0)]);
+      expect(
+        cubit.state.tasks.firstWhere((task) => task.id == 'a').status,
+        'DONE',
+      );
+      expect(find.byKey(const ValueKey('kanban-insert-done')), findsNothing);
+      expect(find.text('Переместить задачу'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'cross-column insertion uses the visible anchor without reordering filtered tasks',
+    (tester) async {
+      final cubit = _BoardCubit();
+      cubit.replaceBoard(
+        tasks: [
+          ...cubit.state.tasks,
+          const ProjectTaskModel(
+            id: 'hidden-before',
+            title: 'Скрытое дело',
+            projectId: 'p',
+            status: 'DONE',
+            order: 0,
+          ),
+          const ProjectTaskModel(
+            id: 'visible',
+            title: 'Целевая задача',
+            projectId: 'p',
+            status: 'DONE',
+            order: 1,
+          ),
+          const ProjectTaskModel(
+            id: 'hidden-after',
+            title: 'Другое дело',
+            projectId: 'p',
+            status: 'DONE',
+            order: 2,
+          ),
+        ],
+      );
+      cubit.setSearch('задача');
+      await _showDragBoard(tester, cubit);
+      final gesture = await _holdTask(tester, 'Первая задача');
+      final target = tester.getRect(find.byKey(const ValueKey('visible')));
+      await gesture.moveTo(target.topLeft + const Offset(100, 6));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byKey(const ValueKey('kanban-insert-done')), findsOneWidget);
+      expect(cubit.transfers, isEmpty);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(cubit.transfers, [('a', 'DONE', 1)]);
+      cubit.setSearch('');
+      expect(
+        cubit.state.tasksFor(cubit.state.columns.last).map((task) => task.id),
+        ['hidden-before', 'a', 'visible', 'hidden-after'],
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'cancelling or leaving the board never commits a hovered destination',
+    (tester) async {
+      final cubit = _BoardCubit();
+      await _showDragBoard(tester, cubit);
+      final target = tester.getRect(
+        find.byKey(const ValueKey('kanban-column-done')),
+      );
+      for (final cancel in [true, false]) {
+        final gesture = await _holdTask(tester, 'Первая задача');
+        await gesture.moveTo(Offset(target.center.dx, target.top + 150));
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(
+          find.byKey(const ValueKey('kanban-insert-done')),
+          findsOneWidget,
+        );
+        if (cancel) {
+          await gesture.cancel();
+        } else {
+          await gesture.moveTo(const Offset(10, 20));
+          await tester.pump();
+          expect(
+            find.byKey(const ValueKey('kanban-insert-done')),
+            findsNothing,
+          );
+          await gesture.up();
+        }
+        await tester.pumpAndSettle();
+        expect(cubit.transfers, isEmpty);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'phone edge hold crosses multiple pages and supports moving back',
+    (tester) async {
+      final cubit = _BoardCubit();
+      cubit.replaceBoard(
+        columns: [
+          cubit.state.columns.first,
+          const KanbanColumnModel(
+            id: 'progress',
+            name: 'В работе',
+            statusMap: 'IN_PROGRESS',
+            order: 1,
+          ),
+          cubit.state.columns.last.copyWith(order: 2),
+        ],
+      );
+      await _showDragBoard(tester, cubit, size: const Size(390, 844));
+      final viewport = tester.getRect(find.byType(PageView));
+      Future<void> crossEdge(TestGesture gesture, bool right) async {
+        await gesture.moveTo(
+          Offset(
+            right ? viewport.right - 4 : viewport.left + 4,
+            viewport.top + 170,
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 220));
+        await tester.pump(const Duration(milliseconds: 180));
+        await gesture.moveTo(Offset(viewport.left + 140, viewport.top + 170));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      var gesture = await _holdTask(tester, 'Первая задача');
+      await crossEdge(gesture, true);
+      expect(
+        find.byKey(const ValueKey('kanban-insert-progress')),
+        findsOneWidget,
+      );
+      expect(cubit.transfers, isEmpty);
+      await crossEdge(gesture, true);
+      expect(find.byKey(const ValueKey('kanban-insert-done')), findsOneWidget);
+      expect(cubit.transfers, isEmpty);
+      await tester.pump(const Duration(milliseconds: 200));
+      await _captureDrag(tester, 'drag-between-columns-phone');
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(cubit.transfers, [('a', 'DONE', 0)]);
+      gesture = await _holdTask(tester, 'Первая задача');
+      await crossEdge(gesture, false);
+      expect(
+        find.byKey(const ValueKey('kanban-insert-progress')),
+        findsOneWidget,
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(cubit.transfers, [('a', 'DONE', 0), ('a', 'IN_PROGRESS', 0)]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'continuous edge hold switches quickly in both directions and saves only on release',
+    (tester) async {
+      final cubit = _BoardCubit();
+      cubit.replaceBoard(
+        columns: [
+          cubit.state.columns.first,
+          const KanbanColumnModel(
+            id: 'progress',
+            name: 'В работе',
+            statusMap: 'IN_PROGRESS',
+            order: 1,
+          ),
+          const KanbanColumnModel(
+            id: 'review',
+            name: 'Проверка',
+            statusMap: 'REVIEW',
+            order: 2,
+          ),
+          cubit.state.columns.last.copyWith(order: 3),
+        ],
+      );
+      await _showDragBoard(tester, cubit, size: const Size(390, 844));
+      final viewport = tester.getRect(find.byType(PageView));
+      int currentPage() => tester
+          .widget<PageView>(find.byType(PageView))
+          .controller!
+          .page!
+          .round();
+      Future<void> finishSwitch(int page) async {
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(currentPage(), page);
+        expect(cubit.transfers, isEmpty);
+      }
+
+      var gesture = await _holdTask(tester, 'Первая задача');
+      await gesture.moveTo(Offset(viewport.right - 4, viewport.top + 170));
+      await tester.pump(const Duration(milliseconds: 219));
+      expect(currentPage(), 0);
+      await tester.pump(const Duration(milliseconds: 1));
+      await finishSwitch(1);
+      // Keep the pointer stationary: further columns need no new pointer event.
+      await tester.pump(const Duration(milliseconds: 159));
+      expect(currentPage(), 1);
+      await tester.pump(const Duration(milliseconds: 1));
+      await finishSwitch(2);
+      await tester.pump(const Duration(milliseconds: 160));
+      await finishSwitch(3);
+      await tester.pump(const Duration(seconds: 1));
+      expect(currentPage(), 3);
+      expect(cubit.transfers, isEmpty);
+      final destination = tester.getRect(
+        find.byKey(const ValueKey('kanban-column-done')),
+      );
+      await gesture.moveTo(
+        Offset(destination.center.dx, destination.top + 150),
+      );
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(cubit.transfers, [('a', 'DONE', 0)]);
+
+      gesture = await _holdTask(tester, 'Первая задача');
+      await gesture.moveTo(Offset(viewport.left + 4, viewport.top + 170));
+      for (var page = 2; page >= 0; page--) {
+        await tester.pump(Duration(milliseconds: page == 2 ? 220 : 160));
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(currentPage(), page);
+        expect(cubit.transfers.length, 1);
+      }
+      await gesture.moveTo(
+        tester.getTopLeft(find.byKey(const ValueKey('b'))) +
+            const Offset(100, 8),
+      );
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(cubit.transfers, [('a', 'DONE', 0), ('a', 'TODO', 0)]);
+      expect(
+        cubit.state.tasksFor(cubit.state.columns.first).map((task) => task.id),
+        ['a', 'b', 'c'],
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'leaving an edge and cancelling a drag stop pending and repeated switches',
+    (tester) async {
+      final cubit = _BoardCubit();
+      cubit.replaceBoard(
+        columns: [
+          cubit.state.columns.first,
+          const KanbanColumnModel(
+            id: 'progress',
+            name: 'В работе',
+            statusMap: 'IN_PROGRESS',
+            order: 1,
+          ),
+          cubit.state.columns.last.copyWith(order: 2),
+        ],
+      );
+      await _showDragBoard(tester, cubit, size: const Size(390, 844));
+      final view = tester.widget<PageView>(find.byType(PageView));
+      final rect = tester.getRect(find.byType(PageView));
+      final edge = Offset(rect.right - 4, rect.top + 170);
+      final center = Offset(rect.left + 140, rect.top + 170);
+      var gesture = await _holdTask(tester, 'Первая задача');
+      await gesture.moveTo(edge);
+      await tester.pump(const Duration(milliseconds: 200));
+      await gesture.moveTo(center);
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(view.controller!.page, 0);
+      await gesture.moveTo(edge);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.cancel();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(view.controller!.page, 0);
+      expect(cubit.transfers, isEmpty);
+
+      gesture = await _holdTask(tester, 'Первая задача');
+      await gesture.moveTo(edge);
+      await tester.pump(const Duration(milliseconds: 220));
+      await tester.pump(const Duration(milliseconds: 70));
+      expect(view.controller!.page, allOf(greaterThan(0), lessThan(1)));
+      await gesture.moveTo(center);
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(view.controller!.page, closeTo(1, 0.01));
+      expect(cubit.transfers, isEmpty);
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(cubit.transfers, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'holding over a long destination scrolls to later insertion positions',
+    (tester) async {
+      final cubit = _BoardCubit();
+      cubit.replaceBoard(
+        tasks: [
+          ...cubit.state.tasks,
+          for (var index = 0; index < 25; index++)
+            ProjectTaskModel(
+              id: 'destination-$index',
+              title: 'Готовая задача $index',
+              projectId: 'p',
+              status: 'DONE',
+              order: index,
+            ),
+        ],
+      );
+      await _showDragBoard(tester, cubit, size: const Size(1100, 650));
+      final gesture = await _holdTask(tester, 'Первая задача');
+      final list = find.descendant(
+        of: find.byKey(const ValueKey('kanban-column-done')),
+        matching: find.byType(ReorderableList),
+      );
+      final rect = tester.getRect(list);
+      final plannerTop = tester
+          .getTopLeft(find.byKey(const Key('kanban-planner-drop')))
+          .dy;
+      await gesture.moveTo(
+        Offset(rect.center.dx, (rect.bottom - 10).clamp(0, plannerTop - 16)),
+      );
+      for (var i = 0; i < 25; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(cubit.transfers, isEmpty);
+      expect(find.byKey(const ValueKey('kanban-insert-done')), findsOneWidget);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(cubit.transfers.single.$1, 'a');
+      expect(cubit.transfers.single.$2, 'DONE');
+      expect(cubit.transfers.single.$3, greaterThan(4));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'wide boards scroll horizontally while holding a card at the edge',
+    (tester) async {
+      final cubit = _BoardCubit();
+      cubit.replaceBoard(
+        columns: [
+          cubit.state.columns.first,
+          const KanbanColumnModel(
+            id: 'progress',
+            name: 'В работе',
+            statusMap: 'IN_PROGRESS',
+            order: 1,
+          ),
+          const KanbanColumnModel(
+            id: 'review',
+            name: 'Проверка',
+            statusMap: 'REVIEW',
+            order: 2,
+          ),
+          cubit.state.columns.last.copyWith(order: 3),
+        ],
+      );
+      await _showDragBoard(tester, cubit, size: const Size(800, 700));
+      final gesture = await _holdTask(tester, 'Первая задача');
+      await gesture.moveTo(const Offset(778, 310));
+      for (var step = 0; step < 2; step++) {
+        await tester.pump(Duration(milliseconds: step == 0 ? 220 : 160));
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+      final destination = tester.getRect(
+        find.byKey(const ValueKey('kanban-column-done')),
+      );
+      expect(destination.center.dx, inInclusiveRange(0, 800));
+      await gesture.moveTo(
+        Offset(destination.center.dx, destination.top + 150),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const ValueKey('kanban-insert-done')), findsOneWidget);
+      expect(cubit.transfers, isEmpty);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(cubit.transfers, [('a', 'DONE', 0)]);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final narrow in [false, true]) {
     testWidgets(

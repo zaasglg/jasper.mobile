@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../widgets/conversation_menu.dart';
 import '../widgets/messenger_refresh_lifecycle.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
@@ -732,7 +733,9 @@ class _CreateChannelSheetState extends State<_CreateChannelSheet> {
     } else {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.error,
           content: Text('Введите название или повторите попытку.'),
         ),
       );

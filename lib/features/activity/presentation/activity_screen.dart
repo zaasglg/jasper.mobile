@@ -1,3 +1,4 @@
+import '../../../core/widgets/app_snack_bar.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -124,7 +125,11 @@ class _ActivityBody extends StatelessWidget {
       if (!context.mounted) return;
       if (matches.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Обсуждение больше недоступно.')),
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.info,
+            content: Text('Обсуждение больше недоступно.'),
+          ),
         );
         return;
       }
@@ -136,7 +141,11 @@ class _ActivityBody extends StatelessWidget {
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось открыть обсуждение.')),
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
+            content: Text('Не удалось открыть обсуждение.'),
+          ),
         );
       }
     }

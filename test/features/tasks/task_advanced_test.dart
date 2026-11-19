@@ -17,6 +17,7 @@ import 'package:jospar/features/tasks/data/repositories/task_details_repository_
 import 'package:jospar/features/tasks/presentation/cubit/task_details_cubit.dart';
 import 'package:jospar/features/tasks/presentation/widgets/task_relationships.dart';
 import 'package:jospar/features/tasks/presentation/widgets/task_rich_description.dart';
+import 'task_test_app.dart';
 
 const attachment = TaskFileModel(
   id: 'draft',
@@ -94,7 +95,7 @@ void main() {
       final cubit = TaskDetailsCubit(_repo(adapter), _Profile());
       await tester.runAsync(() => cubit.load('task'));
       await tester.pumpWidget(
-        MaterialApp(
+        TaskTestApp(
           home: BlocProvider.value(
             value: cubit,
             child: const TaskDetailsScreen(taskId: 'task'),
@@ -119,6 +120,8 @@ void main() {
       final attach = find.byTooltip('Прикрепить файлы к комментарию');
       await tester.ensureVisible(attach);
       await tester.tap(attach);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Файлы').last);
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 100)),
       );

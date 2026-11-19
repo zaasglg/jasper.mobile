@@ -1,3 +1,4 @@
+import '../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -47,7 +48,9 @@ class _MessengerStorageScreenState extends State<MessengerStorageScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text('Не удалось открыть кладовку. Повторите попытку.'),
           ),
         );

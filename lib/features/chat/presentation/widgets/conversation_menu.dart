@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -183,7 +184,9 @@ class _ConversationMenuButtonState extends State<ConversationMenuButton> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text(
               error is ChatException
                   ? error.message

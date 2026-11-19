@@ -1,3 +1,4 @@
+import '../../../core/widgets/app_snack_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
@@ -225,7 +226,11 @@ class _StorageBodyState extends State<_StorageBody> {
         final result = await cubit.analyze(item);
         if (!mounted || result == null) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          appSnackBar(
+            context: context,
+            tone: result.alreadyImported
+                ? AppSnackBarTone.info
+                : AppSnackBarTone.success,
             content: Text(
               result.alreadyImported
                   ? 'Документ уже обработан'
@@ -294,9 +299,13 @@ class _StorageBodyState extends State<_StorageBody> {
   ) => BlocConsumer<StorageCubit, StorageState>(
     listener: (context, state) {
       if (state.error != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(state.error!)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
+            content: Text(state.error!),
+          ),
+        );
       }
     },
     builder: (context, state) {

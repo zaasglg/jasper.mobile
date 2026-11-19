@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
+import '../../../tasks/data/services/task_changes.dart';
 
-/// Invalidates visible task consumers after an AI mutation.
-final assistantTaskChanges = ValueNotifier<int>(0);
-void notifyAssistantTaskChanges() => assistantTaskChanges.value++;
+/// Compatibility names for existing AI action callers and task consumers.
+final assistantTaskChanges = taskChanges;
+void notifyAssistantTaskChanges() => notifyTaskChanges();

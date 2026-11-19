@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_color_picker.dart';
 import 'board_style.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
@@ -9,6 +10,8 @@ import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_form_surface.dart';
 import '../../../../core/widgets/app_action_menu.dart';
 import 'task_card_actions.dart';
+import 'task_move_sheet.dart';
+import '../../domain/repositories/task_move_repository.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../data/models/card_view_settings.dart';
 import '../../data/storage/card_view_storage.dart';
@@ -27,6 +30,8 @@ import 'task_card.dart';
 import '../cubit/kanban_cubit.dart';
 import '../cubit/kanban_state.dart';
 
+typedef _ColumnDrop = ({String columnId, String? beforeTaskId, double markerY});
+
 class KanbanBoard extends StatefulWidget {
   const KanbanBoard({required this.project, super.key});
 
@@ -40,10 +45,18 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
   Timer? _cardViewRefresh;
   static const double _columnViewportFraction = 0.82;
   static const double _columnHorizontalInset = 6;
+  static const _edgeHoverDelay = Duration(milliseconds: 220);
+  static const _edgeRepeatDelay = Duration(milliseconds: 160);
+  static const _edgeTransitionDuration = Duration(milliseconds: 180);
 
   final PageController _horizontalController = PageController(
     viewportFraction: _columnViewportFraction,
   );
+  final _wideController = ScrollController();
+  final _columnsViewport = GlobalKey();
+  final _columnKeys = <String, GlobalKey<_KanbanColumnState>>{};
+  bool _wideLayout = false;
+  bool _geometryRefreshScheduled = false;
 
   String? _currentUserId;
   CardViewSettings _cardView = const CardViewSettings();
@@ -52,6 +65,8 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _horizontalController.addListener(_refreshDragGeometry);
+    _wideController.addListener(_refreshDragGeometry);
     _loadCardView();
     WidgetsBinding.instance.addObserver(this);
     if (sl.isRegistered<CardViewStorage>() &&
@@ -105,7 +120,11 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось сохранить вид карточек.')),
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
+            content: Text('Не удалось сохранить вид карточек.'),
+          ),
         );
       }
     }
@@ -296,21 +315,43 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
   bool _dragCancelled = false;
   int _dragSession = 0;
   Timer? _dropActionTimer;
+  _ColumnDrop? _columnDrop;
+  Offset? _dragPosition;
+  Timer? _edgeScrollTimer;
+  int _edgeDirection = 0;
+  bool _edgeScrolling = false;
 
   void _updateDropTarget(PointerMoveEvent event) {
+    _dragPosition = event.position;
+    _updateDragTargets();
+  }
+
+  Rect? _bounds(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  void _refreshDragGeometry() {
+    if (_draggedTask == null || _geometryRefreshScheduled) return;
+    _geometryRefreshScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _geometryRefreshScheduled = false;
+      if (mounted && _draggedTask != null) _updateDragTargets();
+    });
+  }
+
+  void _updateDragTargets() {
     if (_draggedTask == null) return;
+    final position = _dragPosition;
+    if (position == null) return;
     _TaskDropAction? action;
     for (final entry in {
       _TaskDropAction.archive: _archiveTarget,
       _TaskDropAction.move: _moveTarget,
       _TaskDropAction.planner: _plannerTarget,
     }.entries) {
-      final box = entry.value.currentContext?.findRenderObject() as RenderBox?;
-      if (box != null &&
-          box.hasSize &&
-          (box.localToGlobal(Offset.zero) & box.size).contains(
-            event.position,
-          )) {
+      if (_bounds(entry.value)?.contains(position) == true) {
         action = entry.key;
       }
     }
@@ -319,17 +360,137 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
       _dropActionHover.value = action != null;
       setState(() => _hoveredAction = action);
     }
+    _ColumnDrop? drop;
+    final viewport = _bounds(_columnsViewport);
+    if (action == null && viewport?.contains(position) == true) {
+      for (final key in _columnKeys.values) {
+        final column = key.currentState;
+        if (column == null ||
+            column.widget.column.archived ||
+            column.widget.column.statusMap.toUpperCase() ==
+                _draggedTask!.status.toUpperCase()) {
+          continue;
+        }
+        drop = column.dropAt(position);
+        if (drop != null) break;
+      }
+    }
+    if (_columnDrop != drop) {
+      if (_columnDrop?.columnId != drop?.columnId && drop != null) {
+        HapticFeedback.selectionClick();
+      }
+      setState(() => _columnDrop = drop);
+    }
+    for (final entry in _columnKeys.entries) {
+      final planner = _bounds(_plannerTarget);
+      entry.value.currentState?.trackIncomingDrag(
+        entry.key == drop?.columnId ? position : null,
+        bottom:
+            planner != null &&
+                position.dx >= planner.left &&
+                position.dx <= planner.right
+            ? planner.top - 8
+            : null,
+      );
+    }
+    if (action == null && viewport?.contains(position) == true) {
+      final edge = _wideLayout ? 48.0 : 40.0;
+      _setEdgeDirection(
+        position.dx < viewport!.left + edge
+            ? -1
+            : position.dx > viewport.right - edge
+            ? 1
+            : 0,
+      );
+    } else {
+      _setEdgeDirection(0);
+    }
+  }
+
+  void _setEdgeDirection(int direction) {
+    if (_edgeDirection == direction) return;
+    _edgeDirection = direction;
+    _edgeScrollTimer?.cancel();
+    if (direction != 0 && !_edgeScrolling) _scheduleEdgeScroll();
+  }
+
+  void _scheduleEdgeScroll({bool repeat = false}) {
+    _edgeScrollTimer?.cancel();
+    final session = _dragSession;
+    _edgeScrollTimer = Timer(
+      repeat ? _edgeRepeatDelay : _edgeHoverDelay,
+      () async {
+        if (!mounted ||
+            _draggedTask == null ||
+            _edgeDirection == 0 ||
+            session != _dragSession) {
+          return;
+        }
+        _edgeScrolling = true;
+        var advanced = false;
+        try {
+          if (_wideLayout && _wideController.hasClients) {
+            final scroll = _wideController.position;
+            final next =
+                (scroll.pixels + _edgeDirection * BoardStyle.columnWidth).clamp(
+                  scroll.minScrollExtent,
+                  scroll.maxScrollExtent,
+                );
+            if (next != scroll.pixels) {
+              advanced = true;
+              await _wideController.animateTo(
+                next,
+                duration: _edgeTransitionDuration,
+                curve: Curves.easeInOutCubic,
+              );
+            }
+          } else if (!_wideLayout && _horizontalController.hasClients) {
+            final columns = context.read<KanbanCubit>().state.columns;
+            if (columns.isEmpty) return;
+            final current = _horizontalController.page?.round() ?? 0;
+            final next = (current + _edgeDirection).clamp(
+              0,
+              columns.length - 1,
+            );
+            if (next != current) {
+              advanced = true;
+              await _horizontalController.animateToPage(
+                next,
+                duration: _edgeTransitionDuration,
+                curve: Curves.easeInOutCubic,
+              );
+            }
+          }
+        } finally {
+          _edgeScrolling = false;
+          if (mounted && _draggedTask != null && session == _dragSession) {
+            _updateDragTargets();
+            if (advanced &&
+                _edgeDirection != 0 &&
+                _edgeScrollTimer?.isActive != true) {
+              _scheduleEdgeScroll(repeat: true);
+            }
+          }
+        }
+      },
+    );
   }
 
   void _startTaskDrag(ProjectTaskModel task) {
     _dropActionTimer?.cancel();
     _dragSession++;
+    _edgeScrollTimer?.cancel();
+    _edgeDirection = 0;
+    for (final key in _columnKeys.values) {
+      key.currentState?.trackIncomingDrag(null);
+    }
     _dropActionHover.value = false;
     FocusManager.instance.primaryFocus?.unfocus();
     HapticFeedback.selectionClick();
     setState(() {
       _draggedTask = task;
       _hoveredAction = null;
+      _columnDrop = null;
       _dragCancelled = false;
     });
   }
@@ -339,14 +500,30 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
     final action = _hoveredAction;
     final cancelled = _dragCancelled;
     final session = _dragSession;
+    final drop = _columnDrop;
+    final outsideSource =
+        task != null &&
+        !_columnKeys.values.any(
+          (key) =>
+              key.currentState?.widget.column.statusMap.toUpperCase() ==
+                  task.status.toUpperCase() &&
+              _dragPosition != null &&
+              _bounds(key)?.contains(_dragPosition!) == true,
+        );
+    _edgeScrollTimer?.cancel();
+    _edgeDirection = 0;
     _dropActionHover.value = false;
+    for (final key in _columnKeys.values) {
+      key.currentState?.trackIncomingDrag(null);
+    }
     setState(() {
       _draggedTask = null;
       _hoveredAction = null;
+      _columnDrop = null;
     });
-    if (!cancelled && task != null && action != null) {
-      // Let the reorder proxy finish its drop animation before opening a sheet.
-      _dropActionTimer = Timer(const Duration(milliseconds: 300), () {
+    if (!cancelled && task != null && (action != null || drop != null)) {
+      // Release the source reorder before saving or opening another route.
+      _dropActionTimer = Timer(Duration.zero, () {
         if (!mounted ||
             _dragCancelled ||
             session != _dragSession ||
@@ -362,7 +539,37 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
             cubit.state.movingTaskIds.contains(task.id)) {
           return;
         }
-        switch (action) {
+        if (action == null && drop != null) {
+          final column = cubit.state.columns
+              .where((column) => column.id == drop.columnId)
+              .firstOrNull;
+          if (column == null ||
+              current.status.toUpperCase() != task.status.toUpperCase()) {
+            return;
+          }
+          final target =
+              cubit.state.tasks
+                  .where(
+                    (item) =>
+                        item.id != task.id &&
+                        item.status.toUpperCase() ==
+                            column.statusMap.toUpperCase(),
+                  )
+                  .toList()
+                ..sort((a, b) => a.order.compareTo(b.order));
+          final before = target.indexWhere(
+            (item) => item.id == drop.beforeTaskId,
+          );
+          unawaited(
+            cubit.moveTask(
+              current,
+              column.statusMap,
+              before < 0 ? target.length : before,
+            ),
+          );
+          return;
+        }
+        switch (action!) {
           case _TaskDropAction.move:
             unawaited(_showMoveTask(context, current));
           case _TaskDropAction.planner:
@@ -372,7 +579,7 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
         }
       });
     }
-    return cancelled || action != null;
+    return cancelled || action != null || drop != null || outsideSource;
   }
 
   @override
@@ -380,7 +587,12 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.project.id == widget.project.id) return;
     _dropActionTimer?.cancel();
+    _edgeScrollTimer?.cancel();
+    _edgeDirection = 0;
     _dragCancelled = true;
+    _columnKeys.clear();
+    _columnDrop = null;
+    _draggedTask = null;
     _viewRevision++;
     _cardView = const CardViewSettings();
     _currentUserId = null;
@@ -398,6 +610,8 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _cardViewRefresh?.cancel();
     _dropActionTimer?.cancel();
+    _edgeScrollTimer?.cancel();
+    _wideController.dispose();
     _horizontalController.dispose();
     super.dispose();
   }
@@ -413,7 +627,9 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            SnackBar(
+            appSnackBar(
+              context: context,
+              tone: AppSnackBarTone.error,
               content: Text(message),
               behavior: SnackBarBehavior.floating,
             ),
@@ -421,6 +637,9 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
       },
       builder: (context, state) {
         return Listener(
+          onPointerDown: (event) {
+            if (_draggedTask == null) _dragPosition = event.position;
+          },
           onPointerMove: _updateDropTarget,
           onPointerCancel: (_) {
             _dragCancelled = true;
@@ -564,7 +783,10 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
           2,
         ),
         child: _KanbanColumn(
-          key: ValueKey('${widget.project.id}-${column.id}'),
+          key: _columnKeys.putIfAbsent(
+            column.id,
+            () => GlobalKey<_KanbanColumnState>(),
+          ),
           column: column,
           onMoveTask: (task) => _showMoveTask(context, task),
           onTaskAction: (task, action) => handleTaskCardAction(
@@ -576,7 +798,8 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
           canReorder:
               _cardView.shows(CardField.completed) &&
               state.search.trim().isEmpty &&
-              state.priorityFilter == null,
+              state.priorityFilter == null &&
+              state.epicFilterIds.isEmpty,
           cardView: _cardView,
           currentUserId: _currentUserId,
           tasks: state
@@ -598,17 +821,22 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
           onDragStart: _startTaskDrag,
           onDragEnd: _endTaskDrag,
           dropActionHover: _dropActionHover,
+          incomingDrop: _columnDrop?.columnId == column.id ? _columnDrop : null,
+          onGeometryChanged: _refreshDragGeometry,
           onManage: (action) => _manageColumn(context, column, action),
         ),
       );
     }
 
     return LayoutBuilder(
+      key: _columnsViewport,
       builder: (context, constraints) {
+        _wideLayout = constraints.maxWidth >= 600;
         if (constraints.maxWidth >= 600) {
           return ListView.builder(
             key: PageStorageKey<String>('kanban-wide-${widget.project.id}'),
             scrollDirection: Axis.horizontal,
+            controller: _wideController,
             itemExtent: BoardStyle.columnWidth,
             itemCount: state.columns.length,
             itemBuilder: columnBuilder,
@@ -643,24 +871,37 @@ class _KanbanBoardState extends State<KanbanBoard> with WidgetsBindingObserver {
   ) async {
     final cubit = context.read<KanbanCubit>();
     final projectId = cubit.state.projectId;
-    final result = await showModalBottomSheet<(String, int)>(
+    await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (_) => BlocProvider.value(
         value: cubit,
         child: BlocBuilder<KanbanCubit, KanbanState>(
-          builder: (_, state) =>
-              _MoveTaskSheet(state: state, task: task, projectId: projectId),
+          builder: (_, state) => TaskMoveSheet(
+            project: widget.project,
+            state: state,
+            task: task,
+            repository: sl.isRegistered<TaskMoveRepository>()
+                ? sl<TaskMoveRepository>()
+                : null,
+            onMove: (target) async {
+              if (cubit.isClosed || cubit.state.projectId != projectId) {
+                return false;
+              }
+              if (target.projectId == projectId) {
+                return cubit.moveTask(
+                  task,
+                  target.status,
+                  target.position ?? 0,
+                );
+              }
+              return cubit.transferTask(task, target);
+            },
+          ),
         ),
       ),
     );
-    if (result != null &&
-        context.mounted &&
-        !cubit.isClosed &&
-        cubit.state.projectId == projectId) {
-      await cubit.moveTask(task, result.$1, result.$2);
-    }
   }
 
   Future<void> _manageColumn(
@@ -1027,6 +1268,8 @@ class _KanbanColumn extends StatefulWidget {
     required this.onDragStart,
     required this.onDragEnd,
     required this.dropActionHover,
+    required this.incomingDrop,
+    required this.onGeometryChanged,
     required this.onManage,
   });
 
@@ -1042,13 +1285,16 @@ class _KanbanColumn extends StatefulWidget {
   final ValueChanged<ProjectTaskModel> onDragStart;
   final bool Function() onDragEnd;
   final ValueNotifier<bool> dropActionHover;
+  final _ColumnDrop? incomingDrop;
+  final VoidCallback onGeometryChanged;
   final ValueChanged<_ColumnAction> onManage;
 
   @override
   State<_KanbanColumn> createState() => _KanbanColumnState();
 }
 
-class _KanbanColumnState extends State<_KanbanColumn> {
+class _KanbanColumnState extends State<_KanbanColumn>
+    with AutomaticKeepAliveClientMixin {
   static const Duration _composerAnimationDuration = Duration(
     milliseconds: 240,
   );
@@ -1058,9 +1304,93 @@ class _KanbanColumnState extends State<_KanbanColumn> {
   final FocusNode _taskTitleFocusNode = FocusNode();
 
   final _columnBounds = GlobalKey();
+  final _listBounds = GlobalKey();
+  final _taskBounds = <String, GlobalKey>{};
+  final _scrollController = ScrollController();
+  final _reorderableKey = GlobalKey<ReorderableListState>();
+  Timer? _incomingScrollTimer;
+  Offset? _incomingPointer;
+  double? _incomingBottom;
   final _dragVisual = ValueNotifier<(double, bool)>((0, false));
   double _pointerStartX = 0;
   bool _isDragging = false;
+
+  @override
+  // Keep the source reorder alive while paging across destination columns.
+  bool get wantKeepAlive => true;
+
+  Rect? _rect(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  _ColumnDrop? dropAt(Offset position) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return null;
+    final origin = box.localToGlobal(Offset.zero);
+    if (!(origin & box.size).contains(position)) return null;
+    String? before;
+    var markerY = (_rect(_listBounds)?.top ?? origin.dy + 64) - origin.dy;
+    for (var index = 0; index < widget.tasks.length; index++) {
+      final task = widget.tasks[index];
+      final key = _taskBounds[task.id];
+      final rect = key == null ? null : _rect(key);
+      if (rect == null) continue;
+      if (position.dy < rect.center.dy) {
+        before = task.id;
+        markerY = rect.top - origin.dy - 4;
+        break;
+      }
+      markerY = rect.bottom - origin.dy - 4;
+      final next = index + 1;
+      before = next < widget.tasks.length ? widget.tasks[next].id : null;
+    }
+    return (
+      columnId: widget.column.id,
+      beforeTaskId: before,
+      markerY: markerY.clamp(
+        56.0,
+        (box.size.height - 12).clamp(56.0, double.infinity),
+      ),
+    );
+  }
+
+  void trackIncomingDrag(Offset? position, {double? bottom}) {
+    _incomingPointer = position;
+    _incomingBottom = bottom;
+    if (position == null) {
+      _incomingScrollTimer?.cancel();
+      _incomingScrollTimer = null;
+      return;
+    }
+    _incomingScrollTimer ??= Timer.periodic(const Duration(milliseconds: 40), (
+      timer,
+    ) {
+      final pointer = _incomingPointer;
+      final rect = _rect(_listBounds);
+      if (pointer == null || rect == null || !_scrollController.hasClients) {
+        return;
+      }
+      final direction = pointer.dy < rect.top + 40
+          ? -1
+          : pointer.dy >
+                (_incomingBottom ?? rect.bottom).clamp(rect.top, rect.bottom) -
+                    40
+          ? 1
+          : 0;
+      if (direction == 0) return;
+      final scroll = _scrollController.position;
+      final next = (scroll.pixels + direction * 12).clamp(
+        scroll.minScrollExtent,
+        scroll.maxScrollExtent,
+      );
+      if (next != scroll.pixels) {
+        _scrollController.jumpTo(next);
+        widget.onGeometryChanged();
+      }
+    });
+  }
 
   void _trackDrag(PointerMoveEvent event) {
     if (!_isDragging) return;
@@ -1083,6 +1413,8 @@ class _KanbanColumnState extends State<_KanbanColumn> {
 
   @override
   void dispose() {
+    _incomingScrollTimer?.cancel();
+    _scrollController.dispose();
     _dragVisual.dispose();
     _taskTitleController.dispose();
     _taskTitleFocusNode.dispose();
@@ -1180,6 +1512,7 @@ class _KanbanColumnState extends State<_KanbanColumn> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final colors = Theme.of(context).colorScheme;
     final baseBackground = BoardStyle.listBackground(context);
     final columnBackground = widget.column.color == null
@@ -1200,262 +1533,332 @@ class _KanbanColumnState extends State<_KanbanColumn> {
         _isDragging = false;
         _dragVisual.value = (0, false);
       },
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: AnimatedContainer(
-          key: _columnBounds,
-          duration: const Duration(milliseconds: 180),
-          decoration: BoxDecoration(
-            color: columnBackground,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.xs,
-                  AppSpacing.sm,
-                  AppSpacing.xs,
+      child: Stack(
+        key: ValueKey('kanban-column-${widget.column.id}'),
+        children: [
+          Align(
+            alignment: Alignment.topCenter,
+            child: AnimatedContainer(
+              key: _columnBounds,
+              duration: const Duration(milliseconds: 180),
+              decoration: BoxDecoration(
+                color: widget.incomingDrop == null
+                    ? columnBackground
+                    : Color.alphaBlend(
+                        AppColors.accent.withValues(alpha: 0.06),
+                        columnBackground,
+                      ),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              foregroundDecoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(
+                  color: widget.incomingDrop == null
+                      ? Colors.transparent
+                      : AppColors.accent.withValues(alpha: 0.65),
+                  width: 1.5,
                 ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.xs,
+                      AppSpacing.sm,
+                      AppSpacing.xs,
+                    ),
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            widget.column.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.manrope(
+                              fontSize: BoardStyle.columnTitleSize,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0,
+                              color: headerColor,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: BoardStyle.badgeBackground(context),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            '${widget.tasks.length}',
+                            style: GoogleFonts.manrope(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: headerColor,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Действия колонки',
+                          onPressed: _showColumnMenu,
+                          icon: Icon(
+                            LucideIcons.ellipsis,
+                            size: AppIconSizes.standard,
+                            color: headerColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: KeyedSubtree(
+                      key: _listBounds,
+                      child: widget.tasks.isEmpty
+                          ? _EmptyColumn(receiving: widget.incomingDrop != null)
+                          : ReorderableList(
+                              key: _reorderableKey,
+                              controller: _scrollController,
+                              shrinkWrap: true,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              autoScrollerVelocityScalar: 45,
+                              itemCount: widget.tasks.length,
+                              proxyDecorator: (child, index, animation) =>
+                                  AnimatedBuilder(
+                                    animation: Listenable.merge([
+                                      animation,
+                                      _dragVisual,
+                                      widget.dropActionHover,
+                                    ]),
+                                    child: child,
+                                    builder: (context, child) =>
+                                        Transform.translate(
+                                          offset: Offset(
+                                            _dragVisual.value.$1 *
+                                                (_isDragging
+                                                    ? 1
+                                                    : animation.value),
+                                            0,
+                                          ),
+                                          child: AnimatedOpacity(
+                                            duration: const Duration(
+                                              milliseconds: 120,
+                                            ),
+                                            opacity:
+                                                widget.dropActionHover.value &&
+                                                    _isDragging
+                                                ? 0
+                                                : _dragVisual.value.$2
+                                                ? 0.65
+                                                : 1,
+                                            child: Material(
+                                              color: Colors.transparent,
+                                              elevation:
+                                                  6 *
+                                                  Curves.easeOutCubic.transform(
+                                                    animation.value,
+                                                  ),
+                                              shadowColor: AppColors.ink
+                                                  .withValues(alpha: 0.2),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              child: child,
+                                            ),
+                                          ),
+                                        ),
+                                  ),
+                              dragBoundaryProvider: (_) => null,
+                              onReorderStart: (index) {
+                                _skipReorder = false;
+                                _isDragging = true;
+                                _dragVisual.value = (0, false);
+                                widget.onDragStart(widget.tasks[index]);
+                              },
+                              onReorderEnd: (_) {
+                                _isDragging = false;
+                                _skipReorder = widget.onDragEnd();
+                                if (_skipReorder) {
+                                  // The source page may be offscreen. End its local
+                                  // reorder without animating back to an unpainted item.
+                                  _reorderableKey.currentState?.cancelReorder();
+                                }
+                              },
+                              onReorderItem: (oldIndex, newIndex) {
+                                if (_skipReorder || !widget.canReorder) return;
+                                if (newIndex == oldIndex) return;
+                                widget.onMove(widget.tasks[oldIndex], newIndex);
+                              },
+                              itemBuilder: (context, index) {
+                                final task = widget.tasks[index];
+                                return Padding(
+                                  key: ValueKey(task.id),
+                                  padding: const EdgeInsets.only(bottom: 9),
+                                  child: ReorderableDelayedDragStartListener(
+                                    key: _taskBounds.putIfAbsent(
+                                      task.id,
+                                      () => GlobalKey(),
+                                    ),
+                                    index: index,
+                                    enabled:
+                                        !task.archived &&
+                                        !context
+                                            .watch<KanbanCubit>()
+                                            .state
+                                            .movingTaskIds
+                                            .contains(task.id),
+                                    child: TaskCard(
+                                      boardStyle: true,
+                                      task: task,
+                                      cardView: widget.cardView,
+                                      currentUserId: widget.currentUserId,
+                                      onAction: (action) =>
+                                          widget.onTaskAction(task, action),
+                                      onMove:
+                                          context
+                                              .watch<KanbanCubit>()
+                                              .state
+                                              .movingTaskIds
+                                              .contains(task.id)
+                                          ? null
+                                          : () => widget.onMoveTask(task),
+                                      isUpdating: context
+                                          .watch<KanbanCubit>()
+                                          .state
+                                          .movingTaskIds
+                                          .contains(task.id),
+                                      onToggleCompleted:
+                                          context
+                                              .watch<KanbanCubit>()
+                                              .state
+                                              .movingTaskIds
+                                              .contains(task.id)
+                                          ? null
+                                          : () => context
+                                                .read<KanbanCubit>()
+                                                .toggleCompleted(task),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
+                  ClipRect(
+                    child: AnimatedSize(
+                      duration: _composerAnimationDuration,
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.bottomCenter,
+                      child: AnimatedSwitcher(
+                        duration: _composerAnimationDuration,
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        layoutBuilder: (currentChild, previousChildren) =>
+                            Stack(
+                              alignment: Alignment.bottomCenter,
+                              children: <Widget>[
+                                ...previousChildren,
+                                ?currentChild,
+                              ],
+                            ),
+                        transitionBuilder: (child, animation) {
+                          final curvedAnimation = CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOutCubic,
+                          );
+                          return FadeTransition(
+                            opacity: curvedAnimation,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.08),
+                                end: Offset.zero,
+                              ).animate(curvedAnimation),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: _isAddingTask
+                            ? _InlineTaskComposer(
+                                key: const ValueKey<String>('task-composer'),
+                                controller: _taskTitleController,
+                                focusNode: _taskTitleFocusNode,
+                                isSubmitting: _isSubmittingTask,
+                                accentColor: headerColor,
+                                onSubmit: _submitTask,
+                                onCancel: _closeTaskComposer,
+                              )
+                            : Padding(
+                                key: const ValueKey<String>('add-task-button'),
+                                padding: const EdgeInsets.fromLTRB(
+                                  10,
+                                  6,
+                                  10,
+                                  10,
+                                ),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: TextButton.icon(
+                                    onPressed: _openTaskComposer,
+                                    icon: const Icon(
+                                      LucideIcons.plus,
+                                      size: AppIconSizes.standard,
+                                    ),
+                                    label: const Text('Добавить карточку'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: AppColors.accent,
+                                      backgroundColor:
+                                          BoardStyle.badgeBackground(
+                                            context,
+                                          ).withValues(alpha: 0.65),
+                                      minimumSize: const Size.fromHeight(
+                                        AppSpacing.touchTarget,
+                                      ),
+                                      alignment: Alignment.centerLeft,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.smMd,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppRadius.md,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (widget.incomingDrop != null)
+            Positioned(
+              key: ValueKey('kanban-insert-${widget.column.id}'),
+              top: widget.incomingDrop!.markerY,
+              left: 10,
+              right: 10,
+              child: const IgnorePointer(
                 child: Row(
-                  children: <Widget>[
+                  children: [
+                    Icon(LucideIcons.circle, size: 8, color: AppColors.accent),
                     Expanded(
-                      child: Text(
-                        widget.column.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.manrope(
-                          fontSize: BoardStyle.columnTitleSize,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0,
-                          color: headerColor,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: BoardStyle.badgeBackground(context),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        '${widget.tasks.length}',
-                        style: GoogleFonts.manrope(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: headerColor,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Действия колонки',
-                      onPressed: _showColumnMenu,
-                      icon: Icon(
-                        LucideIcons.ellipsis,
-                        size: AppIconSizes.standard,
-                        color: headerColor,
+                      child: Divider(
+                        height: 8,
+                        thickness: 2,
+                        color: AppColors.accent,
                       ),
                     ),
                   ],
                 ),
               ),
-              Flexible(
-                child: widget.tasks.isEmpty
-                    ? const _EmptyColumn()
-                    : ReorderableListView.builder(
-                        shrinkWrap: true,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        buildDefaultDragHandles: false,
-                        autoScrollerVelocityScalar: 45,
-                        itemCount: widget.tasks.length,
-                        proxyDecorator: (child, index, animation) =>
-                            AnimatedBuilder(
-                              animation: Listenable.merge([
-                                animation,
-                                _dragVisual,
-                                widget.dropActionHover,
-                              ]),
-                              child: child,
-                              builder: (context, child) => Transform.translate(
-                                offset: Offset(
-                                  _dragVisual.value.$1 *
-                                      (_isDragging ? 1 : animation.value),
-                                  0,
-                                ),
-                                child: AnimatedOpacity(
-                                  duration: const Duration(milliseconds: 120),
-                                  opacity:
-                                      widget.dropActionHover.value &&
-                                          _isDragging
-                                      ? 0
-                                      : _dragVisual.value.$2
-                                      ? 0.65
-                                      : 1,
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    elevation:
-                                        6 *
-                                        Curves.easeOutCubic.transform(
-                                          animation.value,
-                                        ),
-                                    shadowColor: AppColors.ink.withValues(
-                                      alpha: 0.2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: child,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        dragBoundaryProvider: (_) => null,
-                        onReorderStart: (index) {
-                          _skipReorder = false;
-                          _isDragging = true;
-                          _dragVisual.value = (0, false);
-                          widget.onDragStart(widget.tasks[index]);
-                        },
-                        onReorderEnd: (_) {
-                          _isDragging = false;
-                          _skipReorder = widget.onDragEnd();
-                        },
-                        onReorderItem: (oldIndex, newIndex) {
-                          if (_skipReorder || !widget.canReorder) return;
-                          if (newIndex == oldIndex) return;
-                          widget.onMove(widget.tasks[oldIndex], newIndex);
-                        },
-                        itemBuilder: (context, index) {
-                          final task = widget.tasks[index];
-                          return Padding(
-                            key: ValueKey(task.id),
-                            padding: const EdgeInsets.only(bottom: 9),
-                            child: ReorderableDelayedDragStartListener(
-                              index: index,
-                              enabled:
-                                  !task.archived &&
-                                  !context
-                                      .watch<KanbanCubit>()
-                                      .state
-                                      .movingTaskIds
-                                      .contains(task.id),
-                              child: TaskCard(
-                                boardStyle: true,
-                                task: task,
-                                cardView: widget.cardView,
-                                currentUserId: widget.currentUserId,
-                                onAction: (action) =>
-                                    widget.onTaskAction(task, action),
-                                onMove:
-                                    context
-                                        .watch<KanbanCubit>()
-                                        .state
-                                        .movingTaskIds
-                                        .contains(task.id)
-                                    ? null
-                                    : () => widget.onMoveTask(task),
-                                isUpdating: context
-                                    .watch<KanbanCubit>()
-                                    .state
-                                    .movingTaskIds
-                                    .contains(task.id),
-                                onToggleCompleted:
-                                    context
-                                        .watch<KanbanCubit>()
-                                        .state
-                                        .movingTaskIds
-                                        .contains(task.id)
-                                    ? null
-                                    : () => context
-                                          .read<KanbanCubit>()
-                                          .toggleCompleted(task),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              ClipRect(
-                child: AnimatedSize(
-                  duration: _composerAnimationDuration,
-                  curve: Curves.easeOutCubic,
-                  alignment: Alignment.bottomCenter,
-                  child: AnimatedSwitcher(
-                    duration: _composerAnimationDuration,
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    layoutBuilder: (currentChild, previousChildren) => Stack(
-                      alignment: Alignment.bottomCenter,
-                      children: <Widget>[...previousChildren, ?currentChild],
-                    ),
-                    transitionBuilder: (child, animation) {
-                      final curvedAnimation = CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.easeOutCubic,
-                      );
-                      return FadeTransition(
-                        opacity: curvedAnimation,
-                        child: SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0, 0.08),
-                            end: Offset.zero,
-                          ).animate(curvedAnimation),
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: _isAddingTask
-                        ? _InlineTaskComposer(
-                            key: const ValueKey<String>('task-composer'),
-                            controller: _taskTitleController,
-                            focusNode: _taskTitleFocusNode,
-                            isSubmitting: _isSubmittingTask,
-                            accentColor: headerColor,
-                            onSubmit: _submitTask,
-                            onCancel: _closeTaskComposer,
-                          )
-                        : Padding(
-                            key: const ValueKey<String>('add-task-button'),
-                            padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: TextButton.icon(
-                                onPressed: _openTaskComposer,
-                                icon: const Icon(
-                                  LucideIcons.plus,
-                                  size: AppIconSizes.standard,
-                                ),
-                                label: const Text('Добавить карточку'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppColors.accent,
-                                  backgroundColor: BoardStyle.badgeBackground(
-                                    context,
-                                  ).withValues(alpha: 0.65),
-                                  minimumSize: const Size.fromHeight(
-                                    AppSpacing.touchTarget,
-                                  ),
-                                  alignment: Alignment.centerLeft,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.smMd,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      AppRadius.md,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -1573,16 +1976,22 @@ Color _parseColumnColor(String? value) {
 enum _ColumnAction { moveLeft, moveRight, rename, color, archive, delete }
 
 class _EmptyColumn extends StatelessWidget {
-  const _EmptyColumn();
+  const _EmptyColumn({this.receiving = false});
+
+  final bool receiving;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Text(
-        'В этой колонке пока нет задач',
+        receiving ? 'Отпустите задачу здесь' : 'В этой колонке пока нет задач',
         textAlign: TextAlign.center,
-        style: GoogleFonts.manrope(fontSize: 12, color: AppColors.muted),
+        style: GoogleFonts.manrope(
+          fontSize: 12,
+          color: receiving ? AppColors.accent : AppColors.muted,
+          fontWeight: receiving ? FontWeight.w600 : FontWeight.w400,
+        ),
       ),
     );
   }
@@ -1770,185 +2179,6 @@ class _EditColumnSheetState extends State<_EditColumnSheet> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MoveTaskSheet extends StatefulWidget {
-  const _MoveTaskSheet({
-    required this.state,
-    required this.task,
-    required this.projectId,
-  });
-  final String projectId;
-  final KanbanState state;
-  final ProjectTaskModel task;
-
-  @override
-  State<_MoveTaskSheet> createState() => _MoveTaskSheetState();
-}
-
-class _MoveTaskSheetState extends State<_MoveTaskSheet> {
-  late String _status = widget.task.status;
-  int _position = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final task = widget.state.projectId == widget.projectId
-        ? widget.state.tasks
-              .where((item) => item.id == widget.task.id)
-              .firstOrNull
-        : null;
-    final column = widget.state.columns
-        .where(
-          (item) =>
-              !item.archived &&
-              item.statusMap.toUpperCase() == _status.toUpperCase(),
-        )
-        .firstOrNull;
-    final count = column == null
-        ? 0
-        : widget.state.tasks
-              .where(
-                (task) =>
-                    task.status.toUpperCase() ==
-                        column.statusMap.toUpperCase() &&
-                    task.id != widget.task.id,
-              )
-              .length;
-    _position = _position.clamp(0, count);
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              'Переместить задачу',
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              widget.task.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.manrope(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'В какую колонку?',
-              style: GoogleFonts.manrope(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(context).height * 0.35,
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: widget.state.columns.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 6),
-                itemBuilder: (context, index) {
-                  final item = widget.state.columns[index];
-                  final selected =
-                      item.statusMap.toUpperCase() == _status.toUpperCase();
-                  final current =
-                      item.statusMap.toUpperCase() ==
-                      task?.status.toUpperCase();
-                  return Material(
-                    color: selected
-                        ? AppColors.accent.withValues(alpha: 0.1)
-                        : Theme.of(context).colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
-                    child: ListTile(
-                      key: ValueKey('move-to-${item.id}'),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      leading: Icon(
-                        LucideIcons.columns3,
-                        color: _parseColumnColor(item.color),
-                        size: AppIconSizes.standard,
-                      ),
-                      title: Text(item.name),
-                      subtitle: current ? const Text('Текущая колонка') : null,
-                      trailing: Icon(
-                        selected ? LucideIcons.circleCheck : LucideIcons.circle,
-                        color: selected
-                            ? AppColors.accent
-                            : Theme.of(context).colorScheme.outline,
-                        size: AppIconSizes.standard,
-                      ),
-                      onTap: () => setState(() {
-                        _status = item.statusMap;
-                        _position = 0;
-                      }),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
-            AppFormField(
-              label: 'Позиция',
-              child: DropdownButtonFormField<int>(
-                isExpanded: true,
-                key: ValueKey((_status, count, _position)),
-                initialValue: _position,
-                decoration: const InputDecoration(hintText: 'Позиция'),
-                items: <DropdownMenuItem<int>>[
-                  for (var index = 0; index <= count; index++)
-                    DropdownMenuItem(value: index, child: Text('${index + 1}')),
-                ],
-                onChanged: (value) => setState(() => _position = value ?? 0),
-              ),
-            ),
-            const SizedBox(height: 18),
-            FilledButton(
-              key: const Key('confirm-task-move'),
-              onPressed:
-                  task == null ||
-                      column == null ||
-                      widget.state.movingTaskIds.contains(widget.task.id)
-                  ? null
-                  : () => Navigator.pop(context, (column.statusMap, _position)),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    LucideIcons.arrowRightLeft,
-                    size: AppIconSizes.standard,
-                  ),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Text(
-                      task == null
-                          ? 'Задача больше недоступна'
-                          : column == null
-                          ? 'Выберите колонку'
-                          : 'Перенести в «${column.name}»',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );

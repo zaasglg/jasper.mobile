@@ -7,6 +7,7 @@ import 'package:jospar/features/storage/data/storage_collector.dart';
 import 'package:jospar/features/storage/data/storage_models.dart';
 import 'package:jospar/features/storage/data/storage_repository_impl.dart';
 import 'package:jospar/features/storage/presentation/storage_cubit.dart';
+import 'package:jospar/features/storage/domain/storage_repository.dart';
 
 const project = StorageScope(
   source: StorageSource.project,
@@ -23,6 +24,56 @@ const chat = StorageScope(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+  test('overlapping archive results are paged independently', () async {
+    final adapter = Adapter((request) {
+      if (request.queryParameters['skip'] == 100) return [];
+      return List.generate(
+        100,
+        (i) => {
+          'id': 'task-$i',
+          'detail': {
+            'files': [
+              {'id': 'file-$i', 'name': 'file-$i.pdf'},
+            ],
+          },
+        },
+      );
+    });
+    final repo = StorageRepositoryImpl(
+      Dio()..httpClientAdapter = adapter,
+      const FlutterSecureStorage(),
+    );
+    expect((await repo.load(project)).length, 100);
+    expect(adapter.requests.length, 4);
+  });
+  for (final archived in [false, true]) {
+    test(
+      'project storage rejects repeated pages (archived: $archived)',
+      () async {
+        final adapter = Adapter((request) {
+          final current = request.queryParameters['archived'] == 'true';
+          if (current != archived) return [];
+          if ((request.queryParameters['skip'] as int) >= 200) {
+            throw StateError('Pagination did not stop');
+          }
+          return List.generate(100, (i) => {'id': 'task-$i'});
+        });
+        final repo = StorageRepositoryImpl(
+          Dio()..httpClientAdapter = adapter,
+          const FlutterSecureStorage(),
+        );
+        await expectLater(repo.load(project), throwsA(isA<StorageException>()));
+        expect(
+          adapter.requests
+              .where(
+                (r) => r.queryParameters['archived'] == archived.toString(),
+              )
+              .length,
+          2,
+        );
+      },
+    );
+  }
   test(
     'project collects comments, deduplicates mirrored files, excludes deleted comments and HTML attributes',
     () {

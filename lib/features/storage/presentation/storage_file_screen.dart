@@ -1,3 +1,4 @@
+import '../../../core/widgets/app_snack_bar.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'dart:io';
@@ -102,9 +103,13 @@ class _StorageFileScreenState extends State<StorageFileScreen> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(StorageCubit.errorText(error))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
+            content: Text(StorageCubit.errorText(error)),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

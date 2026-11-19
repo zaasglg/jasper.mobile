@@ -1,3 +1,4 @@
+import '../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -116,7 +117,9 @@ class _PushSettingsSectionState extends State<PushSettingsSection>
                         );
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            appSnackBar(
+                              context: context,
+                              tone: AppSnackBarTone.success,
                               content: Text(
                                 'Токен устройства скопирован для теста Firebase.',
                               ),

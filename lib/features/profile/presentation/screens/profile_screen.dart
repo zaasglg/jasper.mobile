@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:convert';
 import 'dart:ui' as ui;
@@ -33,7 +34,13 @@ class ProfileScreen extends StatelessWidget {
           if (state is AuthFailure) {
             ScaffoldMessenger.of(context)
               ..hideCurrentSnackBar()
-              ..showSnackBar(SnackBar(content: Text(state.message)));
+              ..showSnackBar(
+                appSnackBar(
+                  context: context,
+                  tone: AppSnackBarTone.error,
+                  content: Text(state.message),
+                ),
+              );
           }
         },
         child: const _ProfileView(),
@@ -84,9 +91,13 @@ class _ProfileView extends StatelessWidget {
       body: BlocConsumer<ProfileCubit, ProfileState>(
         listener: (context, state) {
           if (state is ProfileLoaded && state.photoError != null) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.photoError!)));
+            ScaffoldMessenger.of(context).showSnackBar(
+              appSnackBar(
+                context: context,
+                tone: AppSnackBarTone.error,
+                content: Text(state.photoError!),
+              ),
+            );
           }
         },
         builder: (context, state) {
@@ -155,7 +166,9 @@ class _ProfileContentState extends State<_ProfileContent> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text(
               error is FormatException && error.message.isNotEmpty
                   ? error.message
@@ -266,7 +279,9 @@ class _ProfileContentState extends State<_ProfileContent> {
                           ScaffoldMessenger.of(context)
                             ..hideCurrentSnackBar()
                             ..showSnackBar(
-                              const SnackBar(
+                              appSnackBar(
+                                context: context,
+                                tone: AppSnackBarTone.success,
                                 content: Text('Почта скопирована'),
                               ),
                             );

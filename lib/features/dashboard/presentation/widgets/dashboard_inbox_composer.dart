@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/theme/app_theme.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -50,7 +51,11 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Задача добавлена в Инбокс')),
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.success,
+            content: Text('Задача добавлена в Инбокс'),
+          ),
         );
       return;
     }
@@ -59,7 +64,11 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(message ?? 'Не удалось создать задачу.')),
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.error,
+          content: Text(message ?? 'Не удалось создать задачу.'),
+        ),
       );
   }
 

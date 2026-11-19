@@ -37,8 +37,14 @@ entries with `POST project-planner/account/tasks`, and adds Inbox tasks through
 `POST project-planner/account/inbox-tasks`. No selected workspace is required.
 Updates and removal continue through `project-planner/items/:id`. Linking an
 existing project task still uses `POST project-planner/:projectId/tasks`, as
-required by the backend; it appears in the account-wide list. Due dates and the
-existing-task picker load the account's assigned tasks across workspaces.
+required by the backend; it appears in the account-wide list. Tasks are fetched
+only when the user explicitly opens the existing-task picker. Due dates are not
+automatically imported into the planner.
+
+Linked completion uses `PATCH project-planner/items/:id/completion` so that an
+older server cannot forward the checkmark to the source task. This requires the
+server patch described in [PLANNER_LIFECYCLE.md](backend/PLANNER_LIFECYCLE.md).
+Planner completion and archive come from the planner entry itself.
 
 Backend contract checked against `zaasglg/orbita-back` commit
 `c08a34bbdd00eb9f63792eb460db5c27ac1e3207` (controller, service, account tests).

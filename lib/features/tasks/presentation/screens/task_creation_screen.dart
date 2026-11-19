@@ -6,7 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_form_surface.dart';
 import '../../data/models/task_creation_models.dart';
-import '../../data/services/task_file_picker.dart';
+import '../widgets/task_attachment_picker.dart';
 import '../../domain/repositories/task_details_repository.dart';
 import '../cubit/task_creation_cubit.dart';
 import '../widgets/task_dates_sheet.dart';
@@ -156,7 +156,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
       _fileError = null;
     });
     try {
-      final files = await TaskFilePicker.pick(
+      final files = await pickTaskAttachments(
+        context,
         author: cubit.state.catalog?.user.name,
         authorId: cubit.state.catalog?.user.id,
       );

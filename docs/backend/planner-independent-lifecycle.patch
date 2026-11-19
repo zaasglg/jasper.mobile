@@ -1,0 +1,482 @@
+diff --git a/src/google-drive/google-planner-sync.service.ts b/src/google-drive/google-planner-sync.service.ts
+index 56932ca..a918557 100644
+--- a/src/google-drive/google-planner-sync.service.ts
++++ b/src/google-drive/google-planner-sync.service.ts
+@@ -76,9 +76,9 @@ export class GooglePlannerSyncService implements OnModuleInit, OnModuleDestroy {
+       do {
+         const items = await tx.projectPlannerItem.findMany({
+           where: { createdById: userId, scheduledAt: { not: null }, archived: false, OR: [
+-            { project: projectFilter, task: { archived: false, project: projectFilter } },
++            { project: projectFilter, task: { project: projectFilter } },
+             { taskId: null, inboxTaskId: null },
+-            { taskId: null, inboxTask: { userId, archived: false } },
++            { taskId: null, inboxTask: { userId } },
+           ] },
+           include: { task: { select: { title: true } }, inboxTask: { select: { title: true } } },
+           orderBy: { id: 'asc' }, take: 50, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+diff --git a/src/google-drive/google-planner-sync.spec.ts b/src/google-drive/google-planner-sync.spec.ts
+index f774a59..6348884 100644
+--- a/src/google-drive/google-planner-sync.spec.ts
++++ b/src/google-drive/google-planner-sync.spec.ts
+@@ -53,7 +53,7 @@ describe('Planner export to Google', () => {
+     expect(events.list.mock.calls[1][0].pageToken).toBe('next');
+     expect(events.delete).toHaveBeenCalledTimes(1);
+     expect(events.delete.mock.calls[0][0].eventId).toBe('mine');
+-    expect(tx.projectPlannerItem.findMany.mock.calls[0][0].where).toMatchObject({ createdById: 'user', archived: false, scheduledAt: { not: null }, OR: [{ project: { id: { in: ['allowed'] } }, task: { archived: false, project: { id: { in: ['allowed'] } } } }, { taskId: null, inboxTaskId: null }, { taskId: null, inboxTask: { userId: 'user', archived: false } }] });
++    expect(tx.projectPlannerItem.findMany.mock.calls[0][0].where).toMatchObject({ createdById: 'user', archived: false, scheduledAt: { not: null }, OR: [{ project: { id: { in: ['allowed'] } }, task: { project: { id: { in: ['allowed'] } } } }, { taskId: null, inboxTaskId: null }, { taskId: null, inboxTask: { userId: 'user' } }] });
+   });
+ 
+   it('does not write without new consent or while another worker holds the lock', async () => {
+diff --git a/src/project-planner/planner-account.spec.ts b/src/project-planner/planner-account.spec.ts
+index b393b69..e2935df 100644
+--- a/src/project-planner/planner-account.spec.ts
++++ b/src/project-planner/planner-account.spec.ts
+@@ -38,13 +38,13 @@ describe('Account planner', () => {
+     expect(access.assertWorkspaceAccess).not.toHaveBeenCalled();
+     expect(db.projectPlannerItem.findMany).toHaveBeenCalledWith(expect.objectContaining({
+       skip: 250, take: 250,
+-      where: { NOT: { assignees: { some: { userId: actor.id, excluded: true } } }, OR: [
+-        { task: { archived: false, project: { id: { in: ['project-a', 'project-b'] } } }, OR: [
++      where: { archived: false, NOT: { assignees: { some: { userId: actor.id, excluded: true } } }, OR: [
++        { task: { project: { id: { in: ['project-a', 'project-b'] } } }, OR: [
+           { task: { assignees: { some: { userId: actor.id } } } },
+           { assignees: { some: { userId: actor.id, excluded: false } } },
+         ] },
+         { taskId: null, inboxTaskId: null, archived: false, createdById: actor.id, assignees: { some: { userId: actor.id } } },
+-        { inboxTask: { archived: false, assignees: { some: { userId: actor.id } } }, archived: false },
++        { inboxTask: { assignees: { some: { userId: actor.id } } }, archived: false },
+       ] },
+     }));
+   });
+diff --git a/src/project-planner/planner-inbox.spec.ts b/src/project-planner/planner-inbox.spec.ts
+index c701452..4cd1290 100644
+--- a/src/project-planner/planner-inbox.spec.ts
++++ b/src/project-planner/planner-inbox.spec.ts
+@@ -84,13 +84,13 @@ describe('Direct Inbox planner links', () => {
+     expect(db.projectTask.create).not.toHaveBeenCalled();
+   });
+ 
+-  it.each([true, false])('sets original Inbox completion to %s preserving detail and not archiving', async completed => {
++  it.each([true, false])('sets planner completion to %s without changing Inbox', async completed => {
+     const { service, db, item } = setup();
+     db.projectPlannerItem.findUnique.mockResolvedValue(item);
+     await service.updateItem(item.id, actor, { completed });
+-    expect(db.inboxTask.update).toHaveBeenCalledWith({ where: { id: 'inbox' }, data: { detail: { description: 'Keep me', completed } } });
++    expect(db.inboxTask.update).not.toHaveBeenCalled();
+     expect(db.projectTask.update).not.toHaveBeenCalled();
+-    expect(db.projectPlannerItem.update).toHaveBeenCalledWith(expect.objectContaining({ data: {} }));
++    expect(db.projectPlannerItem.update).toHaveBeenCalledWith(expect.objectContaining({ data: { completed } }));
+   });
+ 
+   it('removing from the planner hides only the placement and leaves Inbox assignees intact', async () => {
+diff --git a/src/project-planner/planner-independent-completion.spec.ts b/src/project-planner/planner-independent-completion.spec.ts
+new file mode 100644
+index 0000000..d2c8186
+--- /dev/null
++++ b/src/project-planner/planner-independent-completion.spec.ts
+@@ -0,0 +1,104 @@
++import { BadRequestException, ForbiddenException } from '@nestjs/common';
++import { UserRole } from '@prisma/client';
++import { PrismaService } from '../prisma/prisma.service';
++import { ProjectAccessService } from '../project-access/project-access.service';
++import { AuthenticatedRequest } from '../auth/authenticated-request';
++import { ProjectPlannerController } from './project-planner.controller';
++import { ProjectPlannerService } from './project-planner.service';
++
++describe('Independent planner lifecycle', () => {
++  const actor = { id: 'user', role: UserRole.EXECUTOR };
++  function setup(source: 'project' | 'inbox') {
++    const item = {
++      id: 'item', projectId: source === 'project' ? 'project' : null,
++      workspaceId: 'workspace', createdById: actor.id,
++      taskId: source === 'project' ? 'task' : null,
++      inboxTaskId: source === 'inbox' ? 'inbox' : null,
++      assignees: [{ userId: actor.id, excluded: false }],
++      task: source === 'project' ? { projectId: 'project', assignees: [] } : null,
++      inboxTask: source === 'inbox' ? { assignees: [] } : null,
++      scheduledAt: new Date('2026-11-18T10:00:00Z'), durationMinutes: 30,
++    };
++    const db = {
++      project: { findMany: jest.fn().mockResolvedValue([{ id: 'project' }]) },
++      projectTask: { update: jest.fn() },
++      inboxTask: { update: jest.fn() },
++      $queryRaw: jest.fn().mockResolvedValue([]),
++      projectPlannerItem: {
++        findUnique: jest.fn().mockResolvedValue(item),
++        findUniqueOrThrow: jest.fn().mockResolvedValue(item),
++        findMany: jest.fn().mockResolvedValue([]),
++        update: jest.fn().mockImplementation(async args => ({ ...item, ...args.data })),
++      },
++      $transaction: jest.fn(),
++    };
++    db.$transaction.mockImplementation(async callback => callback(db));
++    const access = {
++      assertProjectAccess: jest.fn().mockResolvedValue(undefined),
++      assertWorkspaceAccess: jest.fn().mockResolvedValue(undefined),
++      assertCanEditProject: jest.fn().mockRejectedValue(new Error('Cannot edit source')),
++      getEffectiveRole: jest.fn().mockResolvedValue(UserRole.EXECUTOR),
++      projectFilter: jest.fn().mockResolvedValue({ id: 'project' }),
++    };
++    const service = new ProjectPlannerService(db as unknown as PrismaService, access as unknown as ProjectAccessService);
++    return { db, access, service, item };
++  }
++
++  describe.each(['project', 'inbox'] as const)('%s link', source => {
++    it.each([true, false])('stores completed=%s only on the planner entry', async completed => {
++      const { db, access, service } = setup(source);
++      await expect(service.updateItem('item', actor, { completed })).resolves.toEqual(expect.objectContaining({ completed }));
++      expect(db.projectPlannerItem.update).toHaveBeenCalledWith(expect.objectContaining({ data: { completed } }));
++      expect(db.projectTask.update).not.toHaveBeenCalled();
++      expect(db.inboxTask.update).not.toHaveBeenCalled();
++      expect(access.assertCanEditProject).not.toHaveBeenCalled();
++      expect(access.getEffectiveRole).not.toHaveBeenCalled();
++    });
++
++    it('combines schedule and completion without editing the source', async () => {
++      const { db, service } = setup(source);
++      await service.updateItem('item', actor, { completed: true, durationMinutes: 60 });
++      expect(db.$transaction).toHaveBeenCalledTimes(1);
++      expect(db.projectPlannerItem.update).toHaveBeenCalledWith(expect.objectContaining({ data: { completed: true, durationMinutes: 60 } }));
++      expect(db.projectTask.update).not.toHaveBeenCalled();
++      expect(db.inboxTask.update).not.toHaveBeenCalled();
++    });
++
++    it('retains private entry authorization', async () => {
++      const { db, service, item } = setup(source);
++      db.projectPlannerItem.findUnique.mockResolvedValue({ ...item, assignees: [] });
++      await expect(service.updateItem('item', actor, { completed: true })).rejects.toThrow(ForbiddenException);
++      expect(db.projectPlannerItem.update).not.toHaveBeenCalled();
++    });
++  });
++
++  it('preserves current-project permission checks', async () => {
++    const { db, access, service, item } = setup('project');
++    item.task!.projectId = 'inaccessible';
++    access.assertProjectAccess.mockImplementation(async id => {
++      if (id === 'inaccessible') throw new ForbiddenException();
++    });
++    await expect(service.updateItem('item', actor, { completed: true })).rejects.toThrow(ForbiddenException);
++    expect(db.projectPlannerItem.update).not.toHaveBeenCalled();
++  });
++
++  it('filters archive on planner entries while preserving source access filters', async () => {
++    const { db, service } = setup('project');
++    await service.listAccount(actor);
++    const where = db.projectPlannerItem.findMany.mock.calls[0][0].where;
++    expect(where.archived).toBe(false);
++    expect(where.OR[0].task).toEqual({ project: { id: 'project' } });
++    expect(where.OR[2].inboxTask).toEqual({ assignees: { some: { userId: actor.id } } });
++    expect(where.NOT).toEqual({ assignees: { some: { userId: actor.id, excluded: true } } });
++  });
++
++  it('keeps the independent completion route validated and authenticated', async () => {
++    const { db, service } = setup('project');
++    const controller = new ProjectPlannerController(service);
++    const request = { user: actor } as AuthenticatedRequest;
++    expect(() => controller.updateCompletion('item', {}, request)).toThrow(BadRequestException);
++    await controller.updateCompletion('item', { completed: false }, request);
++    expect(db.projectPlannerItem.update).toHaveBeenCalledWith(expect.objectContaining({ data: { completed: false } }));
++    expect(db.projectTask.update).not.toHaveBeenCalled();
++  });
++});
+diff --git a/src/project-planner/planner-list-access.spec.ts b/src/project-planner/planner-list-access.spec.ts
+index 875bbdb..ae88e90 100644
+--- a/src/project-planner/planner-list-access.spec.ts
++++ b/src/project-planner/planner-list-access.spec.ts
+@@ -32,9 +32,10 @@ describe('Planner list current task authorization', () => {
+     await service.list('old-project', actor);
+     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {
+       projectId: 'old-project',
++      archived: false,
+       NOT: { assignees: { some: { userId: actor.id, excluded: true } } },
+       OR: [{ task: { assignees: { some: { userId: actor.id } } } }, { assignees: { some: { userId: actor.id, excluded: false } } }],
+-      task: { archived: false, project: filter },
++      task: { project: filter },
+     } }));
+   });
+ 
+@@ -43,11 +44,11 @@ describe('Planner list current task authorization', () => {
+     await service.listWorkspace('workspace', actor, { take: 10, skip: 0 });
+     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+       take: 10, skip: 0,
+-      where: { NOT: { assignees: { some: { userId: actor.id, excluded: true } } }, OR: [
+-        { OR: [{ workspaceId: 'workspace' }, { workspaceId: null, projectId: { in: ['old-project'] } }], task: { archived: false, project: filter },
++      where: { archived: false, NOT: { assignees: { some: { userId: actor.id, excluded: true } } }, OR: [
++        { OR: [{ workspaceId: 'workspace' }, { workspaceId: null, projectId: { in: ['old-project'] } }], task: { project: filter },
+           AND: [{ OR: [{ task: { assignees: { some: { userId: actor.id } } } }, { assignees: { some: { userId: actor.id, excluded: false } } }] }] },
+         { workspaceId: 'workspace', taskId: null, inboxTaskId: null, archived: false, createdById: actor.id, assignees: { some: { userId: actor.id } } },
+-        { workspaceId: 'workspace', inboxTask: { archived: false, assignees: { some: { userId: actor.id } } }, archived: false },
++        { workspaceId: 'workspace', inboxTask: { assignees: { some: { userId: actor.id } } }, archived: false },
+       ] },
+     }));
+   });
+@@ -56,7 +57,7 @@ describe('Planner list current task authorization', () => {
+     const { service, findMany } = setup(true);
+     await service.list('old-project', { id: 'admin', role: UserRole.SUPER_ADMIN });
+     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {
+-      projectId: 'old-project', task: { archived: false },
++      projectId: 'old-project', archived: false, task: {},
+       NOT: { assignees: { some: { userId: 'admin', excluded: true } } },
+       OR: [{ task: { assignees: { some: { userId: 'admin' } } } }, { assignees: { some: { userId: 'admin', excluded: false } } }],
+     } }));
+diff --git a/src/project-planner/planner-update-transaction.spec.ts b/src/project-planner/planner-update-transaction.spec.ts
+index 8b272c4..02c6824 100644
+--- a/src/project-planner/planner-update-transaction.spec.ts
++++ b/src/project-planner/planner-update-transaction.spec.ts
+@@ -10,6 +10,7 @@ describe('Planner update transaction', () => {
+     const tx = {
+       $queryRaw: jest.fn().mockResolvedValue([{ id: actor.id }]),
+       projectTask: { update: jest.fn().mockResolvedValue({}) },
++      projectPlannerItemAssignee: { count: jest.fn().mockResolvedValue(1) },
+       projectPlannerItem: {
+         update: jest.fn().mockResolvedValue(result),
+         findUniqueOrThrow: jest.fn().mockResolvedValue({ createdById: actor.id, taskId, inboxTaskId: null, completed: false, detail: {}, project: { workspaceId: 'ws' }, scheduledAt: new Date('2026-09-26T10:00:00Z'), durationMinutes: 30 }),
+@@ -19,7 +20,7 @@ describe('Planner update transaction', () => {
+     const db = {
+       projectTask: { update: jest.fn() },
+       projectPlannerItem: {
+-        findUnique: jest.fn().mockResolvedValue({ id: 'item', projectId: 'project', taskId, task: taskId ? { projectId: 'project' } : null, createdById: actor.id }),
++        findUnique: jest.fn().mockResolvedValue({ id: 'item', projectId: 'project', taskId, task: taskId ? { projectId: 'project', assignees: [] } : null, createdById: actor.id, assignees: [{ userId: actor.id }] }),
+         update: jest.fn().mockResolvedValue(result),
+       },
+       $transaction: jest.fn(async (callback: (client: Prisma.TransactionClient) => Promise<unknown>) =>
+@@ -34,23 +35,23 @@ describe('Planner update transaction', () => {
+     const { db, tx, service, result } = setup();
+     await expect(service.updateItem('item', actor, { completed, durationMinutes: 60 })).resolves.toEqual(result);
+     expect(db.$transaction).toHaveBeenCalledTimes(1);
+-    expect(tx.projectTask.update).toHaveBeenCalledWith({ where: { id: 'task' }, data: { progress: completed ? 100 : 0 } });
++    expect(tx.projectTask.update).not.toHaveBeenCalled();
+     expect(tx.projectPlannerItem.update).toHaveBeenCalledWith(expect.objectContaining({
+-      where: { id: 'item' }, data: { durationMinutes: 60 },
++      where: { id: 'item' }, data: { durationMinutes: 60, completed },
+       include: expect.objectContaining({ task: expect.any(Object) }),
+     }));
+     expect(db.projectTask.update).not.toHaveBeenCalled();
+     expect(db.projectPlannerItem.update).not.toHaveBeenCalled();
+   });
+ 
+-  it.each(['task', 'item'] as const)('propagates %s write failure out of the transaction', async target => {
++  it('propagates planner write failure out of the transaction', async () => {
+     const { db, tx, service } = setup();
+     const error = new Error('write failed');
+-    (target === 'task' ? tx.projectTask.update : tx.projectPlannerItem.update).mockRejectedValue(error);
+-    await expect(service.updateItem('item', actor, { completed: true })).rejects.toBe(error);
++    tx.projectPlannerItem.update.mockRejectedValue(error);
++    await expect(service.updateItem('item', actor, { completed: true, durationMinutes: 60 })).rejects.toBe(error);
+     expect(db.$transaction).toHaveBeenCalledTimes(1);
+     expect(db.projectPlannerItem.update).not.toHaveBeenCalled();
+-    if (target === 'task') expect(tx.projectPlannerItem.update).not.toHaveBeenCalled();
++    expect(tx.projectTask.update).not.toHaveBeenCalled();
+   });
+ 
+   it('checks schedule-only updates in a locked transaction', async () => {
+@@ -79,7 +80,7 @@ describe('Planner update transaction', () => {
+   it.each([{ completed: true }, { durationMinutes: 15 }])('rejects updates to a task moved into an inaccessible project: %j', async data => {
+     const { db, access, service } = setup();
+     db.projectPlannerItem.findUnique.mockResolvedValue({
+-      id: 'item', projectId: 'project', taskId: 'task', task: { projectId: 'destination' }, createdById: actor.id,
++      id: 'item', projectId: 'project', taskId: 'task', task: { projectId: 'destination', assignees: [] }, createdById: actor.id, assignees: [{ userId: actor.id }],
+     });
+     access.assertProjectAccess.mockImplementation(async (id: string) => {
+       if (id === 'destination') throw new Error('denied');
+@@ -93,11 +94,11 @@ describe('Planner update transaction', () => {
+   it('allows a moved task when both projects are accessible', async () => {
+     const { db, access, service } = setup();
+     db.projectPlannerItem.findUnique.mockResolvedValue({
+-      id: 'item', projectId: 'project', taskId: 'task', task: { projectId: 'destination' }, createdById: actor.id,
++      id: 'item', projectId: 'project', taskId: 'task', task: { projectId: 'destination', assignees: [] }, createdById: actor.id, assignees: [{ userId: actor.id }],
+     });
+     await service.updateItem('item', actor, { completed: true });
+     expect(access.assertProjectAccess.mock.calls).toEqual([['project', actor], ['destination', actor]]);
+-    expect(db.$transaction).toHaveBeenCalledTimes(1);
++    expect(db.projectPlannerItem.update).toHaveBeenCalledTimes(1);
+   });
+ 
+   it('does not repeat the access check for an unchanged project', async () => {
+@@ -109,7 +110,7 @@ describe('Planner update transaction', () => {
+   it('rejects a missing linked task without mutation', async () => {
+     const { db, service } = setup();
+     db.projectPlannerItem.findUnique.mockResolvedValue({
+-      id: 'item', projectId: 'project', taskId: 'task', task: null, createdById: actor.id,
++      id: 'item', projectId: 'project', taskId: 'task', task: null, createdById: actor.id, assignees: [{ userId: actor.id }],
+     });
+     await expect(service.updateItem('item', actor, { completed: true })).rejects.toThrow('Task not found');
+     expect(db.$transaction).not.toHaveBeenCalled();
+diff --git a/src/project-planner/project-planner.controller.ts b/src/project-planner/project-planner.controller.ts
+index e3970d5..e7277c6 100644
+--- a/src/project-planner/project-planner.controller.ts
++++ b/src/project-planner/project-planner.controller.ts
+@@ -93,6 +93,19 @@ export class ProjectPlannerController {
+     return this.planner.updateItem(itemId, req.user, dto);
+   }
+ 
++  // Dedicated route lets mobile reject older servers that complete source tasks.
++  @Patch('items/:itemId/completion')
++  updateCompletion(
++    @Param('itemId') itemId: string,
++    @Body() dto: UpdatePlannerItemDto,
++    @Request() req: AuthenticatedRequest,
++  ) {
++    if (typeof dto.completed !== 'boolean') {
++      throw new BadRequestException('completed must be a boolean');
++    }
++    return this.planner.updateItem(itemId, req.user, dto);
++  }
++
+   @Post('workspace/:workspaceId/inbox-tasks')
+   addInboxTask(
+     @Param('workspaceId') workspaceId: string,
+diff --git a/src/project-planner/project-planner.service.ts b/src/project-planner/project-planner.service.ts
+index 4f93bff..00c1913 100644
+--- a/src/project-planner/project-planner.service.ts
++++ b/src/project-planner/project-planner.service.ts
+@@ -59,6 +59,7 @@ export class ProjectPlannerService {
+     const items = await tx.projectPlannerItem.findMany({
+       where: {
+         ...(excludeId ? { id: { not: excludeId } } : {}),
++        archived: false,
+         NOT: { assignees: { some: { userId: actor.id, excluded: true } } },
+         scheduledAt: { gte: new Date(start.getTime() - 1440 * 60_000), lt: new Date(start.getTime() + durationMinutes * 60_000) },
+         AND: [
+@@ -67,11 +68,6 @@ export class ProjectPlannerService {
+             { task: { assignees: { some: { userId: actor.id } } } },
+             { inboxTask: { assignees: { some: { userId: actor.id } } } },
+           ] },
+-          { OR: [
+-            { task: { archived: false } },
+-            { taskId: null, inboxTaskId: null, archived: false },
+-            { inboxTask: { archived: false }, archived: false },
+-          ] },
+         ],
+       },
+       select: { scheduledAt: true, durationMinutes: true },
+@@ -87,12 +83,13 @@ export class ProjectPlannerService {
+     return this.prisma.projectPlannerItem.findMany({
+       where: {
+         projectId,
++        archived: false,
+         NOT: { assignees: { some: { userId: actor.id, excluded: true } } },
+         OR: [
+           { task: { assignees: { some: { userId: actor.id } } } },
+           { assignees: { some: { userId: actor.id, excluded: false } } },
+         ],
+-        task: { archived: false, ...(visibleProjectFilter ? { project: visibleProjectFilter } : {}) },
++        task: { ...(visibleProjectFilter ? { project: visibleProjectFilter } : {}) },
+       },
+       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+       include: this.itemInclude(),
+@@ -103,13 +100,13 @@ export class ProjectPlannerService {
+     if (!actor?.id?.trim()) throw new ForbiddenException();
+     const projectFilter = await this.projectAccess.projectFilter(actor);
+     return this.prisma.projectPlannerItem.findMany({
+-      where: { NOT: { assignees: { some: { userId: actor.id, excluded: true } } }, OR: [
+-        { task: { archived: false, project: projectFilter }, OR: [
++      where: { archived: false, NOT: { assignees: { some: { userId: actor.id, excluded: true } } }, OR: [
++        { task: { project: projectFilter }, OR: [
+           { task: { assignees: { some: { userId: actor.id } } } },
+           { assignees: { some: { userId: actor.id, excluded: false } } },
+         ] },
+         { taskId: null, inboxTaskId: null, archived: false, createdById: actor.id, assignees: { some: { userId: actor.id } } },
+-        { inboxTask: { archived: false, assignees: { some: { userId: actor.id } } }, archived: false },
++        { inboxTask: { assignees: { some: { userId: actor.id } } }, archived: false },
+       ] },
+       orderBy: [{ scheduledAt: 'asc' }, { order: 'asc' }, { id: 'asc' }],
+       include: this.itemInclude(),
+@@ -142,13 +139,14 @@ export class ProjectPlannerService {
+     return this.prisma.projectPlannerItem.findMany({
+       where: {
+         NOT: { assignees: { some: { userId: subjectId, excluded: true } } },
++        archived: false,
+         OR: [
+           {
+             OR: [
+               { workspaceId },
+               { workspaceId: null, projectId: { in: projectIds } },
+             ],
+-            task: { archived: false, ...(visibleProjectFilter ? { project: visibleProjectFilter } : {}) },
++            task: { ...(visibleProjectFilter ? { project: visibleProjectFilter } : {}) },
+             AND: [{ OR: [
+               { task: { assignees: { some: { userId: subjectId } } } },
+               { assignees: { some: { userId: subjectId, excluded: false } } },
+@@ -162,7 +160,7 @@ export class ProjectPlannerService {
+             archived: false,
+             assignees: { some: { userId: subjectId } },
+           },
+-          { workspaceId, inboxTask: { archived: false, assignees: { some: { userId: subjectId } } }, archived: false },
++          { workspaceId, inboxTask: { assignees: { some: { userId: subjectId } } }, archived: false },
+         ],
+       },
+       orderBy: [{ scheduledAt: 'asc' }, { order: 'asc' }, { createdAt: 'asc' }],
+@@ -447,13 +445,6 @@ export class ProjectPlannerService {
+ 
+     if (item.taskId) {
+       if (!item.task) throw new NotFoundException('Task not found');
+-      await this.projectAccess.assertCanEditProject(item.task.projectId, actor);
+-      if (data.completed !== undefined) {
+-        const role = await this.projectAccess.getEffectiveRole(item.task.projectId, actor);
+-        if (role !== UserRole.ADMIN && role !== UserRole.SUPER_ADMIN) {
+-          throw new ForbiddenException('Закрыть задачу может Администратор или Супер админ проекта');
+-        }
+-      }
+       if (item.task.projectId !== item.projectId) {
+         await this.projectAccess.assertProjectAccess(item.task.projectId, actor);
+       }
+@@ -489,7 +480,7 @@ export class ProjectPlannerService {
+         ...(data.durationMinutes !== undefined
+           ? { durationMinutes: data.durationMinutes }
+           : {}),
+-        ...(data.completed !== undefined && !item.taskId && !item.inboxTaskId
++        ...(data.completed !== undefined
+           ? { completed: data.completed }
+           : {}),
+         ...(assigneeIds !== undefined
+@@ -547,28 +538,6 @@ export class ProjectPlannerService {
+       });
+     }
+ 
+-    if (item.inboxTaskId) {
+-      const inboxTaskId = item.inboxTaskId;
+-      return this.prisma.$transaction(async tx => {
+-        await this.lockSchedule(tx, actor);
+-        // Lock the source as well so completing cannot overwrite concurrent Inbox edits.
+-        await tx.$queryRaw`SELECT id FROM inbox_tasks WHERE id = ${inboxTaskId} FOR UPDATE`;
+-        const source = await tx.inboxTask.findFirst({ where: { id: inboxTaskId, archived: false, assignees: { some: { userId: actor.id } } } });
+-        if (!source) throw new NotFoundException('Inbox task not found');
+-        const current = await tx.projectPlannerItem.findUniqueOrThrow({ where: { id: itemId } });
+-        if (data.scheduledAt !== undefined || data.durationMinutes !== undefined) {
+-          await this.assertCapacity(tx, actor, current.workspaceId,
+-            data.scheduledAt ? new Date(data.scheduledAt) : current.scheduledAt,
+-            data.durationMinutes ?? current.durationMinutes, itemId);
+-        }
+-        if (data.completed !== undefined) {
+-          const detail = source.detail && typeof source.detail === 'object' && !Array.isArray(source.detail) ? source.detail : {};
+-          await tx.inboxTask.update({ where: { id: source.id }, data: { detail: { ...detail, completed: data.completed } } });
+-        }
+-        return tx.projectPlannerItem.update(updateArgs);
+-      });
+-    }
+-
+     if (data.scheduledAt !== undefined || data.durationMinutes !== undefined) {
+       return this.prisma.$transaction(async tx => {
+         await this.lockSchedule(tx, actor);
+@@ -579,20 +548,6 @@ export class ProjectPlannerService {
+         await this.assertCapacity(tx, actor, workspaceId,
+           data.scheduledAt ? new Date(data.scheduledAt) : current.scheduledAt,
+           data.durationMinutes ?? current.durationMinutes, itemId);
+-        if (item.taskId && data.completed !== undefined) {
+-          await tx.projectTask.update({ where: { id: item.taskId }, data: { progress: data.completed ? 100 : 0 } });
+-        }
+-        return tx.projectPlannerItem.update(updateArgs);
+-      });
+-    }
+-
+-    if (item.taskId && data.completed !== undefined) {
+-      const taskId = item.taskId;
+-      return this.prisma.$transaction(async (tx) => {
+-        await tx.projectTask.update({
+-          where: { id: taskId },
+-          data: { progress: data.completed ? 100 : 0 },
+-        });
+         return tx.projectPlannerItem.update(updateArgs);
+       });
+     }

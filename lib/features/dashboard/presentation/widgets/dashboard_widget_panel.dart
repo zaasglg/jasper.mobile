@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_widget_skeleton.dart';
 import '../../../../core/theme/dashboard_surface.dart';
@@ -569,7 +570,9 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
                       } catch (_) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            appSnackBar(
+                              context: context,
+                              tone: AppSnackBarTone.error,
                               content: Text('Не удалось открыть карту'),
                             ),
                           );

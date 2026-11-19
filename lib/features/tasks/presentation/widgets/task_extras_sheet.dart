@@ -1,5 +1,6 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import 'task_labels_editor.dart';
-import '../../data/services/task_file_picker.dart';
+import 'task_attachment_picker.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
@@ -48,9 +49,13 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
   bool _picking = false;
   void _error(Object e) {
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.error,
+          content: Text(e.toString()),
+        ),
+      );
     }
   }
 
@@ -269,11 +274,12 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
   Future<void> _pickFiles(TaskDetailsCubit cubit) async {
     setState(() => _picking = true);
     try {
-      final files = await TaskFilePicker.pick(
+      final files = await pickTaskAttachments(
+        context,
         author: cubit.state.currentUser?.name,
         authorId: cubit.state.currentUser?.id,
       );
-      if (files.isEmpty || cubit.isClosed) return;
+      if (!mounted || files.isEmpty || cubit.isClosed) return;
       await cubit.addFiles(files);
     } catch (e) {
       _error(e);

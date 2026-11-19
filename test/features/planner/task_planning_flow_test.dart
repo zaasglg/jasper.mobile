@@ -65,7 +65,8 @@ class _Planner implements PlannerRepository {
     String? projectId,
     String? taskId,
     String? inboxTaskId,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   }) async {
     writes++;
@@ -95,6 +96,7 @@ class _Planner implements PlannerRepository {
     PlannerItemModel item, {
     String? title,
     DateTime? scheduledAt,
+    DateTime? plannedDate,
     int? durationMinutes,
     bool? completed,
   }) async {
@@ -241,6 +243,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Добавить в ежедневник'), findsOneWidget);
       expect(repository.writes, 0);
+      expect(find.byKey(const Key('schedule-time')), findsNothing);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('planner-mode-timed')),
+      );
+      await tester.tap(find.byKey(const ValueKey('planner-mode-timed')));
+      await tester.pumpAndSettle();
       if (source == 'project') await _capturePreview(tester, '02-date-time');
       await tester.tap(find.byKey(const ValueKey('schedule-day-Завтра')));
       await tester.ensureVisible(
@@ -300,6 +308,11 @@ void main() {
         ),
       );
       await tester.tap(find.text('Планировать'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('planner-mode-timed')),
+      );
+      await tester.tap(find.byKey(const ValueKey('planner-mode-timed')));
       await tester.pumpAndSettle();
       await tester.ensureVisible(
         find.byKey(const ValueKey('schedule-duration-90')),
@@ -424,7 +437,7 @@ void main() {
       );
       repository.loadGate!.complete();
       await tester.pumpAndSettle();
-      expect(find.text('Изменить время'), findsOneWidget);
+      expect(find.text('Изменить план'), findsOneWidget);
       expect(find.text('11:15'), findsOneWidget);
       await tester.tap(find.byKey(const Key('schedule-confirm')));
       await tester.pumpAndSettle();

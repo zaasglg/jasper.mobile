@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../assistant/data/services/assistant_task_changes.dart';
 import '../widgets/dashboard_expandable_content.dart';
 import '../widgets/dashboard_widget_skeleton.dart';
@@ -158,9 +159,13 @@ class _DashboardView extends StatelessWidget {
   ) => BlocConsumer<DashboardLayoutCubit, DashboardLayoutState>(
     listener: (context, state) {
       if (state.error != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(state.error!)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
+            content: Text(state.error!),
+          ),
+        );
       }
     },
     builder: (context, state) {
@@ -213,7 +218,11 @@ class _DashboardView extends StatelessWidget {
                           cubit.refreshContent();
                           context.read<MyTasksCubit>().refresh();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
+                            appSnackBar(
+                              context: context,
+                              tone: created.orderWarning
+                                  ? AppSnackBarTone.info
+                                  : AppSnackBarTone.success,
                               content: Text(
                                 created.orderWarning
                                     ? 'Задача создана. Не удалось обновить её порядок в колонке'

@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -57,7 +58,9 @@ Future<void> showCreateProjectFlow(BuildContext context) async {
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
-      SnackBar(
+      appSnackBar(
+        context: context,
+        tone: AppSnackBarTone.success,
         content: Text(
           'Проект создан',
           style: GoogleFonts.manrope(fontWeight: FontWeight.w600),

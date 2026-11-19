@@ -1,3 +1,4 @@
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_action_menu.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -43,9 +44,13 @@ class _ParticipantsBody extends StatelessWidget {
     BuildContext context,
   ) => BlocConsumer<ProjectParticipantsCubit, ProjectParticipantsState>(
     listenWhen: (a, b) => a.error != b.error && b.error != null,
-    listener: (context, state) => ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(state.error!))),
+    listener: (context, state) => ScaffoldMessenger.of(context).showSnackBar(
+      appSnackBar(
+        context: context,
+        tone: AppSnackBarTone.error,
+        content: Text(state.error!),
+      ),
+    ),
     builder: (context, state) {
       final cubit = context.read<ProjectParticipantsCubit>();
       final compactAction =
@@ -876,9 +881,13 @@ class _ProjectLinkState extends State<_ProjectLink> {
   Future<void> _copy() async {
     await Clipboard.setData(ClipboardData(text: _link!.url));
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Ссылка скопирована')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.success,
+          content: Text('Ссылка скопирована'),
+        ),
+      );
     }
   }
 
@@ -894,7 +903,9 @@ class _ProjectLinkState extends State<_ProjectLink> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text('Не удалось открыть меню «Поделиться».'),
           ),
         );
@@ -913,7 +924,11 @@ class _ProjectLinkState extends State<_ProjectLink> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось открыть ссылку.')),
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
+            content: Text('Не удалось открыть ссылку.'),
+          ),
         );
       }
     }

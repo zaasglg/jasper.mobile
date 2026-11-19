@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../widgets/task_detail_style.dart';
 import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
 import '../../../../core/theme/task_label_color.dart';
@@ -15,7 +16,7 @@ import '../../../../core/storage/workspace_selection_storage.dart';
 import '../../../storage/data/storage_models.dart';
 import '../../../storage/data/storage_collector.dart';
 import '../widgets/task_files_section.dart';
-import '../../data/services/task_file_picker.dart';
+import '../widgets/task_attachment_picker.dart';
 import '../widgets/task_extras_sheet.dart';
 import '../../../../core/widgets/app_action_menu.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
@@ -93,7 +94,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     if (_pickingCommentFiles || cubit.state.isSaving) return;
     setState(() => _pickingCommentFiles = true);
     try {
-      final files = await TaskFilePicker.pick(
+      final files = await pickTaskAttachments(
+        context,
         author: cubit.state.currentUser?.name,
         authorId: cubit.state.currentUser?.id,
       );
@@ -107,7 +109,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text(
               e is TaskDetailsException
                   ? e.message
@@ -126,21 +130,28 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     if (_pickingFiles || cubit.state.isSaving) return;
     setState(() => _pickingFiles = true);
     try {
-      final files = await TaskFilePicker.pick(
+      final files = await pickTaskAttachments(
+        context,
         author: cubit.state.currentUser?.name,
         authorId: cubit.state.currentUser?.id,
       );
       if (!mounted || cubit.isClosed || files.isEmpty) return;
       final saved = await cubit.addFiles(files);
       if (mounted && saved) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Файлы загружены')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.success,
+            content: Text('Файлы загружены'),
+          ),
+        );
       }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text(
               error is TaskDetailsException
                   ? error.message
@@ -171,7 +182,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            SnackBar(
+            appSnackBar(
+              context: context,
+              tone: AppSnackBarTone.error,
               content: Text(message),
               behavior: SnackBarBehavior.floating,
             ),

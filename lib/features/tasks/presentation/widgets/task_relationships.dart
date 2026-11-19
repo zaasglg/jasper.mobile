@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -230,7 +231,9 @@ class _DependencyEditorState extends State<_DependencyEditor> {
                               widget.tasks,
                             )) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            appSnackBar(
+                              context: context,
+                              tone: AppSnackBarTone.error,
                               content: Text(
                                 'Эта связь создаст циклическую зависимость.',
                               ),

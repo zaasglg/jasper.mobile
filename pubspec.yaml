@@ -74,6 +74,7 @@ dependencies:
   flutter_webrtc: ^1.6.3
   sign_in_with_apple: ^8.2.0
   mobile_scanner: ^7.5.0
+  image_picker: 1.2.4
 
 dev_dependencies:
   flutter_test:
@@ -85,6 +86,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  image_picker_platform_interface: 2.11.2
 
 # path_provider_foundation 2.6.0 crashes on iOS Simulator while loading the
 # objective_c native asset. Keep the last stable platform-channel release

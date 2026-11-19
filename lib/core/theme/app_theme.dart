@@ -40,6 +40,25 @@ abstract final class AppTheme {
       ),
       textTheme: textTheme,
       primaryTextTheme: textTheme,
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: Colors.white,
+        behavior: SnackBarBehavior.floating,
+        elevation: 4,
+        insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        showCloseIcon: true,
+        closeIconColor: AppColors.muted,
+        actionTextColor: AppColors.accent,
+        contentTextStyle: GoogleFonts.manrope(
+          fontSize: 13,
+          height: 1.45,
+          fontWeight: FontWeight.w600,
+          color: AppColors.ink,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.border),
+        ),
+      ),
       checkboxTheme: CheckboxThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         side: const BorderSide(color: Color(0xFFA0A3B3), width: 1.5),

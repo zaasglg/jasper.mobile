@@ -3,6 +3,9 @@ import 'dart:async';
 import '../../../assistant/data/services/assistant_task_changes.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../data/models/task_translation.dart';
+import '../../../tasks/data/services/task_changes.dart';
+import '../../domain/entities/task_move_target.dart';
+import '../../domain/repositories/task_move_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../projects/data/models/project_task_model.dart';
@@ -15,9 +18,13 @@ import '../../domain/utils/kanban_utils.dart';
 import 'kanban_state.dart';
 
 class KanbanCubit extends Cubit<KanbanState> {
-  KanbanCubit(this._repository, {KanbanBoardCache? cache})
-    : _cache = cache ?? KanbanBoardCache(),
-      super(const KanbanState()) {
+  KanbanCubit(
+    this._repository, {
+    KanbanBoardCache? cache,
+    TaskMoveRepository? taskMoveRepository,
+  }) : _cache = cache ?? KanbanBoardCache(),
+       _taskMoveRepository = taskMoveRepository,
+       super(const KanbanState()) {
     assistantTaskChanges.addListener(_onAiTasksChanged);
     authSession.addListener(_onSessionChanged);
   }
@@ -32,6 +39,7 @@ class KanbanCubit extends Cubit<KanbanState> {
   }
 
   void _onAiTasksChanged() {
+    if (_publishingTaskChange) return;
     _cache.clear();
     if (!isClosed && state.projectId.isNotEmpty) {
       load(state.projectId, refresh: true);
@@ -39,6 +47,8 @@ class KanbanCubit extends Cubit<KanbanState> {
   }
 
   final KanbanRepository _repository;
+  final TaskMoveRepository? _taskMoveRepository;
+  bool _publishingTaskChange = false;
   final KanbanBoardCache _cache;
   int _loadRevision = 0;
   int _projectRevision = 0;
@@ -384,12 +394,12 @@ class KanbanCubit extends Cubit<KanbanState> {
     }
   }
 
-  Future<void> moveTask(
+  Future<bool> moveTask(
     ProjectTaskModel task,
     String targetStatus,
     int position,
   ) async {
-    if (!_canUpdateTask(task)) return;
+    if (!_canUpdateTask(task)) return false;
     final target = state.columns
         .where(
           (column) =>
@@ -399,7 +409,7 @@ class KanbanCubit extends Cubit<KanbanState> {
         .firstOrNull;
     if (target == null) {
       _actionError('Колонка больше недоступна. Выберите другую колонку.');
-      return;
+      return false;
     }
     targetStatus = target.statusMap;
     final operationRevision = _beginTaskOperation();
@@ -428,7 +438,7 @@ class KanbanCubit extends Cubit<KanbanState> {
         status: targetStatus,
         position: position,
       );
-      if (!_isCurrentOperation(operationRevision)) return;
+      if (!_isCurrentOperation(operationRevision)) return false;
       _cache.write(
         projectId,
         KanbanBoardData(columns: state.columns, tasks: state.tasks),
@@ -438,8 +448,9 @@ class KanbanCubit extends Cubit<KanbanState> {
           movingTaskIds: {...state.movingTaskIds}..remove(task.id),
         ),
       );
+      return true;
     } catch (error) {
-      if (!_isCurrentOperation(operationRevision)) return;
+      if (!_isCurrentOperation(operationRevision)) return false;
       final message =
           error is KanbanException &&
               error.statusCode == 403 &&
@@ -471,6 +482,76 @@ class KanbanCubit extends Cubit<KanbanState> {
           actionRevision: state.actionRevision + 1,
         ),
       );
+      return false;
+    } finally {
+      if (_isCurrentOperation(operationRevision)) _finishTaskOperation();
+    }
+  }
+
+  Future<bool> transferTask(
+    ProjectTaskModel task,
+    TaskMoveTarget target,
+  ) async {
+    if (!_canUpdateTask(task)) return false;
+    if (target.projectId == state.projectId) {
+      final count = state.tasks
+          .where(
+            (item) =>
+                item.id != task.id &&
+                item.status.toUpperCase() == target.status.toUpperCase(),
+          )
+          .length;
+      return moveTask(task, target.status, target.position ?? count);
+    }
+    final repository = _taskMoveRepository;
+    if (repository == null ||
+        target.workspaceId.isEmpty ||
+        target.projectId.isEmpty ||
+        target.status.isEmpty) {
+      _actionError(
+        'Не удалось определить место назначения. Откройте перемещение заново.',
+      );
+      return false;
+    }
+    final operationRevision = _beginTaskOperation();
+    final session = authSession.generation;
+    emit(
+      state.copyWith(
+        movingTaskIds: {...state.movingTaskIds, task.id},
+        clearActionError: true,
+      ),
+    );
+    try {
+      await repository.move(task.id, target);
+      if (session != authSession.generation) return false;
+      // A board opened earlier must not retain an old copy in either project.
+      _cache.clear();
+      if (_isCurrentOperation(operationRevision)) {
+        emit(
+          state.copyWith(
+            tasks: state.tasks.where((item) => item.id != task.id).toList(),
+            movingTaskIds: _withoutTask(task.id),
+          ),
+        );
+      }
+      // If the user switched boards while saving, this cubit also needs a read
+      // of its new project. Only the already-updated source can skip that read.
+      _publishingTaskChange = _isCurrentOperation(operationRevision);
+      try {
+        notifyTaskChanges();
+      } finally {
+        _publishingTaskChange = false;
+      }
+      return true;
+    } catch (error) {
+      if (!_isCurrentOperation(operationRevision)) return false;
+      emit(state.copyWith(movingTaskIds: _withoutTask(task.id)));
+      _actionError(
+        error is KanbanException
+            ? error.message
+            : 'Не удалось переместить задачу. Попробуйте ещё раз.',
+      );
+      return false;
     } finally {
       if (_isCurrentOperation(operationRevision)) _finishTaskOperation();
     }

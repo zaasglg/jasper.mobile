@@ -1,0 +1,1 @@
+enum TaskAttachmentSource { gallery, files }

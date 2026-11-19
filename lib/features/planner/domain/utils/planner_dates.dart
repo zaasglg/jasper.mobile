@@ -3,6 +3,8 @@ DateTime plannerLocal(DateTime value) => value.toLocal();
 DateTime plannerNow() => plannerLocal(DateTime.now());
 DateTime plannerDate(DateTime value) =>
     DateTime(value.year, value.month, value.day);
+String plannerDayString(DateTime value) =>
+    '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 DateTime plannerInstant(DateTime day, int hour, int minute) =>
     DateTime(day.year, day.month, day.day, hour, minute).toUtc();
 bool samePlannerDay(DateTime a, DateTime b) =>

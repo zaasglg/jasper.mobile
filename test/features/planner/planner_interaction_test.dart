@@ -248,6 +248,7 @@ class _Repository implements PlannerRepository {
     PlannerItemModel item, {
     String? title,
     DateTime? scheduledAt,
+    DateTime? plannedDate,
     int? durationMinutes,
     bool? completed,
   }) async {
@@ -257,7 +258,8 @@ class _Repository implements PlannerRepository {
   @override
   Future<PlannerItemModel> create({
     required String title,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   }) async {
     createdTitle = title;
@@ -276,7 +278,8 @@ class _Repository implements PlannerRepository {
     String? projectId,
     String? taskId,
     String? inboxTaskId,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   }) async {
     addedTaskId = taskId;

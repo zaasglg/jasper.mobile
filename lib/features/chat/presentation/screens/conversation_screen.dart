@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../widgets/messenger_refresh_lifecycle.dart';
 import '../widgets/message_interactions.dart';
 import '../../../calls/data/call_models.dart';
@@ -123,7 +124,11 @@ class _ConversationScreenState extends State<ConversationScreen>
     }
     if (calls.state.incoming != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Сначала ответьте на входящий звонок.')),
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.info,
+          content: Text('Сначала ответьте на входящий звонок.'),
+        ),
       );
       return;
     }
@@ -220,7 +225,9 @@ class _ConversationScreenState extends State<ConversationScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text(
               e is ChatException ? e.message : 'Не удалось начать звонок.',
             ),
@@ -367,9 +374,13 @@ class _ConversationScreenState extends State<ConversationScreen>
               if (_focusedReplyId != null) _composerFocus.requestFocus();
             }
             if (state.error != null) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text(state.error!)));
+              ScaffoldMessenger.of(context).showSnackBar(
+                appSnackBar(
+                  context: context,
+                  tone: AppSnackBarTone.error,
+                  content: Text(state.error!),
+                ),
+              );
             }
             if (_messageScroll.hasClients &&
                 _messageScroll.position.pixels > 80) {
@@ -511,7 +522,9 @@ class _ConversationScreenState extends State<ConversationScreen>
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text('Не удалось выбрать файлы. Попробуйте ещё раз.'),
           ),
         );
@@ -1386,7 +1399,9 @@ class _AttachmentMessageState extends State<_AttachmentMessage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text('Не удалось открыть файл. Попробуйте ещё раз.'),
           ),
         );
@@ -1561,7 +1576,11 @@ class _CallMessage extends StatelessWidget {
               } catch (_) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Звонок недоступен.')),
+                    appSnackBar(
+                      context: context,
+                      tone: AppSnackBarTone.info,
+                      content: Text('Звонок недоступен.'),
+                    ),
                   );
                 }
               }

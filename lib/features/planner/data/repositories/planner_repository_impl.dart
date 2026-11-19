@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../domain/repositories/planner_repository.dart';
+import '../../domain/utils/planner_dates.dart';
 import '../models/planner_item_model.dart';
 
 class PlannerRepositoryImpl implements PlannerRepository {
@@ -10,6 +11,12 @@ class PlannerRepositoryImpl implements PlannerRepository {
     try {
       return await request();
     } on DioException catch (e) {
+      if (e.response?.statusCode == 404 &&
+          e.requestOptions.path.contains('/day-')) {
+        throw const PlannerException(
+          'Для добавления плана без времени требуется обновление сервера ежедневника.',
+        );
+      }
       throw PlannerException(
         e.response?.statusCode == 403
             ? 'Нет доступа к этой записи ежедневника.'
@@ -24,6 +31,7 @@ class PlannerRepositoryImpl implements PlannerRepository {
   Future<List<PlannerItemModel>> load() => _request(() async {
     const pageSize = 250;
     final result = <String, PlannerItemModel>{};
+    final seenIds = <String>{};
     for (var skip = 0; ; skip += pageSize) {
       final response = await _dio.get<dynamic>(
         'project-planner/account',
@@ -40,9 +48,16 @@ class PlannerRepositoryImpl implements PlannerRepository {
           'Сервер вернул некорректные данные ежедневника.',
         );
       }
+      var hasNewIds = false;
       for (final json in items.whereType<Map>()) {
         final item = PlannerItemModel.fromJson(Map<String, dynamic>.from(json));
+        if (item.id.isNotEmpty && seenIds.add(item.id)) hasNewIds = true;
         if (item.id.isNotEmpty && !item.archived) result[item.id] = item;
+      }
+      if (items.isNotEmpty && !hasNewIds) {
+        throw const PlannerException(
+          'Сервер вернул страницу ежедневника без новых записей. Повторите загрузку.',
+        );
       }
       if (items.length < pageSize) return result.values.toList();
     }
@@ -51,14 +66,19 @@ class PlannerRepositoryImpl implements PlannerRepository {
   @override
   Future<PlannerItemModel> create({
     required String title,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   }) => _request(() async {
+    _validateDay(scheduledAt, plannedDate);
     final response = await _dio.post<dynamic>(
-      'project-planner/account/tasks',
+      scheduledAt == null
+          ? 'project-planner/account/day-tasks'
+          : 'project-planner/account/tasks',
       data: {
         'title': title.trim(),
-        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+        'scheduledAt': scheduledAt?.toUtc().toIso8601String(),
+        if (plannedDate != null) 'plannedDate': plannerDayString(plannedDate),
         'durationMinutes': durationMinutes,
       },
     );
@@ -75,29 +95,41 @@ class PlannerRepositoryImpl implements PlannerRepository {
     PlannerItemModel item, {
     String? title,
     DateTime? scheduledAt,
+    DateTime? plannedDate,
     int? durationMinutes,
     bool? completed,
   }) => _request(() async {
-    if (completed != null && item.taskId != null) {
+    // Older servers forward linked completion to the source task. Use a distinct
+    // route so an outdated server rejects the write instead of closing a task.
+    final independentCompletion = completed != null && !item.isStandalone;
+    try {
       await _dio.patch<dynamic>(
-        'project-tasks/${item.taskId}',
+        'project-planner/items/${Uri.encodeComponent(item.id)}${independentCompletion
+            ? '/completion'
+            : plannedDate != null
+            ? '/schedule'
+            : ''}',
         data: {
-          'progress': completed ? 100 : 0,
-          if (!completed && item.task?.status.toUpperCase() == 'DONE')
-            'status': 'TODO',
+          'title': ?title,
+          if (scheduledAt != null || plannedDate != null) 'scheduledAt': scheduledAt?.toUtc().toIso8601String(),
+          if (plannedDate != null) 'plannedDate': plannerDayString(plannedDate),
+          'durationMinutes': ?durationMinutes,
+          'completed': ?completed,
         },
       );
-      return;
+    } on DioException catch (error) {
+      if (independentCompletion && error.response?.statusCode == 404) {
+        throw const PlannerException(
+          'Не удалось сохранить отметку. Нужен обновлённый сервер ежедневника или запись больше недоступна.',
+        );
+      }
+      if (plannedDate != null && error.response?.statusCode == 404) {
+        throw const PlannerException(
+          'Сервер пока не поддерживает план без времени или запись недоступна. Требуется обновление сервера.',
+        );
+      }
+      rethrow;
     }
-    await _dio.patch<dynamic>(
-      'project-planner/items/${item.id}',
-      data: {
-        'title': ?title,
-        'scheduledAt': ?scheduledAt?.toUtc().toIso8601String(),
-        'durationMinutes': ?durationMinutes,
-        'completed': ?completed,
-      },
-    );
   });
 
   @override
@@ -138,19 +170,27 @@ class PlannerRepositoryImpl implements PlannerRepository {
     String? projectId,
     String? taskId,
     String? inboxTaskId,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   }) => _request(() async {
+    _validateDay(scheduledAt, plannedDate);
     await _dio.post<dynamic>(
       inboxTaskId != null
-          ? 'project-planner/account/inbox-tasks'
-          : 'project-planner/$projectId/tasks',
+          ? 'project-planner/account/${scheduledAt == null ? 'day-inbox-tasks' : 'inbox-tasks'}'
+          : 'project-planner/$projectId/${scheduledAt == null ? 'day-tasks' : 'tasks'}',
       data: {
         'taskId': ?taskId,
         'inboxTaskId': ?inboxTaskId,
-        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+        'scheduledAt': scheduledAt?.toUtc().toIso8601String(),
+        if (plannedDate != null) 'plannedDate': plannerDayString(plannedDate),
         'durationMinutes': durationMinutes,
       },
     );
   });
+  void _validateDay(DateTime? time, DateTime? day) {
+    if (time == null && day == null) {
+      throw const PlannerException('Выберите день для записи без времени.');
+    }
+  }
 }

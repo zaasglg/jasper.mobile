@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -87,9 +88,13 @@ class _QrLoginScreenState extends State<QrLoginScreen>
           }
           if (state is QrLoginSessionExpired) context.go('/login');
           if (state is QrLoginApproved) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(strings.approved)));
+            ScaffoldMessenger.of(context).showSnackBar(
+              appSnackBar(
+                context: context,
+                tone: AppSnackBarTone.success,
+                content: Text(strings.approved),
+              ),
+            );
             Future<void>.delayed(const Duration(milliseconds: 700), () {
               if (mounted) this.context.pop();
             });

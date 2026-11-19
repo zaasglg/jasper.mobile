@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_form_surface.dart';
@@ -115,9 +116,13 @@ class InboxTaskMenu extends StatelessWidget {
     if (cubit.isClosed) return;
     final error = await cubit.runAction(task.id, request);
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error ?? 'Готово')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        appSnackBar(
+          context: context,
+          tone: error == null ? AppSnackBarTone.success : AppSnackBarTone.error,
+          content: Text(error ?? 'Готово'),
+        ),
+      );
     }
   }
 

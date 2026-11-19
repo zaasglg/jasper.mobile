@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../widgets/conversation_menu.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
@@ -82,9 +83,13 @@ class _SettingsBody extends StatelessWidget {
   ) => BlocConsumer<MessengerSettingsCubit, MessengerSettingsState>(
     listener: (context, state) {
       if (state.error != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(state.error!)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
+            content: Text(state.error!),
+          ),
+        );
       }
     },
     builder: (context, state) => Scaffold(

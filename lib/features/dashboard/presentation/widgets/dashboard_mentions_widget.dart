@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_selector.dart';
 import 'dashboard_widget_skeleton.dart';
@@ -96,7 +97,9 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
       if (mounted) {
         setState(() => _read = previous);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text('Не удалось сохранить отметку о прочтении'),
           ),
         );

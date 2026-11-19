@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_form_surface.dart';
@@ -25,9 +26,13 @@ Future<void> handleTaskCardAction(
   switch (action) {
     case TaskCardAction.duplicate:
       if (await cubit.duplicateTask(task) && context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Копия задачи создана')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.success,
+            content: Text('Копия задачи создана'),
+          ),
+        );
       }
     case TaskCardAction.archive:
       await cubit.archiveTask(task);
@@ -392,7 +397,9 @@ class _TranslationSheetState extends State<_TranslationSheet> {
                           );
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
+                              appSnackBar(
+                                context: context,
+                                tone: AppSnackBarTone.success,
                                 content: Text('Перевод скопирован'),
                               ),
                             );

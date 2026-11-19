@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../domain/utils/planner_dates.dart';
 import '../cubit/planner_cubit.dart';
 import '../cubit/planner_state.dart';
+import 'planner_time_mode.dart';
 
 enum TaskScheduleResult { added, rescheduled }
 
@@ -31,6 +32,7 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
   late TimeOfDay _time;
   int _duration = 30;
   bool _prepared = false, _existing = false;
+  bool _hasTime = false;
   String? _error;
 
   @override
@@ -44,7 +46,7 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
       now.hour,
       (now.minute ~/ 30 + 1) * 30,
     );
-    _date = plannerDate(next);
+    _date = plannerDate(now);
     _time = TimeOfDay.fromDateTime(next);
   }
 
@@ -60,6 +62,8 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
         .firstOrNull;
     _existing = item != null;
     if (item != null) {
+      _date = item.day ?? _date;
+      _hasTime = item.scheduledAt != null;
       final scheduled = item.scheduledAt;
       if (scheduled != null) {
         final local = plannerLocal(scheduled);
@@ -79,7 +83,10 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
       projectId: widget.projectId,
       taskId: widget.taskId,
       inboxTaskId: widget.inboxTaskId,
-      scheduledAt: plannerInstant(_date, _time.hour, _time.minute),
+      scheduledAt: _hasTime
+          ? plannerInstant(_date, _time.hour, _time.minute)
+          : null,
+      plannedDate: _hasTime ? null : _date,
       durationMinutes: _duration,
     );
     if (!mounted) return;
@@ -137,7 +144,7 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                             Expanded(
                               child: Text(
                                 _existing
-                                    ? 'Изменить время'
+                                    ? 'Изменить план'
                                     : 'Добавить в ежедневник',
                                 style: GoogleFonts.manrope(
                                   fontSize: 22,
@@ -157,7 +164,7 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Выделите время для этой задачи',
+                          'Добавьте задачу в день. Время можно назначить позже.',
                           style: GoogleFonts.manrope(
                             fontSize: 13,
                             color: colors.onSurfaceVariant,
@@ -280,63 +287,72 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                           },
                         ),
                         const SizedBox(height: 10),
-                        _ScheduleField(
-                          fieldKey: const Key('schedule-time'),
-                          icon: LucideIcons.clock3,
-                          label: 'Начало',
-                          value: plannerClock(start),
-                          enabled: enabled,
-                          onTap: () async {
-                            final time = await showTimePicker(
-                              context: context,
-                              initialTime: _time,
-                              helpText: 'Время начала',
-                              cancelText: 'Отмена',
-                              confirmText: 'Готово',
-                              builder: (context, child) => MediaQuery(
-                                data: MediaQuery.of(
-                                  context,
-                                ).copyWith(alwaysUse24HourFormat: true),
-                                child: child!,
-                              ),
-                            );
-                            if (mounted && time != null) {
-                              setState(() => _time = time);
-                            }
-                          },
+                        PlannerTimeMode(
+                          hasTime: _hasTime,
+                          onChanged: enabled
+                              ? (value) => setState(() => _hasTime = value)
+                              : null,
                         ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Сколько времени выделить',
-                          style: style.copyWith(color: colors.onSurface),
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final minutes in ({
-                              15,
-                              30,
-                              45,
-                              60,
-                              90,
-                              120,
-                              180,
-                              _duration,
-                            }.toList()..sort()))
-                              ChoiceChip(
-                                key: ValueKey('schedule-duration-$minutes'),
-                                label: Text('$minutes мин'),
-                                labelStyle: style.copyWith(fontSize: 13),
-                                showCheckmark: false,
-                                selected: _duration == minutes,
-                                onSelected: enabled
-                                    ? (_) => setState(() => _duration = minutes)
-                                    : null,
-                              ),
-                          ],
-                        ),
+                        if (_hasTime) ...[
+                          _ScheduleField(
+                            fieldKey: const Key('schedule-time'),
+                            icon: LucideIcons.clock3,
+                            label: 'Начало',
+                            value: plannerClock(start),
+                            enabled: enabled,
+                            onTap: () async {
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: _time,
+                                helpText: 'Время начала',
+                                cancelText: 'Отмена',
+                                confirmText: 'Готово',
+                                builder: (context, child) => MediaQuery(
+                                  data: MediaQuery.of(
+                                    context,
+                                  ).copyWith(alwaysUse24HourFormat: true),
+                                  child: child!,
+                                ),
+                              );
+                              if (mounted && time != null) {
+                                setState(() => _time = time);
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Сколько времени выделить',
+                            style: style.copyWith(color: colors.onSurface),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final minutes in ({
+                                15,
+                                30,
+                                45,
+                                60,
+                                90,
+                                120,
+                                180,
+                                _duration,
+                              }.toList()..sort()))
+                                ChoiceChip(
+                                  key: ValueKey('schedule-duration-$minutes'),
+                                  label: Text('$minutes мин'),
+                                  labelStyle: style.copyWith(fontSize: 13),
+                                  showCheckmark: false,
+                                  selected: _duration == minutes,
+                                  onSelected: enabled
+                                      ? (_) =>
+                                            setState(() => _duration = minutes)
+                                      : null,
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -348,7 +364,9 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        '${_dateLabel(_date)} · ${plannerClock(start)}–${plannerClock(end)}${samePlannerDay(start, end) ? '' : ' (${_dateLabel(end)})'}',
+                        _hasTime
+                            ? '${_dateLabel(_date)} · ${plannerClock(start)}–${plannerClock(end)}${samePlannerDay(start, end) ? '' : ' (${_dateLabel(end)})'}'
+                            : '${_dateLabel(_date)} · Без времени',
                         key: const Key('schedule-summary'),
                         style: GoogleFonts.manrope(
                           fontSize: 12,
@@ -381,7 +399,7 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                           state.isSaving
                               ? 'Сохранение…'
                               : _existing
-                              ? 'Сохранить время'
+                              ? 'Сохранить план'
                               : 'Добавить в мой день',
                         ),
                       ),

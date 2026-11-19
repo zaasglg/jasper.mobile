@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import 'board_style.dart';
 import '../../../../core/theme/task_label_color.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
@@ -127,9 +128,13 @@ class TaskCard extends StatelessWidget {
       if (copy) {
         await Clipboard.setData(ClipboardData(text: link));
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Ссылка скопирована')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            appSnackBar(
+              context: context,
+              tone: AppSnackBarTone.success,
+              content: Text('Ссылка скопирована'),
+            ),
+          );
         }
       } else {
         final box = context.findRenderObject() as RenderBox?;
@@ -147,7 +152,9 @@ class TaskCard extends StatelessWidget {
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
             content: Text(
               copy
                   ? 'Не удалось скопировать ссылку.'

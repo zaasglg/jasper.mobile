@@ -22,6 +22,7 @@ import 'package:jospar/features/profile/domain/repositories/profile_repository.d
 import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/tasks/data/repositories/task_details_repository_impl.dart';
 import 'package:jospar/features/tasks/presentation/cubit/task_details_cubit.dart';
+import 'task_test_app.dart';
 
 void main() {
   test('pair rollback preserves resources created by another user', () async {
@@ -712,7 +713,7 @@ void main() {
       addTearDown(cubit.close);
       await tester.runAsync(() => cubit.load('t'));
       await tester.pumpWidget(
-        MaterialApp(
+        TaskTestApp(
           home: BlocProvider.value(
             value: cubit,
             child: const TaskDetailsScreen(taskId: 't'),
@@ -734,6 +735,9 @@ void main() {
       await tester.ensureVisible(button);
       await tester.pumpAndSettle();
       await tester.tap(button);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.text('Файлы').last);
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 100)),
       );
@@ -753,6 +757,9 @@ void main() {
       await tester.ensureVisible(button);
       await tester.pumpAndSettle();
       await tester.tap(button);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.text('Файлы').last);
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 100)),
       );

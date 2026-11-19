@@ -16,6 +16,8 @@ class PlannerDayAgenda extends StatelessWidget {
     required this.onCreate,
     required this.onEdit,
     required this.onToggle,
+    this.onMenu,
+    this.hasUntimedPlans = false,
     super.key,
   });
 
@@ -24,6 +26,8 @@ class PlannerDayAgenda extends StatelessWidget {
   final Set<String> busyIds;
   final VoidCallback onCreate;
   final ValueChanged<PlannerItemModel> onEdit, onToggle;
+  final ValueChanged<PlannerItemModel>? onMenu;
+  final bool hasUntimedPlans;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +46,21 @@ class PlannerDayAgenda extends StatelessWidget {
             return time != 0 ? time : a.id.compareTo(b.id);
           });
     if (sorted.isEmpty) {
+      if (hasUntimedPlans) {
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'План дня уже собран.\nНажмите на запись сверху, чтобы назначить время.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.muted, height: 1.6),
+              ),
+            ),
+          ],
+        );
+      }
       return _EmptyDayPlan(onCreate: onCreate);
     }
 
@@ -96,6 +115,7 @@ class PlannerDayAgenda extends StatelessWidget {
           busy: busyIds.contains(item.id),
           onEdit: () => onEdit(item),
           onToggle: () => onToggle(item),
+          onMenu: item.external || onMenu == null ? null : () => onMenu!(item),
         );
       },
     );
@@ -340,12 +360,14 @@ class _AgendaTask extends StatelessWidget {
     required this.busy,
     required this.onEdit,
     required this.onToggle,
+    this.onMenu,
     super.key,
   });
 
   final PlannerItemModel item;
   final bool first, last, busy;
   final VoidCallback onEdit, onToggle;
+  final VoidCallback? onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -460,21 +482,38 @@ class _AgendaTask extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            item.displayTitle,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.manrope(
-                              fontSize: 14,
-                              height: 1.4,
-                              fontWeight: FontWeight.w700,
-                              color: item.completed
-                                  ? AppColors.muted
-                                  : AppColors.ink,
-                              decoration: item.completed
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  item.displayTitle,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 14,
+                                    height: 1.4,
+                                    fontWeight: FontWeight.w700,
+                                    color: item.completed
+                                        ? AppColors.muted
+                                        : AppColors.ink,
+                                    decoration: item.completed
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                              if (onMenu != null)
+                                IconButton(
+                                  key: ValueKey('planner-item-menu-${item.id}'),
+                                  tooltip: 'Действия записи',
+                                  onPressed: busy ? null : onMenu,
+                                  icon: const Icon(
+                                    LucideIcons.ellipsis,
+                                    size: 18,
+                                  ),
+                                ),
+                            ],
                           ),
                           const SizedBox(height: 6),
                           Text(

@@ -5,8 +5,82 @@ import 'package:jospar/features/planner/data/models/planner_item_model.dart';
 import 'package:jospar/features/planner/domain/repositories/planner_repository.dart';
 import 'package:jospar/features/planner/domain/utils/planner_dates.dart';
 import 'package:jospar/features/planner/presentation/cubit/planner_cubit.dart';
+import 'package:jospar/features/planner/presentation/cubit/planner_state.dart';
 
 void main() {
+  for (final operation in ['save', 'add']) {
+    test(
+      'failed $operation during refresh reconciles without stuck loading',
+      () async {
+        final repo = _Repository();
+        final cubit = PlannerCubit(repo);
+        addTearDown(cubit.close);
+        await cubit.initialize();
+        final staleLoad = repo.nextLoad = Completer<List<PlannerItemModel>>();
+        final refresh = cubit.refresh();
+        final addGate = repo.pendingAdd = Completer<void>();
+        final write = operation == 'save'
+            ? cubit.save(
+                item: cubit.state.items.first,
+                title: 'Changed',
+                scheduledAt: DateTime(2026, 11, 18, 10),
+                durationMinutes: 30,
+              )
+            : cubit.addTask(
+                projectId: 'project',
+                taskId: 'task',
+                scheduledAt: DateTime(2026, 11, 18, 10),
+                durationMinutes: 30,
+              );
+        // Even a response arriving while the write is pending must be ignored.
+        staleLoad.complete(const [PlannerItemModel(id: 'stale', title: 'Old')]);
+        await refresh;
+        expect(cubit.state.items.first.id, 'one');
+        final gate = operation == 'save' ? repo.pending['one']! : addGate;
+        gate.completeError(const PlannerException('Ошибка сохранения'));
+        expect(await write, isFalse);
+        expect(cubit.state.status, PlannerStatus.success);
+        expect(cubit.state.isSaving, isFalse);
+        expect(cubit.state.actionError, 'Ошибка сохранения');
+        expect(repo.loads, 3);
+      },
+    );
+  }
+  for (final reloadFails in [false, true]) {
+    test(
+      'failed toggle during refresh settles loading (reload fails: $reloadFails)',
+      () async {
+        final repo = _Repository();
+        final cubit = PlannerCubit(repo);
+        addTearDown(cubit.close);
+        await cubit.initialize();
+        final staleLoad = repo.nextLoad = Completer<List<PlannerItemModel>>();
+        final refresh = cubit.refresh();
+        expect(cubit.state.status, PlannerStatus.loading);
+        final toggle = cubit.toggle(cubit.state.items.first);
+        repo.loadError = reloadFails
+            ? const PlannerException('Ошибка загрузки')
+            : null;
+        repo.pending['one']!.completeError(
+          const PlannerException('Ошибка отметки'),
+        );
+        await toggle;
+        staleLoad.complete(const [
+          PlannerItemModel(id: 'stale', title: 'Old response'),
+        ]);
+        await refresh;
+        expect(
+          cubit.state.status,
+          reloadFails ? PlannerStatus.failure : PlannerStatus.success,
+        );
+        expect(cubit.state.items.first.id, 'one');
+        expect(cubit.state.items.first.completed, isFalse);
+        expect(cubit.state.actionError, 'Ошибка отметки');
+        expect(cubit.state.busyIds, isEmpty);
+        expect(repo.loads, 3);
+      },
+    );
+  }
   test(
     'task invalidation during mutation refreshes after it completes',
     () async {
@@ -86,6 +160,7 @@ void main() {
     for (final json in [
       {
         'id': 'a',
+        'completed': true,
         'taskId': 'task',
         'task': {
           'id': 'task',
@@ -97,6 +172,7 @@ void main() {
       },
       {
         'id': 'b',
+        'completed': true,
         'inboxTaskId': 'inbox',
         'inboxTask': {
           'id': 'inbox',
@@ -115,10 +191,17 @@ void main() {
 
 class _Repository implements PlannerRepository {
   final pending = <String, Completer<void>>{};
+  Completer<List<PlannerItemModel>>? nextLoad;
+  Completer<void>? pendingAdd;
+  PlannerException? loadError;
   int loads = 0;
   @override
   Future<List<PlannerItemModel>> load() async {
     loads++;
+    final pendingLoad = nextLoad;
+    nextLoad = null;
+    if (pendingLoad != null) return pendingLoad.future;
+    if (loadError != null) throw loadError!;
     return const [
       PlannerItemModel(id: 'one', title: 'First'),
       PlannerItemModel(id: 'two', title: 'Second'),
@@ -130,6 +213,7 @@ class _Repository implements PlannerRepository {
     PlannerItemModel item, {
     String? title,
     DateTime? scheduledAt,
+    DateTime? plannedDate,
     int? durationMinutes,
     bool? completed,
   }) async {
@@ -139,7 +223,8 @@ class _Repository implements PlannerRepository {
   @override
   Future<PlannerItemModel> create({
     required String title,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   }) async => PlannerItemModel(
     id: 'new',
@@ -154,7 +239,10 @@ class _Repository implements PlannerRepository {
     String? projectId,
     String? taskId,
     String? inboxTaskId,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
-  }) async {}
+  }) async {
+    await pendingAdd?.future;
+  }
 }

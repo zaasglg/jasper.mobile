@@ -4,13 +4,15 @@ abstract interface class PlannerRepository {
   Future<List<PlannerItemModel>> load();
   Future<PlannerItemModel> create({
     required String title,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   });
   Future<void> update(
     PlannerItemModel item, {
     String? title,
     DateTime? scheduledAt,
+    DateTime? plannedDate,
     int? durationMinutes,
     bool? completed,
   });
@@ -19,7 +21,8 @@ abstract interface class PlannerRepository {
     String? projectId,
     String? taskId,
     String? inboxTaskId,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   });
 }

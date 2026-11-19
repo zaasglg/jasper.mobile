@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -83,7 +84,11 @@ class _InboxScreenState extends State<InboxScreen> {
     if (!created) {
       final message = context.read<InboxCubit>().state.creationErrorMessage;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message ?? 'Не удалось создать задачу.')),
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.error,
+          content: Text(message ?? 'Не удалось создать задачу.'),
+        ),
       );
       return;
     }
@@ -162,7 +167,9 @@ class InboxContent extends StatelessWidget {
     final completed = await cubit.complete(taskId);
     if (!context.mounted || completed) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      appSnackBar(
+        context: context,
+        tone: AppSnackBarTone.error,
         content: Text(
           cubit.state.completionErrorMessage ?? 'Не удалось завершить задачу.',
         ),

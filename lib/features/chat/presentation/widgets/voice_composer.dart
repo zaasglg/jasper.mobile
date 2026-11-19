@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_action_menu.dart';
 import 'dart:async';
@@ -127,9 +128,13 @@ class _VoiceComposerState extends State<VoiceComposer>
 
   void _error(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.error,
+          content: Text(message),
+        ),
+      );
     }
   }
 

@@ -49,6 +49,8 @@ import '../../features/inbox/domain/repositories/inbox_repository.dart';
 import '../../features/inbox/presentation/cubit/inbox_cubit.dart';
 import '../../features/profile/data/repositories/profile_repository_impl.dart';
 import '../../features/kanban/data/repositories/kanban_repository_impl.dart';
+import '../../features/kanban/data/repositories/task_move_repository_impl.dart';
+import '../../features/kanban/domain/repositories/task_move_repository.dart';
 import '../../features/kanban/domain/repositories/kanban_repository.dart';
 import '../../features/kanban/domain/entities/kanban_board_cache.dart';
 import '../../features/kanban/presentation/cubit/kanban_cubit.dart';
@@ -171,8 +173,13 @@ Future<void> initServiceLocator() async {
 
   // Project Kanban
   sl.registerFactory<KanbanRepository>(() => KanbanRepositoryImpl(sl()));
+  sl.registerLazySingleton<TaskMoveRepository>(
+    () => TaskMoveRepositoryImpl(sl()),
+  );
   sl.registerLazySingleton<KanbanBoardCache>(KanbanBoardCache.new);
-  sl.registerFactory<KanbanCubit>(() => KanbanCubit(sl(), cache: sl()));
+  sl.registerFactory<KanbanCubit>(
+    () => KanbanCubit(sl(), cache: sl(), taskMoveRepository: sl()),
+  );
 
   // Dashboard tasks
   sl.registerLazySingleton<MyTasksRepository>(

@@ -34,6 +34,7 @@ class PlannerCubit extends Cubit<PlannerState> {
   }
 
   Future<void> refresh() async {
+    if (isClosed) return;
     if (state.busyIds.isNotEmpty || state.isSaving) {
       _refreshPending = true;
       return;
@@ -64,23 +65,46 @@ class PlannerCubit extends Cubit<PlannerState> {
     ),
   );
 
+  void _invalidateRefresh() {
+    // A write invalidates any running read; reconcile after writes even on error.
+    if (state.status == PlannerStatus.loading) _refreshPending = true;
+    ++_revision;
+  }
+
+  Future<void> _refreshIfPending() async {
+    if (!isClosed &&
+        _refreshPending &&
+        state.busyIds.isEmpty &&
+        !state.isSaving) {
+      await refresh();
+    }
+  }
+
   Future<bool> save({
     PlannerItemModel? item,
     required String title,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   }) async {
     if (item?.external == true) return false;
     if (state.isSaving || state.busyIds.isNotEmpty) {
       return false;
     }
-    ++_revision;
-    emit(state.copyWith(isSaving: true));
+    _invalidateRefresh();
+    emit(
+      state.copyWith(
+        isSaving: true,
+        status: PlannerStatus.success,
+        clearError: true,
+      ),
+    );
     try {
       if (item == null) {
         await _repository.create(
           title: title,
           scheduledAt: scheduledAt,
+          plannedDate: plannedDate,
           durationMinutes: durationMinutes,
         );
       } else {
@@ -88,6 +112,7 @@ class PlannerCubit extends Cubit<PlannerState> {
           item,
           title: item.isStandalone ? title : null,
           scheduledAt: scheduledAt,
+          plannedDate: plannedDate,
           durationMinutes: durationMinutes,
         );
       }
@@ -100,6 +125,8 @@ class PlannerCubit extends Cubit<PlannerState> {
       emit(state.copyWith(isSaving: false));
       _failure(e);
       return false;
+    } finally {
+      await _refreshIfPending();
     }
   }
 
@@ -145,9 +172,11 @@ class PlannerCubit extends Cubit<PlannerState> {
         state.isSaving) {
       return false;
     }
-    ++_revision;
+    _invalidateRefresh();
     emit(
       state.copyWith(
+        status: PlannerStatus.success,
+        clearError: true,
         busyIds: {...state.busyIds, item.id},
         items: [
           for (final current in state.items)
@@ -183,9 +212,7 @@ class PlannerCubit extends Cubit<PlannerState> {
       _failure(e);
       return false;
     } finally {
-      if (!isClosed && _refreshPending && state.busyIds.isEmpty) {
-        await refresh();
-      }
+      await _refreshIfPending();
     }
   }
 
@@ -193,14 +220,21 @@ class PlannerCubit extends Cubit<PlannerState> {
     String? projectId,
     String? taskId,
     String? inboxTaskId,
-    required DateTime scheduledAt,
+    required DateTime? scheduledAt,
+    DateTime? plannedDate,
     required int durationMinutes,
   }) async {
     if (state.isSaving || state.busyIds.isNotEmpty) {
       return false;
     }
-    ++_revision;
-    emit(state.copyWith(isSaving: true));
+    _invalidateRefresh();
+    emit(
+      state.copyWith(
+        isSaving: true,
+        status: PlannerStatus.success,
+        clearError: true,
+      ),
+    );
     try {
       final existing = state.items
           .where(
@@ -213,6 +247,7 @@ class PlannerCubit extends Cubit<PlannerState> {
         await _repository.update(
           existing,
           scheduledAt: scheduledAt,
+          plannedDate: plannedDate,
           durationMinutes: durationMinutes,
         );
       } else {
@@ -221,6 +256,7 @@ class PlannerCubit extends Cubit<PlannerState> {
           taskId: taskId,
           inboxTaskId: inboxTaskId,
           scheduledAt: scheduledAt,
+          plannedDate: plannedDate,
           durationMinutes: durationMinutes,
         );
       }
@@ -233,6 +269,8 @@ class PlannerCubit extends Cubit<PlannerState> {
       emit(state.copyWith(isSaving: false));
       _failure(e);
       return false;
+    } finally {
+      await _refreshIfPending();
     }
   }
 }

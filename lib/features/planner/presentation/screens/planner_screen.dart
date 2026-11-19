@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../profile/domain/repositories/profile_repository.dart';
 import '../../../tasks/domain/repositories/my_tasks_repository.dart';
 import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
@@ -7,6 +8,9 @@ import '../cubit/google_calendar_cubit.dart';
 import '../widgets/google_calendar_settings.dart';
 import '../widgets/planner_day_agenda.dart';
 import '../widgets/task_schedule_sheet.dart';
+import '../widgets/planner_time_mode.dart';
+import '../widgets/planner_untimed_list.dart';
+import '../../../../core/widgets/app_action_menu.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_form_surface.dart';
@@ -40,10 +44,6 @@ class _PlannerScreenState extends State<PlannerScreen>
   StreamSubscription<GoogleCalendarState>? _googleSubscription;
   DateTime _selectedDate = plannerDate(plannerNow());
   _View _view = _View.day;
-  List<ProjectTaskModel> _tasks = [];
-  bool _tasksRequested = false;
-  String? _taskError;
-  int _taskRevision = 0;
   Timer? _clock;
   PlannerCubit? _cubit;
 
@@ -68,10 +68,6 @@ class _PlannerScreenState extends State<PlannerScreen>
     super.didChangeDependencies();
     _cubit ??= context.read<PlannerCubit?>();
     unawaited(_cubit?.initialize() ?? Future<void>.value());
-    if (!_tasksRequested) {
-      _tasksRequested = true;
-      unawaited(_loadTasks());
-    }
   }
 
   @override
@@ -80,7 +76,6 @@ class _PlannerScreenState extends State<PlannerScreen>
     _googleSubscription?.cancel();
     _google?.close();
     _clock?.cancel();
-    _taskRevision++;
     super.dispose();
   }
 
@@ -102,36 +97,10 @@ class _PlannerScreenState extends State<PlannerScreen>
     );
   }
 
-  Future<void> _loadTasks() async {
-    if (!sl.isRegistered<MyTasksRepository>() ||
-        !sl.isRegistered<ProfileRepository>()) {
-      return;
-    }
-    final revision = ++_taskRevision;
-    setState(() {
-      _tasks = [];
-      _taskError = null;
-    });
-    try {
-      final profile = await sl<ProfileRepository>().getCurrentUser();
-      final tasks = await sl<MyTasksRepository>().getTasks(
-        assigneeId: profile.id,
-      );
-      if (mounted && revision == _taskRevision) {
-        setState(() => _tasks = tasks.where((e) => !e.archived).toList());
-      }
-    } catch (_) {
-      if (mounted && revision == _taskRevision) {
-        setState(() => _taskError = 'Не удалось загрузить сроки задач.');
-      }
-    }
-  }
-
   Future<void> _refresh() async {
     await Future.wait([
       if (_cubit != null) _cubit!.refresh(),
       if (_google != null) _google!.refresh(),
-      _loadTasks(),
     ]);
   }
 
@@ -165,7 +134,11 @@ class _PlannerScreenState extends State<PlannerScreen>
     if (date != null && mounted) _selectDate(date);
   }
 
-  Future<void> _edit({PlannerItemModel? item, int? hour}) async {
+  Future<void> _edit({
+    PlannerItemModel? item,
+    int? hour,
+    TimeOfDay? assignedTime,
+  }) async {
     if (item?.external == true) {
       await showAppDialog<void>(
         context: context,
@@ -198,10 +171,73 @@ class _PlannerScreenState extends State<PlannerScreen>
           item: item,
           initialDate: _selectedDate,
           hour: hour ?? 9,
-          tasks: _tasks,
+          withTime: assignedTime != null || hour != null ? true : null,
+          assignedTime: assignedTime,
         ),
       ),
     );
+  }
+
+  Future<void> _assignTime(PlannerItemModel item) async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 9, minute: 0),
+      helpText: 'Время начала',
+      cancelText: 'Отмена',
+      confirmText: 'Готово',
+    );
+    if (mounted && time != null) await _edit(item: item, assignedTime: time);
+  }
+
+  Future<void> _itemMenu(PlannerItemModel item) async {
+    final action = await showAppActionMenu<String>(
+      context,
+      title: item.displayTitle,
+      groups: [
+        [
+          if (item.scheduledAt != null)
+            const AppMenuAction(
+              value: 'untimed',
+              label: 'Без времени',
+              icon: LucideIcons.clock,
+            ),
+          if (item.scheduledAt == null)
+            const AppMenuAction(
+              value: 'time',
+              label: 'Назначить время',
+              icon: LucideIcons.clock,
+            ),
+          const AppMenuAction(
+            value: 'edit',
+            label: 'Изменить день и запись',
+            icon: LucideIcons.calendarDays,
+          ),
+          const AppMenuAction(
+            value: 'remove',
+            label: 'Убрать из ежедневника',
+            icon: LucideIcons.calendarMinus,
+            destructive: true,
+          ),
+        ],
+      ],
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'time':
+        await _assignTime(item);
+      case 'edit':
+        await _edit(item: item);
+      case 'remove':
+        await _cubit?.remove(item);
+      case 'untimed':
+        await _cubit?.save(
+          item: item,
+          title: item.title,
+          scheduledAt: null,
+          plannedDate: item.day ?? _selectedDate,
+          durationMinutes: item.durationMinutes,
+        );
+    }
   }
 
   @override
@@ -212,9 +248,13 @@ class _PlannerScreenState extends State<PlannerScreen>
             listenWhen: (a, b) => a.actionRevision != b.actionRevision,
             listener: (context, state) {
               if (state.actionError != null) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(state.actionError!)));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  appSnackBar(
+                    context: context,
+                    tone: AppSnackBarTone.error,
+                    content: Text(state.actionError!),
+                  ),
+                );
               }
             },
             builder: (_, state) => _scaffold(state),
@@ -342,13 +382,6 @@ class _PlannerScreenState extends State<PlannerScreen>
             rangeStart.add(const Duration(days: 42)),
           ),
     ];
-    final due = _tasks
-        .where(
-          (e) =>
-              e.end != null &&
-              samePlannerDay(plannerLocal(e.end!), _selectedDate),
-        )
-        .toList();
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: const DashboardAppBar(accountTitle: 'Ежедневник'),
@@ -420,9 +453,9 @@ class _PlannerScreenState extends State<PlannerScreen>
                   minHeight: 2,
                   color: AppColors.accent,
                 ),
-              if (state.error != null || _taskError != null)
+              if (state.error != null)
                 MaterialBanner(
-                  content: Text(state.error ?? _taskError!),
+                  content: Text(state.error!),
                   actions: [const Text('Потяните вниз, чтобы повторить')],
                 ),
               if (google?.error != null)
@@ -469,10 +502,6 @@ class _PlannerScreenState extends State<PlannerScreen>
                                 ),
                               ),
                             ),
-                            if (_view != _View.day ||
-                                due.isNotEmpty ||
-                                _taskError != null)
-                              _dueLane(due),
                             if (items.any(
                               (e) =>
                                   e.allDay &&
@@ -515,10 +544,26 @@ class _PlannerScreenState extends State<PlannerScreen>
                                   ],
                                 ),
                               ),
-                            if (items.any((e) => e.scheduledAt == null))
+                            if (items.any(
+                              (e) =>
+                                  e.scheduledAt == null &&
+                                  (e.plannedDate == null ||
+                                      samePlannerDay(
+                                        e.plannedDate!,
+                                        _selectedDate,
+                                      )),
+                            ))
                               _unscheduled(
                                 items
-                                    .where((e) => e.scheduledAt == null)
+                                    .where(
+                                      (e) =>
+                                          e.scheduledAt == null &&
+                                          (e.plannedDate == null ||
+                                              samePlannerDay(
+                                                e.plannedDate!,
+                                                _selectedDate,
+                                              )),
+                                    )
                                     .toList(),
                               ),
                             Expanded(
@@ -532,6 +577,16 @@ class _PlannerScreenState extends State<PlannerScreen>
                                       onCreate: () => _edit(),
                                       onEdit: (item) => _edit(item: item),
                                       onToggle: (item) => _cubit?.toggle(item),
+                                      onMenu: (item) => _itemMenu(item),
+                                      hasUntimedPlans: items.any(
+                                        (item) =>
+                                            item.scheduledAt == null &&
+                                            item.plannedDate != null &&
+                                            samePlannerDay(
+                                              item.plannedDate!,
+                                              _selectedDate,
+                                            ),
+                                      ),
                                     )
                                   : _DayTimeline(
                                       key: ValueKey(_selectedDate),
@@ -578,107 +633,13 @@ class _PlannerScreenState extends State<PlannerScreen>
     );
   }
 
-  Widget _dueLane(List<ProjectTaskModel> due) => Container(
-    height: due.isEmpty
-        ? 44
-        : (due.length * 44.0 + 8).clamp(44, 120).toDouble(),
-    decoration: const BoxDecoration(
-      border: Border(bottom: BorderSide(color: AppColors.border)),
-    ),
-    child: Row(
-      children: [
-        const SizedBox(width: 57),
-        const VerticalDivider(width: 1),
-        Expanded(
-          child: due.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(
-                    _taskError != null
-                        ? 'Сроки задач недоступны'
-                        : 'Нет задач со сроком',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      for (final task in due)
-                        ListTile(
-                          dense: true,
-                          leading: Icon(
-                            task.isDone
-                                ? Icons.check_circle
-                                : Icons.flag_outlined,
-                            color: task.isDone
-                                ? AppColors.accent
-                                : AppColors.muted,
-                            size: AppIconSizes.standard,
-                          ),
-                          title: Text(
-                            task.displayId.trim().isEmpty
-                                ? task.title
-                                : '${task.displayId} ${task.title}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          onTap: () async {
-                            await context.push(
-                              '/tasks/${task.id}',
-                              extra: task,
-                            );
-                            if (mounted) _refresh();
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _unscheduled(List<PlannerItemModel> items) => SizedBox(
-    height: 40,
-    child: ListView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      children: [
-        const Center(
-          child: Text(
-            'Без времени  ',
-            style: TextStyle(fontSize: 11, color: AppColors.muted),
-          ),
-        ),
-        for (final item in items)
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: (MediaQuery.sizeOf(context).width - 140)
-                    .clamp(120, 400)
-                    .toDouble(),
-              ),
-              child: ActionChip(
-                key: ValueKey('planner-unscheduled-${item.id}'),
-                avatar: item.inboxTaskId == null
-                    ? null
-                    : const Icon(
-                        Icons.inbox_outlined,
-                        size: AppIconSizes.standard,
-                        color: AppColors.accent,
-                      ),
-                label: Text(item.displayTitle, overflow: TextOverflow.ellipsis),
-                onPressed: () => _edit(item: item),
-              ),
-            ),
-          ),
-      ],
-    ),
+  Widget _unscheduled(List<PlannerItemModel> items) => PlannerUntimedList(
+    items: items,
+    busyIds: _cubit?.state.busyIds ?? {},
+    onAssign: (item) =>
+        item.plannedDate == null ? _edit(item: item) : _assignTime(item),
+    onMenu: _itemMenu,
+    onToggle: (item) => _cubit?.toggle(item),
   );
 
   Widget _weekStrip(List<PlannerItemModel> items) {
@@ -703,9 +664,7 @@ class _PlannerScreenState extends State<PlannerScreen>
                   final selected = samePlannerDay(day, _selectedDate);
                   final count = items
                       .where(
-                        (e) =>
-                            e.scheduledAt != null &&
-                            samePlannerDay(plannerLocal(e.scheduledAt!), day),
+                        (e) => e.day != null && samePlannerDay(e.day!, day),
                       )
                       .length;
                   return InkWell(
@@ -798,19 +757,8 @@ class _PlannerScreenState extends State<PlannerScreen>
                   start.day + index,
                 );
                 final events = items
-                    .where(
-                      (e) =>
-                          e.scheduledAt != null &&
-                          samePlannerDay(plannerLocal(e.scheduledAt!), day),
-                    )
+                    .where((e) => e.day != null && samePlannerDay(e.day!, day))
                     .toList();
-                final deadlineCount = _tasks
-                    .where(
-                      (e) =>
-                          e.end != null &&
-                          samePlannerDay(plannerLocal(e.end!), day),
-                    )
-                    .length;
                 return InkWell(
                   key: ValueKey('planner-month-${day.toIso8601String()}'),
                   onTap: () {
@@ -868,14 +816,6 @@ class _PlannerScreenState extends State<PlannerScreen>
                         if (events.length > 2)
                           Text(
                             '+${events.length - 2}',
-                            style: const TextStyle(
-                              fontSize: 9,
-                              color: AppColors.muted,
-                            ),
-                          ),
-                        if (deadlineCount > 0)
-                          Text(
-                            'Сроки: $deadlineCount',
                             style: const TextStyle(
                               fontSize: 9,
                               color: AppColors.muted,
@@ -1227,11 +1167,14 @@ Future<void> _showScheduleTask(
     notifyPlannerChanges();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      appSnackBar(
+        context: context,
+        tone: AppSnackBarTone.success,
+        description: task?.title ?? inboxTask!.title,
         content: Text(
           saved == TaskScheduleResult.added
               ? 'Задача добавлена в ежедневник'
-              : 'Время в ежедневнике обновлено',
+              : 'План в ежедневнике обновлён',
         ),
       ),
     );
@@ -1243,12 +1186,14 @@ class _PlannerEditor extends StatefulWidget {
     this.item,
     required this.initialDate,
     required this.hour,
-    required this.tasks,
+    this.withTime,
+    this.assignedTime,
   });
   final PlannerItemModel? item;
   final DateTime initialDate;
   final int hour;
-  final List<ProjectTaskModel> tasks;
+  final bool? withTime;
+  final TimeOfDay? assignedTime;
   @override
   State<_PlannerEditor> createState() => _PlannerEditorState();
 }
@@ -1264,6 +1209,7 @@ class _PlannerEditorState extends State<_PlannerEditor> {
   String? _removeError;
   bool _removing = false;
   bool _picking = false;
+  late bool _hasTime;
   @override
   void initState() {
     super.initState();
@@ -1274,10 +1220,12 @@ class _PlannerEditorState extends State<_PlannerEditor> {
     final local = scheduled == null
         ? widget.initialDate
         : plannerLocal(scheduled);
-    _date = plannerDate(local);
+    _date = widget.item?.day ?? plannerDate(local);
+    _hasTime = widget.withTime ?? (scheduled != null);
     _time = scheduled == null
         ? TimeOfDay(hour: widget.hour, minute: 0)
         : TimeOfDay(hour: local.hour, minute: local.minute);
+    _time = widget.assignedTime ?? _time;
     _duration = (widget.item?.durationMinutes ?? 30).clamp(15, 1440);
   }
 
@@ -1288,21 +1236,48 @@ class _PlannerEditorState extends State<_PlannerEditor> {
   }
 
   Future<void> _pickTask() async {
+    if (_picking) return;
+    FocusScope.of(context).unfocus();
     setState(() => _picking = true);
+    List<ProjectTaskModel> tasks = [];
     List<InboxTaskModel> inbox = [];
-    try {
-      if (sl.isRegistered<InboxRepository>()) {
-        inbox = await sl<InboxRepository>().getInbox(archived: false);
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось загрузить Инбокс.')),
-        );
-      }
-    }
+    final errors = <String>[];
+    // Sources are read only after an explicit request to choose a task.
+    await Future.wait<void>([
+      () async {
+        if (!sl.isRegistered<MyTasksRepository>() ||
+            !sl.isRegistered<ProfileRepository>()) {
+          return;
+        }
+        try {
+          final profile = await sl<ProfileRepository>().getCurrentUser();
+          tasks = await sl<MyTasksRepository>().getTasks(
+            assigneeId: profile.id,
+          );
+        } catch (_) {
+          errors.add('Не удалось загрузить задачи проектов.');
+        }
+      }(),
+      () async {
+        if (!sl.isRegistered<InboxRepository>()) return;
+        try {
+          inbox = await sl<InboxRepository>().getInbox(archived: false);
+        } catch (_) {
+          errors.add('Не удалось загрузить Инбокс.');
+        }
+      }(),
+    ]);
     if (!mounted) return;
     setState(() => _picking = false);
+    if (errors.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.error,
+          content: Text(errors.join('\n')),
+        ),
+      );
+    }
     final result = await showModalBottomSheet<Object>(
       context: context,
       isScrollControlled: true,
@@ -1321,9 +1296,9 @@ class _PlannerEditorState extends State<_PlannerEditor> {
               Expanded(
                 child: ListView(
                   children: [
-                    if (widget.tasks.isEmpty && inbox.isEmpty)
+                    if (tasks.isEmpty && inbox.isEmpty)
                       const ListTile(title: Text('Нет доступных задач')),
-                    for (final task in widget.tasks.where((e) => !e.archived))
+                    for (final task in tasks.where((e) => !e.archived))
                       ListTile(
                         title: Text(task.title),
                         subtitle: Text(
@@ -1361,19 +1336,23 @@ class _PlannerEditorState extends State<_PlannerEditor> {
       return;
     }
     final cubit = context.read<PlannerCubit>();
-    final scheduled = plannerInstant(_date, _time.hour, _time.minute);
+    final scheduled = _hasTime
+        ? plannerInstant(_date, _time.hour, _time.minute)
+        : null;
     final success = _task != null || _inbox != null
         ? await cubit.addTask(
             projectId: _task?.projectId,
             taskId: _task?.id,
             inboxTaskId: _inbox?.id,
             scheduledAt: scheduled,
+            plannedDate: _hasTime ? null : _date,
             durationMinutes: _duration,
           )
         : await cubit.save(
             item: widget.item,
             title: _title.text,
             scheduledAt: scheduled,
+            plannedDate: _hasTime ? null : _date,
             durationMinutes: _duration,
           );
     if (mounted && success) Navigator.pop(context, true);
@@ -1472,6 +1451,7 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                   const SizedBox(height: 12),
                   const SizedBox(height: 8),
                   ListTile(
+                    key: const Key('planner-editor-date'),
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(
                       Icons.calendar_month_outlined,
@@ -1493,51 +1473,61 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                           },
                   ),
                   const SizedBox(height: 8),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(
-                      Icons.schedule,
-                      size: AppIconSizes.standard,
-                    ),
-                    title: Text(_time.format(context)),
-                    onTap: saving
+                  PlannerTimeMode(
+                    hasTime: _hasTime,
+                    onChanged: saving
                         ? null
-                        : () async {
-                            final time = await showTimePicker(
-                              context: context,
-                              initialTime: _time,
-                            );
-                            if (time != null && mounted) {
-                              setState(() => _time = time);
-                            }
-                          },
+                        : (value) => setState(() => _hasTime = value),
                   ),
-                  const SizedBox(height: 16),
-                  AppFormField(
-                    label: 'Длительность',
-                    child: DropdownButtonFormField<int>(
-                      isExpanded: true,
-                      initialValue: _duration,
-                      decoration: const InputDecoration(
-                        hintText: 'Выберите длительность',
+                  if (_hasTime) ...[
+                    ListTile(
+                      key: const Key('planner-editor-time'),
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.schedule,
+                        size: AppIconSizes.standard,
                       ),
-                      items:
-                          ({15, 30, 45, 60, 90, 120, 180, _duration}.toList()
-                                ..sort())
-                              .map(
-                                (minutes) => DropdownMenuItem(
-                                  value: minutes,
-                                  child: Text('$minutes мин'),
-                                ),
-                              )
-                              .toList(),
-                      onChanged: saving
+                      title: Text(_time.format(context)),
+                      onTap: saving
                           ? null
-                          : (value) => setState(() => _duration = value!),
+                          : () async {
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: _time,
+                              );
+                              if (time != null && mounted) {
+                                setState(() => _time = time);
+                              }
+                            },
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    AppFormField(
+                      label: 'Длительность',
+                      child: DropdownButtonFormField<int>(
+                        isExpanded: true,
+                        initialValue: _duration,
+                        decoration: const InputDecoration(
+                          hintText: 'Выберите длительность',
+                        ),
+                        items:
+                            ({15, 30, 45, 60, 90, 120, 180, _duration}.toList()
+                                  ..sort())
+                                .map(
+                                  (minutes) => DropdownMenuItem(
+                                    value: minutes,
+                                    child: Text('$minutes мин'),
+                                  ),
+                                )
+                                .toList(),
+                        onChanged: saving
+                            ? null
+                            : (value) => setState(() => _duration = value!),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   AppFormButton(
+                    key: const Key('planner-editor-save'),
                     onPressed: saving ? null : _save,
                     child: Text(saving ? 'Сохранение…' : 'Сохранить'),
                   ),

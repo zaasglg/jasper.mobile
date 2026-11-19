@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widget_skeleton.dart';
 import '../../../dashboard/presentation/widgets/dashboard_expandable_content.dart';
@@ -43,7 +44,9 @@ class MyTasksWidget extends StatelessWidget {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            SnackBar(
+            appSnackBar(
+              context: context,
+              tone: AppSnackBarTone.error,
               content: Text(message),
               behavior: SnackBarBehavior.floating,
             ),

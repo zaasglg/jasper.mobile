@@ -1,3 +1,4 @@
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../core/theme/app_ui_tokens.dart';
 import '../../../core/widgets/app_color_picker.dart';
 import '../../../core/widgets/app_dialog.dart';
@@ -42,9 +43,13 @@ class _ManagementBody extends StatelessWidget {
     BuildContext context,
   ) => BlocConsumer<CollaborationCubit, CollaborationState>(
     listenWhen: (a, b) => a.error != b.error && b.error != null,
-    listener: (context, state) => ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(state.error!))),
+    listener: (context, state) => ScaffoldMessenger.of(context).showSnackBar(
+      appSnackBar(
+        context: context,
+        tone: AppSnackBarTone.error,
+        content: Text(state.error!),
+      ),
+    ),
     builder: (context, state) {
       final cubit = context.read<CollaborationCubit>();
       final space = state.space;
@@ -322,7 +327,9 @@ class _ManagementBody extends StatelessWidget {
           .toList();
       if (available.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.info,
             content: Text('Все доступные пользователи уже добавлены.'),
           ),
         );
@@ -356,9 +363,13 @@ class _ManagementBody extends StatelessWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(
+          appSnackBar(
+            context: context,
+            tone: AppSnackBarTone.error,
+            content: Text(e.toString()),
+          ),
+        );
       }
     }
   }

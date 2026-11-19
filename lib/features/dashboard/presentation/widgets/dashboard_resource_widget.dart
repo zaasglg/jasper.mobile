@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_selector.dart';
 import 'dashboard_expandable_content.dart';
@@ -145,7 +146,11 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
     });
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось сохранить настройки ресурса')),
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.error,
+          content: Text('Не удалось сохранить настройки ресурса'),
+        ),
       );
     }
   }

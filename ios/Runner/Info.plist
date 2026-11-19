@@ -52,6 +52,8 @@
 	</array>
 	<key>FlutterDeepLinkingEnabled</key>
 	<false/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Доступ к галерее нужен для добавления фото и видео к задачам и обсуждениям.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Камера нужна для видеозвонков и записи видеозаметок в чатах.</string>
 	<key>NSMicrophoneUsageDescription</key>

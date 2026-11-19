@@ -45,6 +45,8 @@ class StorageRepositoryImpl implements StorageRepository {
     final rows = <String, Map<String, dynamic>>{};
     if (scope.source == StorageSource.project) {
       for (final archived in [false, true]) {
+        // Track each query separately: a task may occur in both archive results.
+        final seenIds = <String>{};
         for (var skip = 0; ; skip += 100) {
           final response = await dio.get<dynamic>(
             'project-tasks',
@@ -64,9 +66,18 @@ class StorageRepositoryImpl implements StorageRepository {
           if (page is! List) {
             throw const StorageException('Не удалось прочитать файлы проекта');
           }
+          var hasNewIds = false;
           for (final row in page.whereType<Map>()) {
             final map = Map<String, dynamic>.from(row);
-            rows[map['id'].toString()] = map;
+            final id = map['id']?.toString() ?? '';
+            if (id.isEmpty) continue;
+            if (seenIds.add(id)) hasNewIds = true;
+            rows[id] = map;
+          }
+          if (page.isNotEmpty && !hasNewIds) {
+            throw const StorageException(
+              'Сервер вернул страницу файлов проекта без новых записей. Повторите загрузку.',
+            );
           }
           if (page.length < 100) break;
         }
