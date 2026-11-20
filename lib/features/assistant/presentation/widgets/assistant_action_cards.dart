@@ -10,7 +10,9 @@ import '../../domain/entities/assistant_message_model.dart';
 import '../../data/services/assistant_actions.dart';
 import '../../domain/repositories/assistant_repository.dart';
 import '../cubit/assistant_cubit.dart';
-import '../../../storage/data/storage_models.dart';
+import '../../../storage/domain/entities/storage_scope.dart';
+import '../../../storage/domain/entities/storage_item.dart';
+import '../../../storage/domain/entities/storage_enums.dart';
 import '../../../storage/presentation/storage_file_screen.dart';
 
 const _toolLabels = {

@@ -10,7 +10,9 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/di/service_locator.dart';
-import '../data/storage_models.dart';
+import '../domain/entities/storage_scope.dart';
+import '../domain/entities/storage_item.dart';
+import '../domain/entities/storage_enums.dart';
 import '../domain/storage_repository.dart';
 import 'storage_cubit.dart';
 

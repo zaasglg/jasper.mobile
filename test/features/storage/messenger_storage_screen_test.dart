@@ -8,7 +8,8 @@ import 'package:jospar/core/storage/workspace_selection_storage.dart';
 import 'package:jospar/features/chat/data/models/chat_conversation_model.dart';
 import 'package:jospar/features/chat/domain/repositories/chat_repository.dart';
 import 'package:jospar/features/chat/presentation/cubit/chat_cubit.dart';
-import 'package:jospar/features/storage/data/storage_models.dart';
+import 'package:jospar/features/storage/domain/entities/storage_scope.dart';
+import 'package:jospar/features/storage/domain/entities/storage_enums.dart';
 import 'package:jospar/features/storage/presentation/messenger_storage_screen.dart';
 
 void main() {

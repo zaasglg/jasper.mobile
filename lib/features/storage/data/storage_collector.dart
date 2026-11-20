@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:html/parser.dart' as html;
 import '../../../core/utils/html_text.dart';
-import 'storage_models.dart';
+import '../domain/entities/storage_item.dart';
+import '../domain/entities/storage_enums.dart';
 
 class StorageCollector {
   static StorageFileKind classify(String name, [String mime = '']) {

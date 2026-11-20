@@ -3,7 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../storage/data/storage_collector.dart';
-import '../../../storage/data/storage_models.dart';
+import '../../../storage/domain/entities/storage_enums.dart';
 import '../../data/models/task_detail_model.dart';
 
 class TaskCommentAttachment extends StatelessWidget {

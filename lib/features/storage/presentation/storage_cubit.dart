@@ -1,7 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../data/storage_models.dart';
+import '../domain/entities/storage_scope.dart';
+import '../domain/entities/storage_item.dart';
+import '../domain/entities/storage_summary.dart';
+import '../domain/entities/storage_analysis_result.dart';
+import '../domain/entities/storage_enums.dart';
 import '../domain/storage_repository.dart';
 
 class StorageState extends Equatable {

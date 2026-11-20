@@ -1,3 +1,6 @@
+import 'models/storage_summary_page_dto.dart';
+import 'models/storage_analysis_result_dto.dart';
+import 'models/storage_summary_content_dto.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
@@ -6,7 +9,12 @@ import '../../chat/data/services/chat_attachment_loader.dart';
 import '../../chat/data/services/chat_media_payload.dart';
 import '../domain/storage_repository.dart';
 import 'storage_collector.dart';
-import 'storage_models.dart';
+import '../domain/entities/storage_scope.dart';
+import '../domain/entities/storage_item.dart';
+import '../domain/entities/storage_summary.dart';
+import '../domain/entities/storage_summary_page.dart';
+import '../domain/entities/storage_analysis_result.dart';
+import '../domain/entities/storage_enums.dart';
 
 class StorageRepositoryImpl implements StorageRepository {
   StorageRepositoryImpl(this.dio, this.storage, {Dio? downloadDio})
@@ -223,7 +231,7 @@ class StorageRepositoryImpl implements StorageRepository {
     StorageScope scope,
     int skip, {
     CancelToken? cancelToken,
-  }) async => StorageSummaryPage.fromJson(
+  }) async => StorageSummaryPageDto.fromJson(
     object(
       (await dio.get<dynamic>(
         'video/thread-summaries',
@@ -237,7 +245,7 @@ class StorageRepositoryImpl implements StorageRepository {
         cancelToken: cancelToken,
       )).data,
     ),
-  );
+  ).toEntity();
   @override
   Future<StorageSummary> summary(
     StorageScope scope,
@@ -252,7 +260,9 @@ class StorageRepositoryImpl implements StorageRepository {
       )).data,
     );
     return item.copyWith(
-      content: StorageCollector.object(data['content'] ?? data),
+      content: StorageSummaryContentDto.fromJson(
+        StorageCollector.object(data['content'] ?? data),
+      ).toEntity(),
     );
   }
 
@@ -340,7 +350,7 @@ class StorageRepositoryImpl implements StorageRepository {
         if (source?.scheme == 'https') 'sourceFile': {'dataUrl': item.dataUrl},
       },
     );
-    return StorageAnalysisResult.fromJson(object(response.data));
+    return StorageAnalysisResultDto.fromJson(object(response.data)).toEntity();
   }
 
   @override

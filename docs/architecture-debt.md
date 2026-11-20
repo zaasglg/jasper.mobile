@@ -49,3 +49,22 @@ SpaceMember.lastActiveAt — формат не установлен (ISO или 
 `InboxTaskDetail.unknownDetailFields: Map<String, dynamic>` — осознанное исключение: в API-фикстуре `test/features/inbox/inbox_repository_test.dart` есть `detail.files`, и HTTP-тест требует сохранить его при PATCH и копировании. `description`, `labels` и `completed` выделены в явные поля; остальные ключи проходят без изменений. После уточнения контракта detail поднять дополнительные данные (включая файлы) в типизированные сущности отдельной задачей. Не удалять карту без замены сохранения данных.
 
 `lib/features/inbox/presentation/cubit/inbox_cubit.dart` → `data/repositories/inbox_repository_impl.dart` (`InboxException`) и `data/services/inbox_home_widget_service.dart` (`InboxHomeWidgetService`): отдельными задачами перенести исключение в domain и выделить domain-интерфейс обновления домашнего виджета с платформенной реализацией в data.
+
+## Storage: гибридное содержимое резюме встречи
+
+`StorageSummary.content` имеет тип `StorageSummaryContent` с явными полями верхнего уровня. До разделения UI читал: `participantDetails` ×1, `keyDecisions` ×1, `allEntries` ×1, `duration` ×2. Динамическими остаются:
+
+- `participantDetails: Map<String, dynamic>`: словарь участников по идентификаторам, вложенный `name` читается дважды;
+- `keyDecisions` и `allEntries: List<Map<String, dynamic>>`: записи решений/стенограммы с `userId` ×2, `createdTask` ×1, `file` ×1, `text` ×1, `id` ×1;
+- вложенная задача: `id` ×2, `title` ×1;
+- вложенный файл: `dataUrl` ×2, `name` ×3, `mimeType` ×2.
+
+Глубина достигает трёх уровней объектов от content. Отдельной задачей уточнить контракты участников и разных форм записей, затем заменить динамические части чистыми типами. `duration: String?` — DTO сохраняет текущее текстовое представление через toString; единицы и числовой формат API пока не установлены.
+
+## Storage: presentation → data
+
+- `lib/features/storage/presentation/storage_summary_screen.dart` использует `data/storage_collector.dart` для вложенных динамических объектов и классификации файлов. После типизации содержимого резюме убрать разбор объектов из UI, классификацию предоставить через domain-контракт.
+- `lib/features/storage/presentation/storage_screen.dart` использует `features/chat/data/services/chat_media_payload.dart` (`openStorageLink`); отдельно выделить интерфейс открытия ссылок/медиа.
+- `lib/features/storage/presentation/messenger_storage_screen.dart` использует `features/chat/data/models/chat_conversation_model.dart`; заменить на domain-сущность при шаге chat.
+
+`StorageException` уже находится в domain.

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/di/service_locator.dart';
 import '../data/storage_collector.dart';
-import '../data/storage_models.dart';
+import '../domain/entities/storage_scope.dart';
+import '../domain/entities/storage_item.dart';
+import '../domain/entities/storage_summary.dart';
 import '../domain/storage_repository.dart';
 import 'storage_cubit.dart';
 
@@ -55,10 +57,9 @@ class _StorageSummaryScreenState extends State<StorageSummaryScreen> {
         }
         final summary = snapshot.data!;
         final content = summary.content;
-        final people = StorageCollector.object(content['participantDetails']);
-        final decisions = (content['keyDecisions'] as List? ?? [])
-            .whereType<Map>();
-        final entries = (content['allEntries'] as List? ?? []).whereType<Map>();
+        final people = content.participantDetails;
+        final decisions = content.keyDecisions;
+        final entries = content.allEntries;
         Widget heading(String text) => Padding(
           padding: const EdgeInsets.only(top: 24, bottom: 12),
           child: Text(text, style: Theme.of(context).textTheme.titleMedium),
@@ -124,8 +125,8 @@ class _StorageSummaryScreenState extends State<StorageSummaryScreen> {
             Text(
               '${summary.date.toLocal().toString().substring(0, 16)} · ${summary.authorName}',
             ),
-            if (content['duration'] != null)
-              Text('Длительность: ${content['duration']}'),
+            if (content.duration != null)
+              Text('Длительность: ${content.duration}'),
             heading('Участники'),
             for (final person in people.values)
               Text(StorageCollector.object(person)['name']?.toString() ?? ''),

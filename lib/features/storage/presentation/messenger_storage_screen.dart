@@ -8,7 +8,8 @@ import '../../../core/storage/workspace_selection_storage.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../chat/data/models/chat_conversation_model.dart';
 import '../../chat/presentation/cubit/chat_cubit.dart';
-import '../data/storage_models.dart';
+import '../domain/entities/storage_scope.dart';
+import '../domain/entities/storage_enums.dart';
 
 /// The web storage belongs to a thread; choose that thread before opening files.
 class MessengerStorageScreen extends StatefulWidget {

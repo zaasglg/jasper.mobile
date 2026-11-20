@@ -1,7 +1,8 @@
 import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../kanban/presentation/widgets/board_style.dart';
-import '../../../storage/data/storage_models.dart';
+import '../../../storage/domain/entities/storage_scope.dart';
+import '../../../storage/domain/entities/storage_enums.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_action_menu.dart';
 import 'package:flutter/material.dart';

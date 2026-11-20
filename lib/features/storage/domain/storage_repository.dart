@@ -1,6 +1,10 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
-import '../data/storage_models.dart';
+import 'entities/storage_scope.dart';
+import 'entities/storage_item.dart';
+import 'entities/storage_summary.dart';
+import 'entities/storage_summary_page.dart';
+import 'entities/storage_analysis_result.dart';
 
 abstract interface class StorageRepository {
   Future<List<StorageItem>> load(
