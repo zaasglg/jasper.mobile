@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:jospar/core/theme/app_theme.dart';
-import 'package:jospar/features/profile/data/models/user_profile.dart';
+import 'package:jospar/features/profile/domain/entities/user_profile.dart';
 import 'package:jospar/features/profile/domain/repositories/profile_repository.dart';
 import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/tasks/data/repositories/task_details_repository_impl.dart';

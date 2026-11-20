@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/kanban/data/repositories/kanban_repository_impl.dart';
 import 'package:jospar/features/kanban/presentation/cubit/kanban_cubit.dart';
-import 'package:jospar/features/profile/data/models/user_profile.dart';
+import 'package:jospar/features/profile/domain/entities/user_profile.dart';
 import 'package:jospar/features/profile/domain/repositories/profile_repository.dart';
 import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';

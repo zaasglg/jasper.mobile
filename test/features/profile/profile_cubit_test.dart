@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/profile/data/models/user_profile.dart';
+import 'package:jospar/features/profile/domain/entities/user_profile.dart';
 import 'package:jospar/features/profile/domain/repositories/profile_repository.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_state.dart';

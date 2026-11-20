@@ -1,8 +1,10 @@
 import '../../../../core/network/api_constants.dart';
 import 'package:equatable/equatable.dart';
 
-class UserProfile extends Equatable {
-  const UserProfile({
+import '../../domain/entities/user_profile.dart';
+
+class UserProfileDto extends Equatable {
+  const UserProfileDto({
     required this.id,
     required this.name,
     required this.email,
@@ -10,11 +12,11 @@ class UserProfile extends Equatable {
     this.role = '',
   });
 
-  factory UserProfile.fromJson(Map<String, dynamic> json) {
+  factory UserProfileDto.fromJson(Map<String, dynamic> json) {
     final rawAvatarUrl =
         json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar'];
 
-    return UserProfile(
+    return UserProfileDto(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
@@ -31,14 +33,21 @@ class UserProfile extends Equatable {
   final String? avatarUrl;
   final String role;
 
-  String get roleLabel => switch (role.trim().toUpperCase()) {
-    'SUPER_ADMIN' || 'SUPERADMIN' => 'Суперадмин',
-    'ADMIN' => 'Админ',
-    'EXECUTOR' || 'MEMBER' || 'USER' => 'Участник',
-    'OWNER' => 'Владелец',
-    '' => 'Не указана',
-    _ => role,
-  };
+  factory UserProfileDto.fromEntity(UserProfile entity) => UserProfileDto(
+    id: entity.id,
+    name: entity.name,
+    email: entity.email,
+    avatarUrl: entity.avatarUrl,
+    role: entity.role,
+  );
+
+  UserProfile toEntity() => UserProfile(
+    id: id,
+    name: name,
+    email: email,
+    avatarUrl: avatarUrl,
+    role: role,
+  );
 
   static String _resolveAvatarUrl(String value) {
     final uri = Uri.tryParse(value);
@@ -54,14 +63,14 @@ class UserProfile extends Equatable {
     'role': role,
   };
 
-  UserProfile copyWith({
+  UserProfileDto copyWith({
     String? id,
     String? name,
     String? email,
     String? avatarUrl,
     String? role,
   }) {
-    return UserProfile(
+    return UserProfileDto(
       id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:jospar/core/di/service_locator.dart';
 import 'package:jospar/features/profile/domain/repositories/profile_repository.dart';
-import 'package:jospar/features/profile/data/models/user_profile.dart';
+import 'package:jospar/features/profile/domain/entities/user_profile.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/chat/data/models/chat_conversation_model.dart';

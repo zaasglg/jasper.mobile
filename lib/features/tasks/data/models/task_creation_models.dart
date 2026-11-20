@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
-import '../../../profile/data/models/user_profile.dart';
+import '../../../profile/domain/entities/user_profile.dart';
+import '../../../profile/data/models/user_profile_dto.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../../workspaces/data/models/workspace_model.dart';
 import 'kanban_column_model.dart';
@@ -15,13 +16,13 @@ class TaskCreationCatalog extends Equatable {
             .whereType<Map>()
             .map((e) => WorkspaceModel.fromJson(Map<String, dynamic>.from(e)))
             .toList(),
-        user: UserProfile.fromJson(
+        user: UserProfileDto.fromJson(
           Map<String, dynamic>.from(json['user'] as Map),
-        ),
+        ).toEntity(),
       );
   Map<String, dynamic> toJson() => {
     'workspaces': workspaces.map((e) => e.toJson()).toList(),
-    'user': user.toJson(),
+    'user': UserProfileDto.fromEntity(user).toJson(),
   };
   TaskCreationCatalog copyWith({
     List<WorkspaceModel>? workspaces,

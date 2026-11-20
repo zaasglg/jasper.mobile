@@ -9,7 +9,7 @@ import 'package:jospar/features/dashboard/presentation/cubit/dashboard_layout_cu
 import 'package:jospar/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:jospar/features/inbox/domain/repositories/inbox_repository.dart';
 import 'package:jospar/features/inbox/presentation/cubit/inbox_cubit.dart';
-import 'package:jospar/features/profile/data/models/user_profile.dart';
+import 'package:jospar/features/profile/domain/entities/user_profile.dart';
 import 'package:jospar/features/profile/domain/repositories/profile_repository.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:jospar/features/projects/data/models/project_model.dart';

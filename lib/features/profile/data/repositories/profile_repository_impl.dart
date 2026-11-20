@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
 
 import '../../domain/repositories/profile_repository.dart';
-import '../models/user_profile.dart';
+import '../../domain/entities/user_profile.dart';
+import '../models/user_profile_dto.dart';
 
 class ProfileRepositoryImpl implements ProfileRepository {
   const ProfileRepositoryImpl(this._dio);
@@ -13,7 +14,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
     try {
       final response = await _dio.get<dynamic>('users/me');
       final json = _unwrapPayload(response.data);
-      return UserProfile.fromJson(json);
+      return UserProfileDto.fromJson(json).toEntity();
     } on DioException catch (error) {
       throw ProfileException(_messageForDioError(error));
     } on ProfileException {

@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-import '../../data/models/user_profile.dart';
+import '../../domain/entities/user_profile.dart';
 
 sealed class ProfileState extends Equatable {
   const ProfileState();

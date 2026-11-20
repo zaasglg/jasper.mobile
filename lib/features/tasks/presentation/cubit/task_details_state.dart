@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-import '../../../profile/data/models/user_profile.dart';
+import '../../../profile/domain/entities/user_profile.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../data/models/task_detail_model.dart';
 import '../../data/models/kanban_column_model.dart';
