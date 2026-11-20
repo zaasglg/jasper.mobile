@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/core/storage/auth_token_storage.dart';
 import 'package:jospar/core/storage/workspace_selection_storage.dart';
-import 'package:jospar/features/auth/data/models/login_request.dart';
+import 'package:jospar/features/auth/domain/entities/login_request.dart';
 import 'package:jospar/features/auth/data/google_auth_browser.dart';
 import 'package:jospar/features/auth/data/repositories/auth_repository_impl.dart';
 

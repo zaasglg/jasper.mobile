@@ -5,7 +5,8 @@ import '../../../../core/storage/auth_token_storage.dart';
 import '../../../../core/storage/workspace_selection_storage.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../apple_auth_provider.dart';
-import '../models/login_request.dart';
+import '../../domain/entities/login_request.dart';
+import '../models/login_request_dto.dart';
 import '../google_auth_browser.dart';
 
 class AuthRepositoryImpl
@@ -136,7 +137,7 @@ class AuthRepositoryImpl
     try {
       final response = await _dio.post<dynamic>(
         'auth/login',
-        data: request.toJson(),
+        data: LoginRequestDto.fromEntity(request).toJson(),
       );
       final token = _extractToken(response.data);
       return await _commit(operation, () => _saveToken(operation, token));

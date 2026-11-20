@@ -3,22 +3,21 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/core/auth/auth_session.dart';
 import 'package:jospar/features/auth/data/repositories/auth_repository_impl.dart';
-import 'package:jospar/features/auth/data/models/login_request.dart';
+import 'package:jospar/features/auth/domain/entities/login_request.dart';
 import 'package:jospar/features/auth/domain/repositories/auth_repository.dart';
 import 'package:jospar/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:jospar/features/auth/presentation/cubit/auth_state.dart';
 
 void main() {
   group('LoginRequest', () {
-    test('serializes and copies explicitly', () {
+    test('compares and copies credentials', () {
       const request = LoginRequest(email: 'user@jospar.me', password: 'secret');
-
-      expect(request.toJson(), <String, dynamic>{
-        'email': 'user@jospar.me',
-        'password': 'secret',
-      });
-      expect(LoginRequest.fromJson(request.toJson()), request);
+      expect(
+        request,
+        const LoginRequest(email: 'user@jospar.me', password: 'secret'),
+      );
       expect(request.copyWith(email: 'new@jospar.me').password, 'secret');
+      expect(request.copyWith(password: 'changed').email, request.email);
     });
   });
 

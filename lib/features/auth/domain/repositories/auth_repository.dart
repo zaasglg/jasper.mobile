@@ -1,4 +1,4 @@
-import '../../data/models/login_request.dart';
+import '../entities/login_request.dart';
 
 abstract interface class GoogleLoginRepository {
   Future<String?> loginWithGoogle();

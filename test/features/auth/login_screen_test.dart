@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/auth/data/models/login_request.dart';
+import 'package:jospar/features/auth/domain/entities/login_request.dart';
 import 'package:jospar/features/auth/domain/repositories/auth_repository.dart';
 import 'package:jospar/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:jospar/features/auth/presentation/screens/login_screen.dart';
