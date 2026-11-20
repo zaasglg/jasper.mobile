@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:jospar/core/di/service_locator.dart';
 import 'package:jospar/core/theme/app_theme.dart';
-import 'package:jospar/features/inbox/data/models/inbox_task_model.dart';
+import 'package:jospar/features/inbox/domain/entities/inbox_task_model.dart';
 import 'package:jospar/features/inbox/domain/repositories/inbox_repository.dart';
 import 'package:jospar/features/planner/data/models/planner_item_model.dart';
 import 'package:jospar/features/planner/domain/repositories/planner_repository.dart';

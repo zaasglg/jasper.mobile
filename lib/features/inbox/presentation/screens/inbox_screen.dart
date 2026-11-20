@@ -6,7 +6,7 @@ import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
-import '../../data/models/inbox_task_model.dart';
+import '../../domain/entities/inbox_task_model.dart';
 import '../cubit/inbox_cubit.dart';
 import '../cubit/inbox_state.dart';
 import '../widgets/inbox_task_menu.dart';

@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:home_widget/home_widget.dart';
 
-import '../models/inbox_task_model.dart';
+import '../../domain/entities/inbox_task_model.dart';
 
 /// Keeps the native Android/iOS home-screen widget in sync with Inbox.
 abstract final class InboxHomeWidgetService {

@@ -43,3 +43,9 @@ SpaceMember.lastActiveAt — формат не установлен (ISO или 
   - `dashboard_widget_panel_test.dart`: `AI renders teammate overdue recommendations instead of a quote`;
   - `dashboard_widget_panel_test.dart`: `swiping inside expanded recommendations scrolls dashboard`.
   При шаге dashboard сравнить также причины падений, а не только количество.
+
+## Inbox: типизированный detail с сохранением дополнительных полей
+
+`InboxTaskDetail.unknownDetailFields: Map<String, dynamic>` — осознанное исключение: в API-фикстуре `test/features/inbox/inbox_repository_test.dart` есть `detail.files`, и HTTP-тест требует сохранить его при PATCH и копировании. `description`, `labels` и `completed` выделены в явные поля; остальные ключи проходят без изменений. После уточнения контракта detail поднять дополнительные данные (включая файлы) в типизированные сущности отдельной задачей. Не удалять карту без замены сохранения данных.
+
+`lib/features/inbox/presentation/cubit/inbox_cubit.dart` → `data/repositories/inbox_repository_impl.dart` (`InboxException`) и `data/services/inbox_home_widget_service.dart` (`InboxHomeWidgetService`): отдельными задачами перенести исключение в domain и выделить domain-интерфейс обновления домашнего виджета с платформенной реализацией в data.

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/inbox/data/models/inbox_task_model.dart';
+import 'package:jospar/features/inbox/domain/entities/inbox_task_model.dart';
 import 'package:jospar/features/inbox/domain/repositories/inbox_repository.dart';
 import 'package:jospar/features/inbox/presentation/cubit/inbox_cubit.dart';
 

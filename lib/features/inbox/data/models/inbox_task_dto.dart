@@ -1,7 +1,9 @@
+import '../../domain/entities/inbox_task_model.dart';
+import 'inbox_task_detail_dto.dart';
 import 'package:equatable/equatable.dart';
 
-class InboxTaskModel extends Equatable {
-  const InboxTaskModel({
+class InboxTaskDto extends Equatable {
+  const InboxTaskDto({
     required this.id,
     required this.title,
     this.displayId = '',
@@ -17,9 +19,9 @@ class InboxTaskModel extends Equatable {
     this.priority = 'MED',
   });
 
-  factory InboxTaskModel.fromJson(Map<String, dynamic> json) {
+  factory InboxTaskDto.fromJson(Map<String, dynamic> json) {
     final status = json['status']?.toString().toUpperCase();
-    return InboxTaskModel(
+    return InboxTaskDto(
       id: (json['id'] ?? json['taskId'] ?? json['task_id'])?.toString() ?? '',
       displayId:
           (json['displayId'] ?? json['display_id'] ?? json['key'])
@@ -57,6 +59,36 @@ class InboxTaskModel extends Equatable {
     );
   }
 
+  factory InboxTaskDto.fromEntity(InboxTaskModel entity) => InboxTaskDto(
+    id: entity.id,
+    displayId: entity.displayId,
+    title: entity.title,
+    description: entity.description,
+    completed: entity.completed,
+    archived: entity.archived,
+    order: entity.order,
+    createdAt: entity.createdAt,
+    isLocalOnly: entity.isLocalOnly,
+    start: entity.start,
+    end: entity.end,
+    priority: entity.priority,
+    detail: InboxTaskDetailDto.fromEntity(entity.detail).toJson(),
+  );
+  InboxTaskModel toEntity() => InboxTaskModel(
+    id: id,
+    displayId: displayId,
+    title: title,
+    description: description,
+    completed: completed,
+    archived: archived,
+    order: order,
+    createdAt: createdAt,
+    isLocalOnly: isLocalOnly,
+    start: start,
+    end: end,
+    priority: priority,
+    detail: InboxTaskDetailDto.fromJson(detail).toEntity(),
+  );
   final String id;
   final String displayId;
   final String title;
@@ -85,7 +117,7 @@ class InboxTaskModel extends Equatable {
     if (createdAt != null) 'createdAt': createdAt!.toUtc().toIso8601String(),
   };
 
-  InboxTaskModel copyWith({
+  InboxTaskDto copyWith({
     String? id,
     String? displayId,
     String? title,
@@ -100,7 +132,7 @@ class InboxTaskModel extends Equatable {
     String? end,
     String? priority,
   }) {
-    return InboxTaskModel(
+    return InboxTaskDto(
       id: id ?? this.id,
       displayId: displayId ?? this.displayId,
       title: title ?? this.title,

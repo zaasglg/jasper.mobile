@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-import '../../data/models/inbox_task_model.dart';
+import '../../domain/entities/inbox_task_model.dart';
 
 enum InboxStatus { initial, loading, success, failure }
 

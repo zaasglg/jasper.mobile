@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../data/models/inbox_task_model.dart';
+import '../../domain/entities/inbox_task_model.dart';
 import '../../data/repositories/inbox_repository_impl.dart';
 import '../../data/services/inbox_home_widget_service.dart';
 import '../../domain/repositories/inbox_repository.dart';

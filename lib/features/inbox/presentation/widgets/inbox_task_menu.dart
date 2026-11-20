@@ -1,3 +1,4 @@
+import '../../domain/entities/inbox_task_label.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
@@ -13,7 +14,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../planner/presentation/screens/planner_screen.dart';
 import '../../../projects/data/models/project_model.dart';
 import '../../../projects/presentation/cubit/projects_cubit.dart';
-import '../../data/models/inbox_task_model.dart';
+import '../../domain/entities/inbox_task_model.dart';
 import '../../domain/repositories/inbox_repository.dart';
 import '../cubit/inbox_cubit.dart';
 
@@ -185,7 +186,7 @@ class _InboxEditorState extends State<_InboxEditor> {
   late final TextEditingController _title;
   late final TextEditingController _description;
   final _labelText = TextEditingController();
-  late List<Map<String, dynamic>> _labels;
+  late List<InboxTaskLabel> _labels;
   String? _start, _end, _error;
   bool _saving = false;
 
@@ -194,18 +195,9 @@ class _InboxEditorState extends State<_InboxEditor> {
     super.initState();
     _title = TextEditingController(text: widget.task.title);
     _description = TextEditingController(
-      text:
-          widget.task.detail['description']?.toString() ??
-          widget.task.description ??
-          '',
+      text: widget.task.detail.description ?? widget.task.description ?? '',
     );
-    final labels = widget.task.detail['labels'];
-    _labels = labels is List
-        ? labels
-              .whereType<Map>()
-              .map((label) => Map<String, dynamic>.from(label))
-              .toList()
-        : [];
+    _labels = [...?widget.task.detail.labels];
     _start = widget.task.start;
     _end = widget.task.end;
   }
@@ -220,13 +212,15 @@ class _InboxEditorState extends State<_InboxEditor> {
 
   void _addLabel() {
     final text = _labelText.text.trim();
-    if (text.isEmpty || _labels.any((label) => label['text'] == text)) return;
+    if (text.isEmpty || _labels.any((label) => label.text == text)) return;
     setState(
-      () => _labels.add({
-        'id': 'label-${DateTime.now().microsecondsSinceEpoch}',
-        'text': text,
-        'color': '#6d5fe0',
-      }),
+      () => _labels.add(
+        InboxTaskLabel(
+          id: 'label-${DateTime.now().microsecondsSinceEpoch}',
+          text: text,
+          color: '#6d5fe0',
+        ),
+      ),
     );
     _labelText.clear();
   }
@@ -271,11 +265,10 @@ class _InboxEditorState extends State<_InboxEditor> {
         'title': _title.text.trim(),
         'start': _start,
         'end': _end,
-        'detail': {
-          ...widget.task.detail,
-          'description': _description.text,
-          'labels': _labels,
-        },
+        'detail': widget.task.detail.copyWith(
+          description: _description.text,
+          labels: _labels,
+        ),
       }),
     );
     if (!mounted) return;
@@ -343,7 +336,7 @@ class _InboxEditorState extends State<_InboxEditor> {
               children: [
                 for (final label in _labels)
                   InputChip(
-                    label: Text(label['text']?.toString() ?? ''),
+                    label: Text(label.text ?? ''),
                     onDeleted: _saving || widget.task.isLocalOnly
                         ? null
                         : () => setState(() => _labels.remove(label)),

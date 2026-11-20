@@ -1,7 +1,10 @@
+import '../../domain/entities/inbox_task_detail.dart';
 import 'package:dio/dio.dart';
 
 import '../../domain/repositories/inbox_repository.dart';
-import '../models/inbox_task_model.dart';
+import '../../domain/entities/inbox_task_model.dart';
+import '../models/inbox_task_dto.dart';
+import '../models/inbox_task_detail_dto.dart';
 
 class InboxRepositoryImpl implements InboxRepository, InboxActionsRepository {
   const InboxRepositoryImpl(this._dio);
@@ -22,8 +25,16 @@ class InboxRepositoryImpl implements InboxRepository, InboxActionsRepository {
 
   @override
   Future<void> updateTask(String id, Map<String, dynamic> changes) => _action(
-    () =>
-        _dio.patch<dynamic>('inbox/${Uri.encodeComponent(id)}', data: changes),
+    () => _dio.patch<dynamic>(
+      'inbox/${Uri.encodeComponent(id)}',
+      data: {
+        ...changes,
+        if (changes['detail'] is InboxTaskDetail)
+          'detail': InboxTaskDetailDto.fromEntity(
+            changes['detail'] as InboxTaskDetail,
+          ).toJson(),
+      },
+    ),
   );
 
   @override
@@ -36,7 +47,7 @@ class InboxRepositoryImpl implements InboxRepository, InboxActionsRepository {
       'inbox',
       data: {
         'title': '${task.title} (копия)',
-        'detail': task.detail,
+        'detail': InboxTaskDetailDto.fromEntity(task.detail).toJson(),
         if (task.start != null) 'start': task.start,
         if (task.end != null) 'end': task.end,
         'priority': task.priority,
@@ -93,7 +104,9 @@ class InboxRepositoryImpl implements InboxRepository, InboxActionsRepository {
       return _unwrapList(response.data)
           .whereType<Map>()
           .map(
-            (item) => InboxTaskModel.fromJson(Map<String, dynamic>.from(item)),
+            (item) => InboxTaskDto.fromJson(
+              Map<String, dynamic>.from(item),
+            ).toEntity(),
           )
           .where((task) => task.id.isNotEmpty && task.title.isNotEmpty)
           .toList(growable: false);

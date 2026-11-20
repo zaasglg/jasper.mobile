@@ -1,7 +1,8 @@
+import '../../inbox/data/models/inbox_task_dto.dart';
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
 
-import '../../inbox/data/models/inbox_task_model.dart';
+import '../../inbox/domain/entities/inbox_task_model.dart';
 import '../../projects/data/models/project_model.dart';
 import '../../projects/data/models/project_task_model.dart';
 
@@ -176,7 +177,7 @@ class SearchRepositoryImpl implements SearchRepository {
           )
           .toList(),
       inbox: initial[1]
-          .map(InboxTaskModel.fromJson)
+          .map((json) => InboxTaskDto.fromJson(json).toEntity())
           .where(
             (task) =>
                 !task.archived &&

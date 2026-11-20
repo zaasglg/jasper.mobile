@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/inbox/data/models/inbox_task_model.dart';
+import 'package:jospar/features/inbox/domain/entities/inbox_task_model.dart';
 import 'package:jospar/features/inbox/domain/repositories/inbox_repository.dart';
 import 'package:jospar/features/inbox/presentation/cubit/inbox_cubit.dart';
 import 'package:jospar/features/inbox/presentation/screens/inbox_screen.dart';

@@ -1,9 +1,9 @@
+import 'package:jospar/features/inbox/data/models/inbox_task_dto.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/inbox/data/models/inbox_task_model.dart';
 import 'package:jospar/features/inbox/data/repositories/inbox_repository_impl.dart';
 
 void main() {
@@ -12,7 +12,7 @@ void main() {
     final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/'))
       ..httpClientAdapter = adapter;
     final repository = InboxRepositoryImpl(dio);
-    final task = InboxTaskModel.fromJson({
+    final task = InboxTaskDto.fromJson({
       'id': 'inbox-1',
       'title': 'Отчёт',
       'start': '2026-10-16',
@@ -28,19 +28,37 @@ void main() {
         ],
       },
     });
-    expect(task.description, 'Описание');
-    expect(InboxTaskModel.fromJson(task.toJson()), task);
-    await repository.updateTask(task.id, {'detail': task.detail, 'end': null});
+    final entity = task.toEntity();
+    expect(entity.description, 'Описание');
+    expect(InboxTaskDto.fromJson(task.toJson()), task);
+    await repository.updateTask(task.id, {
+      'detail': entity.detail,
+      'end': null,
+    });
     expect(adapter.lastRequest!.method, 'PATCH');
     expect(adapter.lastRequest!.path, 'inbox/inbox-1');
     expect(adapter.lastRequest!.data['detail']['files'], [
       {'id': 'file'},
     ]);
     expect(adapter.lastRequest!.data['end'], isNull);
-    await repository.copyTask(task);
+    await repository.copyTask(entity);
     expect(adapter.lastRequest!.path, 'inbox');
     expect(adapter.lastRequest!.data['title'], 'Отчёт (копия)');
     expect(adapter.lastRequest!.data['detail'], task.detail);
+    await repository.updateTask(task.id, {
+      'detail': entity.detail.copyWith(
+        description: 'Новое описание',
+        labels: [],
+      ),
+    });
+    expect(adapter.lastRequest!.data['detail'], {
+      'description': 'Новое описание',
+      'labels': [],
+      'files': [
+        {'id': 'file'},
+      ],
+    });
+
     await repository.moveTask(task.id, 'project');
     expect(adapter.lastRequest!.path, 'inbox/inbox-1/move');
     expect(adapter.lastRequest!.data['projectId'], 'project');
@@ -65,8 +83,8 @@ void main() {
     expect(tasks.single.completed, isFalse);
   });
 
-  test('InboxTaskModel parses alternative API field names', () {
-    final task = InboxTaskModel.fromJson(<String, dynamic>{
+  test('InboxTaskDto parses alternative API field names', () {
+    final task = InboxTaskDto.fromJson(<String, dynamic>{
       'task_id': 'inbox-2',
       'subject': 'Проверить договор',
       'display_id': 'IN-2',

@@ -23,7 +23,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../../inbox/domain/repositories/inbox_repository.dart';
-import '../../../inbox/data/models/inbox_task_model.dart';
+import '../../../inbox/domain/entities/inbox_task_model.dart';
 import '../../data/models/planner_item_model.dart';
 import '../../data/planner_changes.dart';
 import '../../domain/utils/planner_dates.dart';
