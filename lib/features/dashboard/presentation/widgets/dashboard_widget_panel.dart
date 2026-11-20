@@ -23,7 +23,7 @@ import '../../../projects/data/models/project_model.dart';
 import '../../../planner/domain/repositories/planner_repository.dart';
 import '../../../planner/data/models/planner_item_model.dart';
 import '../../../storage/presentation/storage_file_screen.dart';
-import '../../data/dashboard_layout.dart';
+import '../../domain/entities/dashboard_widget_slot.dart';
 import '../../data/dashboard_repository_impl.dart';
 import '../cubit/dashboard_layout_cubit.dart';
 
@@ -185,11 +185,11 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
     final tasks = DashboardRepositoryImpl.items(raw);
     final options = widget.slot.options;
     if (widget.slot.id == 'resource' &&
-        ['labels', 'epics'].contains(options['resourceFilterType'])) {
-      final labels = (options['resourceLabelKeys'] as List? ?? [])
+        ['labels', 'epics'].contains(options.resourceFilterType)) {
+      final labels = (options.resourceLabelKeys as List? ?? [])
           .map((e) => e.toString())
           .toSet();
-      final epics = (options['resourceEpicIds'] as List? ?? [])
+      final epics = (options.resourceEpicIds as List? ?? [])
           .map((e) => e.toString())
           .toSet();
       Set<String> taskLabels(Map<String, dynamic> task) =>
@@ -212,7 +212,7 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
                     '',
               )
               .toSet();
-      if (options['resourceFilterType'] == 'labels') {
+      if (options.resourceFilterType == 'labels') {
         final valid = labels.intersection(tasks.expand(taskLabels).toSet());
         return tasks
             .where(
@@ -229,21 +229,18 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
           .toList();
     }
     final selected = widget.slot.id == 'team'
-        ? options['teamProjectIds'] ??
-              (options['teamProjectId'] != null &&
-                      options['teamProjectId'] != 'all'
-                  ? [options['teamProjectId']]
+        ? options.teamProjectIds ??
+              (options.teamProjectId != null && options.teamProjectId != 'all'
+                  ? [options.teamProjectId!]
                   : [])
         : widget.slot.id == 'resource'
-        ? (options['resourceProjectId'] != null &&
-                  options['resourceProjectId'] != 'all'
-              ? [options['resourceProjectId']]
+        ? (options.resourceProjectId != null &&
+                  options.resourceProjectId != 'all'
+              ? [options.resourceProjectId!]
               : [])
-        : options['projectIds'] ??
-              (options['projectId'] != null ? [options['projectId']] : []);
-    final ids = (selected is List ? selected : [])
-        .map((e) => e.toString())
-        .toSet();
+        : options.projectIds ??
+              (options.projectId != null ? [options.projectId!] : []);
+    final ids = selected.map((e) => e.toString()).toSet();
     if (ids.isNotEmpty) {
       for (final project in flattenDashboardProjects(widget.projects)) {
         if (ids.contains(project.id)) {
@@ -396,7 +393,7 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
     }
     if (kind == 'mentions') {
       var entries = DashboardRepositoryImpl.items(data);
-      final selected = (widget.slot.options['projectIds'] as List? ?? [])
+      final selected = (widget.slot.options.projectIds as List? ?? [])
           .map((e) => e.toString())
           .toSet();
       if (selected.isNotEmpty) {
@@ -438,7 +435,7 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
         projects: widget.projects,
         projectRecords: DashboardRepositoryImpl.items(bundle[1]),
         trailing: widget.trailing,
-        initialProjectIds: (widget.slot.options['projectIds'] as List? ?? [])
+        initialProjectIds: (widget.slot.options.projectIds as List? ?? [])
             .map((id) => id.toString())
             .toList(),
         onOpenTask: (id) => _openTask(id),
@@ -452,8 +449,8 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
         metadata: dashboardObject(bundle[1]),
         projects: widget.projects,
         userId: widget.userId,
-        initialMode: widget.slot.options['mode']?.toString() ?? 'column',
-        initialProjectIds: (widget.slot.options['projectIds'] as List? ?? [])
+        initialMode: widget.slot.options.mode?.toString() ?? 'column',
+        initialProjectIds: (widget.slot.options.projectIds as List? ?? [])
             .map((id) => id.toString())
             .toList(),
         trailing: widget.trailing,
@@ -479,7 +476,7 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
         key: ValueKey('${widget.workspaceId}:${widget.slot.instanceId}'),
         tasks: DashboardRepositoryImpl.items(data),
         projects: widget.projects,
-        initialProjectIds: (widget.slot.options['projectIds'] as List? ?? [])
+        initialProjectIds: (widget.slot.options.projectIds as List? ?? [])
             .map((id) => id.toString())
             .toList(),
         trailing: widget.trailing,

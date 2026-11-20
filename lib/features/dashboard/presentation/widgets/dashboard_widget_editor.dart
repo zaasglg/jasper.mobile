@@ -6,7 +6,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_action_menu.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../projects/data/models/project_model.dart';
-import '../../data/dashboard_layout.dart';
+import '../../domain/entities/dashboard_widget_slot.dart';
+import '../../domain/entities/dashboard_widget_definition.dart';
 import '../cubit/dashboard_layout_cubit.dart';
 import 'dashboard_widget_panel.dart';
 
@@ -102,25 +103,25 @@ Future<void> showDashboardWidgetSettings(
       ? 'half'
       : slot.size;
   Map<String, dynamic> resourceChanges = {};
-  var mode = slot.options['mode'] == 'epic' ? 'epic' : 'column';
+  var mode = slot.options.mode == 'epic' ? 'epic' : 'column';
   final projectKey = slot.id == 'team' ? 'teamProjectIds' : 'projectIds';
   final original =
-      slot.options[projectKey] ??
+      (projectKey == 'teamProjectIds'
+          ? slot.options.teamProjectIds
+          : slot.options.projectIds) ??
       (slot.id == 'resource'
-          ? (slot.options['resourceProjectId'] == null ||
-                    slot.options['resourceProjectId'] == 'all'
+          ? (slot.options.resourceProjectId == null ||
+                    slot.options.resourceProjectId == 'all'
                 ? []
-                : [slot.options['resourceProjectId']])
-          : slot.options['projectId'] != null
-          ? [slot.options['projectId']]
+                : [slot.options.resourceProjectId!])
+          : slot.options.projectId != null
+          ? [slot.options.projectId!]
           : slot.id == 'team' &&
-                slot.options['teamProjectId'] != null &&
-                slot.options['teamProjectId'] != 'all'
-          ? [slot.options['teamProjectId']]
+                slot.options.teamProjectId != null &&
+                slot.options.teamProjectId != 'all'
+          ? [slot.options.teamProjectId!]
           : []);
-  final selected = (original is List ? original : [])
-      .map((e) => e.toString())
-      .toSet();
+  final selected = original.map((e) => e.toString()).toSet();
   final canFilter = [
     'kpi-group',
     'tasks-summary',

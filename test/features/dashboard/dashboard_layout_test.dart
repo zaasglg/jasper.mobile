@@ -1,14 +1,18 @@
+import 'package:jospar/features/dashboard/data/models/dashboard_layout_dto.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/dashboard/data/dashboard_layout.dart';
+import 'package:jospar/features/dashboard/domain/entities/dashboard_layout.dart';
 import 'package:jospar/features/dashboard/data/dashboard_repository_impl.dart';
 import 'package:jospar/features/dashboard/domain/dashboard_repository.dart';
 import 'package:jospar/features/dashboard/presentation/cubit/dashboard_layout_cubit.dart';
 
-DashboardLayout fixture() => DashboardLayout.parse({
+DashboardLayout parseLayout(dynamic value) =>
+    DashboardLayoutDto.parse(value).toEntity();
+
+DashboardLayout fixture() => parseLayout({
   'layout': {
     'version': 2,
     'unknown': {'keep': true},
@@ -73,27 +77,34 @@ void main() {
       {'layout': ' \n\t '},
       {'layout': 'null'},
     ]) {
-      expect(DashboardLayout.parse(value), defaults);
+      expect(parseLayout(value), defaults);
     }
   });
 
   test('legacy dashboard configs use web defaults', () {
-    expect(() => DashboardLayout.parse('{broken'), throwsFormatException);
+    expect(() => parseLayout('{broken'), throwsFormatException);
     for (final value in <dynamic>[
       {},
       {'layout': {}},
       {'widgets': 'invalid'},
     ]) {
-      expect(DashboardLayout.parse(value), DashboardLayout.defaults());
+      expect(parseLayout(value), DashboardLayout.defaults());
     }
-    expect(DashboardLayout.parse(jsonEncode(fixture().extra)), fixture());
+    expect(
+      parseLayout(
+        jsonEncode(DashboardLayoutDto.fromEntity(fixture()).toJson()),
+      ),
+      fixture(),
+    );
   });
 
   test(
     'switching to a workspace with an empty API response loads defaults',
     () async {
       final adapter = DashboardAdapter()
-        ..configResponseBody = jsonEncode({'layout': fixture().extra});
+        ..configResponseBody = jsonEncode({
+          'layout': DashboardLayoutDto.fromEntity(fixture()).toJson(),
+        });
       final cubit = DashboardLayoutCubit(
         DashboardRepositoryImpl(Dio()..httpClientAdapter = adapter),
       );
@@ -151,29 +162,33 @@ void main() {
   test(
     'uses web defaults and normalizes legacy layouts without losing unknown preferences',
     () {
-      expect(DashboardLayout.parse(null).widgets.length, 10);
+      expect(parseLayout(null).widgets.length, 10);
       final layout = fixture();
       expect(layout.ordered.first.instanceId, 'resource-custom');
       expect(
         layout.widgets
             .firstWhere((e) => e.instanceId == 'scrum-custom')
-            .options['mode'],
+            .options
+            .mode,
         'epic',
       );
-      expect(layout.toJson()['unknown'], {'keep': true});
+      expect(DashboardLayoutDto.fromEntity(layout).toJson()['unknown'], {
+        'keep': true,
+      });
       expect(
         layout.widgets
             .firstWhere((e) => e.id == 'future-widget')
-            .options['extra'],
+            .options
+            .unknownOptions['extra'],
         42,
       );
-      final legacy = DashboardLayout.parse([
+      final legacy = parseLayout([
         {'id': 'my-tasks', 'visible': false},
       ]);
       expect(legacy.widgets.first.instanceId, 'my-tasks');
       expect(legacy.widgets.first.visible, false);
       expect(legacy.widgets.any((e) => e.id == 'daily-motivation'), true);
-      expect(DashboardLayout.parse({'layout': {}}), DashboardLayout.defaults());
+      expect(parseLayout({'layout': {}}), DashboardLayout.defaults());
     },
   );
   test(
@@ -194,11 +209,12 @@ void main() {
         (old.layouts['md'] as List).first,
       );
       expect(next.ordered.first.instanceId, 'scrum-custom');
-      expect(next.widgets.first.options['custom'], 'keep');
+      expect(next.widgets.first.options.unknownOptions['custom'], 'keep');
       expect(
         next.widgets
             .firstWhere((e) => e.id == 'resource')
-            .options['resourceNamesByProject'],
+            .options
+            .resourceNamesByProject,
         {
           'p': ['["План","Факт"]'],
         },
@@ -305,7 +321,12 @@ void main() {
       expect(await cubit.save(), true);
       expect(cubit.state.editing, false);
       expect(repository.saved.single.$1, 'w');
-      expect(repository.saved.single.$2.toJson()['version'], 2);
+      expect(
+        DashboardLayoutDto.fromEntity(
+          repository.saved.single.$2,
+        ).toJson()['version'],
+        2,
+      );
       await cubit.close();
     },
   );
@@ -318,7 +339,7 @@ void main() {
       cubit.enterEdit();
       cubit.update('my-tasks', {'visible': false});
       repository.value = repository.value.copyWith(
-        extra: {'changedElsewhere': true},
+        unknownExtra: {'changedElsewhere': true},
       );
       expect(await cubit.save(), false);
       expect(repository.saved, isEmpty);
@@ -427,7 +448,7 @@ class FakeDashboardRepository implements DashboardRepository {
   ) async {
     if (fail) throw const DashboardException('Не удалось сохранить');
     saved.add((workspaceId, layout));
-    return value = DashboardLayout.parse(layout.toJson());
+    return value = parseLayout(DashboardLayoutDto.fromEntity(layout).toJson());
   }
 
   @override

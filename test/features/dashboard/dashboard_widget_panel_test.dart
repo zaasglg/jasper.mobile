@@ -1,9 +1,10 @@
+import 'package:jospar/features/dashboard/domain/entities/dashboard_widget_options.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/dashboard/data/dashboard_layout.dart';
+import 'package:jospar/features/dashboard/domain/entities/dashboard_widget_slot.dart';
 import 'package:jospar/features/dashboard/presentation/cubit/dashboard_layout_cubit.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_widget_panel.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_collapsible_widget.dart';
@@ -188,7 +189,7 @@ void main() {
                     slot: const DashboardWidgetSlot(
                       id: 'tasks-summary',
                       instanceId: 's',
-                      options: {'mode': 'epic'},
+                      options: DashboardWidgetOptions(mode: 'epic'),
                     ),
                     projects: const [project],
                     workspaceId: 'w',
@@ -264,10 +265,7 @@ void main() {
       const DashboardWidgetSlot(
         id: 'tasks-summary',
         instanceId: 's',
-        options: {
-          'mode': 'epic',
-          'projectIds': ['p'],
-        },
+        options: DashboardWidgetOptions(mode: 'epic', projectIds: ['p']),
       ),
     );
     expect(find.text('Строительство'), findsOneWidget);
@@ -284,13 +282,13 @@ void main() {
       const DashboardWidgetSlot(
         id: 'resource',
         instanceId: 'r',
-        options: {
-          'resourceProjectId': 'p',
-          'resourceModeByProject': {'p': 'selected'},
-          'resourceNamesByProject': {
+        options: DashboardWidgetOptions(
+          resourceProjectId: 'p',
+          resourceModeByProject: {'p': 'selected'},
+          resourceNamesByProject: {
             'p': ['["Бюджет","Расход"]'],
           },
-        },
+        ),
       ),
     );
     expect(find.text('Бюджет / Расход'), findsOneWidget);
@@ -345,9 +343,7 @@ void main() {
         const DashboardWidgetSlot(
           id: 'mentions',
           instanceId: 'm',
-          options: {
-            'projectIds': ['p'],
-          },
+          options: DashboardWidgetOptions(projectIds: ['p']),
         ),
       );
       expect(find.text('Проверить смету'), findsOneWidget);

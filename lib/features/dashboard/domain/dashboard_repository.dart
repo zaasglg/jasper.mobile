@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import '../data/dashboard_layout.dart';
+import 'entities/dashboard_layout.dart';
 
 abstract interface class DashboardRepository {
   Future<DashboardLayout> load(String workspaceId, {CancelToken? cancelToken});

@@ -1,3 +1,4 @@
+import '../../domain/entities/dashboard_widget_options.dart';
 import 'dart:convert';
 import 'dashboard_widget_skeleton.dart';
 import 'dashboard_selector.dart';
@@ -19,7 +20,7 @@ class DashboardResourceOptions extends StatefulWidget {
   final DashboardLayoutCubit cubit;
   final List<ProjectModel> projects;
   final String projectId;
-  final Map<String, dynamic> options;
+  final DashboardWidgetOptions options;
   final ValueChanged<Map<String, dynamic>> onChanged;
   @override
   State<DashboardResourceOptions> createState() =>
@@ -41,13 +42,13 @@ class _DashboardResourceOptionsState extends State<DashboardResourceOptions> {
           'projects',
           'labels',
           'epics',
-        ].contains(widget.options['resourceFilterType'])
-        ? widget.options['resourceFilterType'] as String
+        ].contains(widget.options.resourceFilterType)
+        ? widget.options.resourceFilterType as String
         : 'projects';
-    _labels = _set(widget.options['resourceLabelKeys']);
-    _epics = _set(widget.options['resourceEpicIds']);
-    _modes = dashboardObject(widget.options['resourceModeByProject']);
-    _namesByProject = dashboardObject(widget.options['resourceNamesByProject']);
+    _labels = _set(widget.options.resourceLabelKeys);
+    _epics = _set(widget.options.resourceEpicIds);
+    _modes = dashboardObject(widget.options.resourceModeByProject);
+    _namesByProject = dashboardObject(widget.options.resourceNamesByProject);
     _projectOptions();
     _load();
   }
@@ -64,7 +65,7 @@ class _DashboardResourceOptionsState extends State<DashboardResourceOptions> {
         ? mode as String
         : 'all';
     _names = _set(
-      _namesByProject[widget.projectId] ?? widget.options['resourceNames'],
+      _namesByProject[widget.projectId] ?? widget.options.resourceNames,
     );
     _notify();
   }

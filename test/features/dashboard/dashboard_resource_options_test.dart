@@ -1,3 +1,4 @@
+import 'package:jospar/features/dashboard/domain/entities/dashboard_widget_options.dart';
 import 'package:flutter/material.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_selector.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,14 +30,14 @@ void main() {
                     cubit: cubit,
                     projects: const [],
                     projectId: project,
-                    options: const {
-                      'resourceFilterType': 'projects',
-                      'resourceModeByProject': {'p1': 'all', 'p2': 'all'},
-                      'resourceNamesByProject': {
+                    options: const DashboardWidgetOptions(
+                      resourceFilterType: 'projects',
+                      resourceModeByProject: {'p1': 'all', 'p2': 'all'},
+                      resourceNamesByProject: {
                         'p1': ['["План","Факт"]'],
                         'p2': [],
                       },
-                    },
+                    ),
                     onChanged: (value) => changes = value,
                   ),
                 ],

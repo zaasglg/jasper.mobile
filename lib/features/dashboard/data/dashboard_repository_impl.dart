@@ -1,8 +1,9 @@
+import 'models/dashboard_layout_dto.dart';
 import '../../tasks/domain/utils/task_column_label.dart';
 import '../../tasks/data/models/kanban_column_model.dart';
 import 'package:dio/dio.dart';
 import '../domain/dashboard_repository.dart';
-import 'dashboard_layout.dart';
+import '../domain/entities/dashboard_layout.dart';
 
 class DashboardRepositoryImpl implements DashboardRepository {
   const DashboardRepositoryImpl(this.dio);
@@ -13,14 +14,14 @@ class DashboardRepositoryImpl implements DashboardRepository {
   Future<DashboardLayout> load(
     String workspaceId, {
     CancelToken? cancelToken,
-  }) async => DashboardLayout.parse(
+  }) async => DashboardLayoutDto.parse(
     (await dio.get<dynamic>(
       'dashboard/config',
       queryParameters: {'workspaceId': workspaceId},
       options: options(workspaceId),
       cancelToken: cancelToken,
     )).data,
-  );
+  ).toEntity();
   @override
   Future<DashboardLayout> save(
     String workspaceId,
@@ -28,10 +29,13 @@ class DashboardRepositoryImpl implements DashboardRepository {
   ) async {
     final response = await dio.put<dynamic>(
       'dashboard/config',
-      data: {'workspaceId': workspaceId, 'layout': layout.toJson()},
+      data: {
+        'workspaceId': workspaceId,
+        'layout': DashboardLayoutDto.fromEntity(layout).toJson(),
+      },
       options: options(workspaceId),
     );
-    return DashboardLayout.parse(response.data);
+    return DashboardLayoutDto.parse(response.data).toEntity();
   }
 
   static List<Map<String, dynamic>> items(dynamic data) {

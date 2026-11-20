@@ -68,3 +68,19 @@ SpaceMember.lastActiveAt — формат не установлен (ISO или 
 - `lib/features/storage/presentation/messenger_storage_screen.dart` использует `features/chat/data/models/chat_conversation_model.dart`; заменить на domain-сущность при шаге chat.
 
 `StorageException` уже находится в domain.
+
+## Dashboard: типизированные настройки и сохранение расширений
+
+`DashboardWidgetOptions` содержит явные поля `mode`, `projectId`, `projectIds`, `teamProjectId`, `teamProjectIds`, `resourceProjectId`, `resourceFilterType`, `resourceLabelKeys`, `resourceEpicIds`, `resourceNames`, `resourceModeByProject`, `resourceNamesByProject`. До разделения найдено 21 прямое чтение options и ещё 23 чтения через локальные options/_options; есть чтения по переменному ключу.
+
+- `DashboardWidgetOptions.unknownOptions: Map<String, dynamic>` сохраняет неизвестные параметры, включая проверяемые тестами `custom`, `extra`, `remote`. Отдельной задачей типизировать параметры новых виджетов после определения контракта; не удалять непрочитанные значения при сохранении.
+- `DashboardLayout.unknownExtra: Map<String, dynamic>` содержит только неизвестные верхнеуровневые настройки (`unknown`, `changedElsewhere` в тестах). Известные `version/widgets/layouts` собирает DTO; дублировать их в domain-карте нельзя.
+- `DashboardLayout.layouts: Map<String, dynamic>` намеренно сохраняет произвольные breakpoint'ы. Алгоритм меняет `sm/md/lg`, но остальные ключи и дополнительные grid-поля должны проходить без потерь. Известные координаты: `i/x/y/w/h/minW/minH/maxH`; тесты проверяют `customGrid`. Отдельной задачей согласовать полный контракт breakpoint'ов и grid-расширений и ввести типизированную сетку с сохранением расширений.
+
+## Dashboard: presentation → data
+
+- `presentation/widgets/dashboard_widget_panel.dart` → `data/dashboard_repository_impl.dart` (`DashboardRepositoryImpl.items`) и `data/mentions_read_storage.dart`: разбор API-списков перенести за domain-интерфейс; для отметок прочтения выделить интерфейс хранилища.
+- `presentation/screens/dashboard_screen.dart` → `features/assistant/data/services/assistant_task_changes.dart`: заменить конкретный канал изменений domain-контрактом уведомлений.
+- Импорты моделей projects, planner и tasks из data в presentation остаются до соответствующих шагов разделения сущностей; не объединять их рефакторинг с dashboard.
+
+`DashboardException` уже находится в domain.

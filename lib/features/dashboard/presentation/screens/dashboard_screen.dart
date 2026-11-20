@@ -8,7 +8,7 @@ import '../../../tasks/data/models/task_creation_models.dart';
 import '../../../tasks/presentation/cubit/my_tasks_state.dart';
 import '../../../projects/data/models/project_model.dart';
 import 'dart:async';
-import '../../data/dashboard_layout.dart';
+import '../../domain/entities/dashboard_widget_slot.dart';
 import '../cubit/dashboard_layout_cubit.dart';
 import '../widgets/dashboard_widget_editor.dart';
 import '../widgets/dashboard_edit_toolbar.dart';

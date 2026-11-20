@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:jospar/core/di/service_locator.dart';
-import 'package:jospar/features/dashboard/data/dashboard_layout.dart';
+import 'package:jospar/features/dashboard/domain/entities/dashboard_layout.dart';
 import 'package:jospar/features/dashboard/presentation/cubit/dashboard_layout_cubit.dart';
 import 'package:jospar/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:jospar/features/inbox/domain/repositories/inbox_repository.dart';

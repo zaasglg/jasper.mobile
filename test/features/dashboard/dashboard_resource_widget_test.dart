@@ -1,3 +1,5 @@
+import 'package:jospar/features/dashboard/presentation/utils/dashboard_options_changes.dart';
+import 'package:jospar/features/dashboard/domain/entities/dashboard_widget_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_resource_widget.dart';
@@ -28,7 +30,7 @@ void main() {
                     end: null,
                   ),
                 ],
-                options: const {},
+                options: const DashboardWidgetOptions(),
                 onChanged: (patch) async {
                   patches.add(patch);
                   return true;
@@ -139,14 +141,13 @@ void main() {
             .map(
               (slot) => slot.instanceId == 'resource-custom'
                   ? slot.copyWith(
-                      options: {
-                        ...slot.options,
+                      options: patchDashboardOptions(slot.options, {
                         'resourceModeByProject': {
                           'p': 'selected',
                           'q': 'tasks',
                         },
                         'remote': 'keep',
-                      },
+                      }),
                     )
                   : slot,
             )
@@ -165,11 +166,11 @@ void main() {
       final resource = saved.widgets.firstWhere(
         (s) => s.instanceId == 'resource-custom',
       );
-      expect(resource.options['resourceModeByProject'], {
+      expect(resource.options.resourceModeByProject, {
         'p': 'all',
         'q': 'tasks',
       });
-      expect(resource.options['remote'], 'keep');
+      expect(resource.options.unknownOptions['remote'], 'keep');
       expect(
         saved.widgets.firstWhere((s) => s.instanceId == 'future'),
         latest.widgets.firstWhere((s) => s.instanceId == 'future'),
@@ -214,7 +215,7 @@ void main() {
                   end: null,
                 ),
               ],
-              options: const {},
+              options: const DashboardWidgetOptions(),
               onChanged: (patch) async {
                 patches.add(patch);
                 return true;

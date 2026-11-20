@@ -1,3 +1,5 @@
+import '../utils/dashboard_options_changes.dart';
+import '../../domain/entities/dashboard_widget_options.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_selector.dart';
@@ -34,7 +36,7 @@ class DashboardResourceWidget extends StatefulWidget {
   });
   final List<Map<String, dynamic>> tasks;
   final List<ProjectModel> projects;
-  final Map<String, dynamic> options;
+  final DashboardWidgetOptions options;
   final String size;
   final Widget? trailing;
   final Future<bool> Function(Map<String, dynamic>) onChanged;
@@ -102,15 +104,12 @@ class ResourceEmptyState extends StatelessWidget {
 }
 
 class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
-  late Map<String, dynamic> _options = {...widget.options};
+  late DashboardWidgetOptions _options = widget.options;
   bool _saving = false;
-  String get _projectId => _options['resourceProjectId']?.toString() ?? 'all';
-  String get _filter =>
-      _options['resourceFilterType']?.toString() ?? 'projects';
+  String get _projectId => _options.resourceProjectId?.toString() ?? 'all';
+  String get _filter => _options.resourceFilterType?.toString() ?? 'projects';
   String get _mode =>
-      dashboardObject(
-        _options['resourceModeByProject'],
-      )[_projectId]?.toString() ??
+      dashboardObject(_options.resourceModeByProject)[_projectId]?.toString() ??
       'all';
   int get _limit => widget.size == 'full'
       ? 12
@@ -120,14 +119,14 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
   Set<String> _set(dynamic value) =>
       value is List ? value.map((e) => e.toString()).toSet() : {};
   Set<String> get _names => _set(
-    dashboardObject(_options['resourceNamesByProject'])[_projectId] ??
-        _options['resourceNames'],
+    dashboardObject(_options.resourceNamesByProject)[_projectId] ??
+        _options.resourceNames,
   );
   @override
   void didUpdateWidget(covariant DashboardResourceWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.options != widget.options && !_saving) {
-      _options = {...widget.options};
+      _options = widget.options;
     }
   }
 
@@ -136,7 +135,7 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
     final previous = _options;
     setState(() {
       _saving = true;
-      _options = {..._options, ...patch};
+      _options = patchDashboardOptions(_options, patch);
     });
     final success = await widget.onChanged(patch);
     if (!mounted) return;
@@ -251,7 +250,9 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
         : flattenDashboardProjects([selected]).map((p) => p.id).toSet();
     final available = _filter == 'labels' ? _labels : _epics;
     final values = _set(
-      _options[_filter == 'labels' ? 'resourceLabelKeys' : 'resourceEpicIds'],
+      (_filter == 'labels'
+          ? _options.resourceLabelKeys
+          : _options.resourceEpicIds),
     ).intersection(available.keys.toSet());
     return widget.tasks.where((task) {
       if (task['archived'] == true) return false;
@@ -389,11 +390,11 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
     if (result == null || !mounted) return;
     await _apply({
       'resourceModeByProject': {
-        ...dashboardObject(_options['resourceModeByProject']),
+        ...dashboardObject(_options.resourceModeByProject),
         _projectId: result.mode,
       },
       'resourceNamesByProject': {
-        ...dashboardObject(_options['resourceNamesByProject']),
+        ...dashboardObject(_options.resourceNamesByProject),
         _projectId: result.names,
       },
     });
@@ -402,7 +403,11 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
   Future<void> _selectionPicker() async {
     final available = _filter == 'labels' ? _labels : _epics;
     final key = _filter == 'labels' ? 'resourceLabelKeys' : 'resourceEpicIds';
-    final selected = _set(_options[key]).intersection(available.keys.toSet());
+    final selected = _set(
+      (key == 'resourceLabelKeys'
+          ? _options.resourceLabelKeys
+          : _options.resourceEpicIds),
+    ).intersection(available.keys.toSet());
     final entries = available.entries.toList()
       ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
     final result = await showModalBottomSheet<List<String>>(
@@ -558,11 +563,11 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
     ids.insert(newIndex, ids.removeAt(oldIndex));
     await _apply({
       'resourceModeByProject': {
-        ...dashboardObject(_options['resourceModeByProject']),
+        ...dashboardObject(_options.resourceModeByProject),
         _projectId: 'selected',
       },
       'resourceNamesByProject': {
-        ...dashboardObject(_options['resourceNamesByProject']),
+        ...dashboardObject(_options.resourceNamesByProject),
         _projectId: ids,
       },
     });
@@ -711,7 +716,9 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
       widget.projects,
     ).where((p) => p.id == _projectId).firstOrNull;
     final selectedLabelCount = _set(
-      _options[_filter == 'labels' ? 'resourceLabelKeys' : 'resourceEpicIds'],
+      (_filter == 'labels'
+          ? _options.resourceLabelKeys
+          : _options.resourceEpicIds),
     ).length;
     final selectionLabel = _filter == 'projects'
         ? project?.name ?? 'Все проекты'

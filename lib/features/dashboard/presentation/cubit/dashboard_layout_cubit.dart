@@ -1,7 +1,10 @@
+import '../utils/dashboard_options_changes.dart';
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../data/dashboard_layout.dart';
+import '../../domain/entities/dashboard_layout.dart';
+import '../../domain/entities/dashboard_widget_slot.dart';
+import '../../domain/entities/dashboard_widget_definition.dart';
 import '../../domain/dashboard_repository.dart';
 
 class DashboardLayoutState extends Equatable {
@@ -200,7 +203,7 @@ class DashboardLayoutCubit extends Cubit<DashboardLayoutState> {
           .map(
             (slot) => slot.instanceId != instanceId
                 ? slot
-                : DashboardWidgetSlot.fromJson({...slot.toJson(), ...changes}),
+                : patchDashboardSlot(slot, changes),
           )
           .toList(),
       resized: changes.containsKey('height') ? {instanceId} : {},
@@ -287,12 +290,14 @@ class DashboardLayoutCubit extends Cubit<DashboardLayoutState> {
           ]) {
             if (changes[key] is Map) {
               patch[key] = {
-                ...(slot.options[key] as Map? ?? {}),
+                ...(key == 'resourceModeByProject'
+                    ? slot.options.resourceModeByProject ?? {}
+                    : slot.options.resourceNamesByProject ?? {}),
                 ...changes[key] as Map,
               };
             }
           }
-          return DashboardWidgetSlot.fromJson({...slot.toJson(), ...patch});
+          return patchDashboardSlot(slot, patch);
         }).toList(),
       );
     }

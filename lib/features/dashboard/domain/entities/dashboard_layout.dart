@@ -1,152 +1,22 @@
-import 'dart:convert';
 import 'package:equatable/equatable.dart';
-
-class DashboardWidgetDefinition {
-  const DashboardWidgetDefinition(
-    this.id,
-    this.title,
-    this.description, {
-    this.duplicable = false,
-    this.rows = 14,
-  });
-  final String id, title, description;
-  final bool duplicable;
-  final int rows;
-  bool get available => id != 'calendar';
-  static const all = [
-    DashboardWidgetDefinition(
-      'daily-motivation',
-      'AI',
-      'Фокус дня и рекомендации',
-      rows: 11,
-    ),
-    DashboardWidgetDefinition(
-      'kpi-group',
-      'KPI-показатели',
-      'Обзор проектов и задач',
-    ),
-    DashboardWidgetDefinition(
-      'tasks-summary',
-      'Скрам',
-      'Прогресс по колонкам и эпикам',
-      duplicable: true,
-    ),
-    DashboardWidgetDefinition(
-      'activity',
-      'Активность',
-      'Последние события workspace',
-    ),
-    DashboardWidgetDefinition(
-      'my-tasks',
-      'Мои задачи',
-      'Назначенные мне задачи',
-      rows: 15,
-    ),
-    DashboardWidgetDefinition(
-      'team',
-      'Команда',
-      'Участники и нагрузка',
-      duplicable: true,
-      rows: 15,
-    ),
-    DashboardWidgetDefinition('mentions', 'Упоминания', 'Упоминания и реакции'),
-    DashboardWidgetDefinition(
-      'calendar',
-      'Ежедневник',
-      'Запланированные дела',
-      rows: 16,
-    ),
-    DashboardWidgetDefinition(
-      'resource',
-      'Ресурс',
-      'План и факт по ресурсам',
-      duplicable: true,
-      rows: 20,
-    ),
-    DashboardWidgetDefinition(
-      'task-map',
-      'Карта',
-      'Местоположения задач',
-      duplicable: true,
-      rows: 20,
-    ),
-  ];
-  static DashboardWidgetDefinition? find(String id) {
-    for (final value in all) {
-      if (value.id == id) return value;
-    }
-    return null;
-  }
-}
-
-class DashboardWidgetSlot extends Equatable {
-  const DashboardWidgetSlot({
-    required this.id,
-    required this.instanceId,
-    this.visible = true,
-    this.size = 'half',
-    this.height,
-    this.options = const {},
-  });
-  final String id, instanceId, size;
-  final bool visible;
-  final double? height;
-  final Map<String, dynamic> options;
-  DashboardWidgetDefinition? get definition =>
-      DashboardWidgetDefinition.find(id);
-  factory DashboardWidgetSlot.fromJson(Map<String, dynamic> json) =>
-      DashboardWidgetSlot(
-        id: json['id']?.toString() ?? '',
-        instanceId: (json['instanceId'] ?? json['id'])?.toString() ?? '',
-        visible: json['visible'] != false,
-        size: ['full', 'half', 'third'].contains(json['size'])
-            ? json['size'] as String
-            : 'half',
-        height: (json['height'] as num?)?.toDouble().clamp(180, 900),
-        options: Map<String, dynamic>.from(json),
-      );
-  Map<String, dynamic> toJson() => {
-    ...options,
-    'id': id,
-    'instanceId': instanceId,
-    'visible': visible,
-    'size': size,
-    if (height != null) 'height': height,
-  };
-  DashboardWidgetSlot copyWith({
-    String? id,
-    String? instanceId,
-    bool? visible,
-    String? size,
-    double? height,
-    Map<String, dynamic>? options,
-  }) => DashboardWidgetSlot(
-    id: id ?? this.id,
-    instanceId: instanceId ?? this.instanceId,
-    visible: visible ?? this.visible,
-    size: size ?? this.size,
-    height: height ?? this.height,
-    options: options ?? this.options,
-  );
-  @override
-  List<Object?> get props => [id, instanceId, visible, size, height, options];
-}
+import 'dashboard_widget_slot.dart';
+import 'dashboard_widget_options.dart';
 
 class DashboardLayout extends Equatable {
   const DashboardLayout({
     required this.widgets,
     this.layouts = const {},
-    this.extra = const {},
+    this.unknownExtra = const {},
   });
   final List<DashboardWidgetSlot> widgets;
-  final Map<String, dynamic> layouts, extra;
+  final Map<String, dynamic> layouts, unknownExtra;
   static DashboardLayout defaults() => DashboardLayout(
     widgets: [
       const DashboardWidgetSlot(
         id: 'task-map',
         instanceId: 'task-map',
         visible: false,
-        options: {'projectIds': []},
+        options: DashboardWidgetOptions(projectIds: []),
       ),
       const DashboardWidgetSlot(
         id: 'daily-motivation',
@@ -161,7 +31,7 @@ class DashboardLayout extends Equatable {
       const DashboardWidgetSlot(
         id: 'tasks-summary',
         instanceId: 'tasks-summary',
-        options: {'projectIds': [], 'mode': 'column'},
+        options: DashboardWidgetOptions(projectIds: [], mode: 'column'),
       ),
       const DashboardWidgetSlot(id: 'activity', instanceId: 'activity'),
       const DashboardWidgetSlot(id: 'my-tasks', instanceId: 'my-tasks'),
@@ -171,70 +41,25 @@ class DashboardLayout extends Equatable {
         instanceId: 'team',
         size: 'full',
         visible: false,
-        options: {'teamProjectId': 'all'},
+        options: DashboardWidgetOptions(teamProjectId: 'all'),
       ),
       const DashboardWidgetSlot(id: 'calendar', instanceId: 'calendar'),
       const DashboardWidgetSlot(
         id: 'resource',
         instanceId: 'resource',
         size: 'third',
-        options: {
-          'resourceProjectId': 'all',
-          'resourceFilterType': 'projects',
-          'resourceNamesByProject': {},
-          'resourceModeByProject': {},
-          'resourceLabelKeys': [],
-          'resourceEpicIds': [],
-          'resourceNames': [],
-        },
+        options: DashboardWidgetOptions(
+          resourceProjectId: 'all',
+          resourceFilterType: 'projects',
+          resourceNamesByProject: {},
+          resourceModeByProject: {},
+          resourceLabelKeys: [],
+          resourceEpicIds: [],
+          resourceNames: [],
+        ),
       ),
     ],
   );
-  factory DashboardLayout.fromJson(Map<String, dynamic> json) =>
-      DashboardLayout.parse(json);
-  static DashboardLayout parse(dynamic value) {
-    if (value is String) {
-      // Workspaces without saved settings can return an empty HTTP 200 body.
-      if (value.trim().isEmpty) return defaults();
-      value = jsonDecode(value);
-    }
-    if (value == null) return defaults();
-    if (value is Map && value.containsKey('layout')) {
-      return parse(value['layout']);
-    }
-    final raw = value is Map
-        ? Map<String, dynamic>.from(value)
-        : <String, dynamic>{};
-    final values = value is List ? value : raw['widgets'];
-    if (values is! List) {
-      // Match the web client's parseSavedConfig fallback for legacy configs.
-      return defaults();
-    }
-    final ids = <String>{};
-    final slots = values
-        .whereType<Map>()
-        .map((e) => DashboardWidgetSlot.fromJson(Map<String, dynamic>.from(e)))
-        .where(
-          (e) =>
-              e.id.isNotEmpty &&
-              e.instanceId.isNotEmpty &&
-              ids.add(e.instanceId),
-        )
-        .toList();
-    for (final slot in defaults().widgets) {
-      if (slot.definition?.duplicable != true &&
-          !slots.any((e) => e.id == slot.id)) {
-        slots.add(slot);
-      }
-    }
-    return DashboardLayout(
-      widgets: slots,
-      layouts: raw['layouts'] is Map
-          ? Map<String, dynamic>.from(raw['layouts'] as Map)
-          : {},
-      extra: raw,
-    );
-  }
 
   /// Mobile order is the web's single-column sm layout; desktop coordinates survive.
   List<DashboardWidgetSlot> get ordered {
@@ -390,21 +215,15 @@ class DashboardLayout extends Equatable {
     return copyWith(widgets: next, layouts: grid);
   }
 
-  Map<String, dynamic> toJson() => {
-    ...extra,
-    'version': 2,
-    'widgets': widgets.map((e) => e.toJson()).toList(),
-    'layouts': layouts,
-  };
   DashboardLayout copyWith({
     List<DashboardWidgetSlot>? widgets,
     Map<String, dynamic>? layouts,
-    Map<String, dynamic>? extra,
+    Map<String, dynamic>? unknownExtra,
   }) => DashboardLayout(
     widgets: widgets ?? this.widgets,
     layouts: layouts ?? this.layouts,
-    extra: extra ?? this.extra,
+    unknownExtra: unknownExtra ?? this.unknownExtra,
   );
   @override
-  List<Object?> get props => [widgets, layouts, extra];
+  List<Object?> get props => [widgets, layouts, unknownExtra];
 }
