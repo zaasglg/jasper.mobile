@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/widgets/user_avatar.dart';
-import '../data/collaboration_models.dart';
+import '../domain/entities/space_member.dart';
+import '../domain/entities/member_role.dart';
 
 /// Compact member directory with horizontally scrollable filters on phones.
 class WorkspaceParticipantsPanel extends StatefulWidget {
@@ -33,14 +34,11 @@ class _WorkspaceParticipantsPanelState
     if (member.access != 'GUEST' &&
         member.access != 'project' &&
         member.role != 'GUEST' &&
-        member.details['isGuest'] != true) {
+        member.isGuest != true) {
       return 0;
     }
-    final projects = member.details['projects'];
-    final count =
-        member.details['projectCount'] ??
-        (projects is List ? projects.length : null);
-    return count is num && count > 1 ? 2 : 1;
+    final count = member.projectCount ?? member.projects.length;
+    return count > 1 ? 2 : 1;
   }
 
   @override
@@ -131,32 +129,23 @@ class _WorkspaceParticipantsPanelState
                             color: theme.colorScheme.primary,
                           ),
                         ),
-                        if (member.details['lastActiveAt'] != null)
+                        if (member.lastActiveAt != null)
                           Text(
-                            'Последняя активность: ${member.details['lastActiveAt']}',
+                            'Последняя активность: ${member.lastActiveAt}',
                             style: theme.textTheme.bodySmall,
                           ),
-                        if (member.details['projects'] is List &&
-                            (member.details['projects'] as List).isNotEmpty)
+                        if (member.projects.isNotEmpty)
                           ExpansionTile(
                             tilePadding: EdgeInsets.zero,
                             title: Text(
-                              'Проекты · ${(member.details['projects'] as List).length}',
+                              'Проекты · ${member.projects.length}',
                               style: theme.textTheme.bodySmall,
                             ),
                             children: [
-                              for (final project
-                                  in member.details['projects'] as List)
+                              for (final project in member.projects)
                                 ListTile(
                                   dense: true,
-                                  title: Text(
-                                    project is Map
-                                        ? (project['name'] ??
-                                                  project['title'] ??
-                                                  'Проект')
-                                              .toString()
-                                        : project.toString(),
-                                  ),
+                                  title: Text(project.name),
                                 ),
                             ],
                           ),

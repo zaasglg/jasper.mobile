@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/collaboration/data/collaboration_models.dart';
+import 'package:jospar/features/collaboration/domain/entities/space_member.dart';
 import 'package:jospar/features/collaboration/presentation/workspace_participants_panel.dart';
 
 void main() {
@@ -23,7 +23,7 @@ void main() {
                   userId: '',
                   name: 'Гость',
                   access: 'GUEST',
-                  details: {'projectCount': 2},
+                  projectCount: 2,
                 ),
               ],
             ),

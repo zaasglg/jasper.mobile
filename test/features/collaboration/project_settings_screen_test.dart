@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:jospar/core/di/service_locator.dart';
-import 'package:jospar/features/collaboration/data/collaboration_models.dart';
+import 'package:jospar/features/collaboration/domain/entities/managed_space.dart';
+import 'package:jospar/features/collaboration/domain/entities/space_member.dart';
+import 'package:jospar/features/collaboration/domain/entities/space_kind.dart';
 import 'package:jospar/features/collaboration/domain/collaboration_repository.dart';
 import 'package:jospar/features/collaboration/presentation/space_management_screen.dart';
 
@@ -13,15 +15,7 @@ class _Repository implements CollaborationRepository {
   Map<String, dynamic>? saved;
   @override
   Future<ManagedSpace> getSpace(SpaceKind kind, String id) async =>
-      const ManagedSpace(
-        id: 'p',
-        name: 'Мой проект',
-        raw: {
-          'code': 'PR',
-          'start': '2026-01-01T00:00:00Z',
-          'end': '2026-12-31T00:00:00Z',
-        },
-      );
+      const ManagedSpace(id: 'p', name: 'Мой проект', code: 'PR');
   @override
   Future<List<SpaceMember>> members(SpaceKind kind, String id) async => [];
   @override

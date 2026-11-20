@@ -1,4 +1,6 @@
-import '../data/collaboration_models.dart';
+import 'entities/managed_space.dart';
+import 'entities/space_member.dart';
+import 'entities/space_kind.dart';
 
 abstract interface class CollaborationRepository {
   Future<ManagedSpace> getSpace(SpaceKind kind, String id);

@@ -8,7 +8,7 @@ import 'package:jospar/features/chat/domain/repositories/chat_repository.dart';
 import 'package:jospar/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:jospar/features/chat/presentation/cubit/conversation_cubit.dart';
 import 'package:jospar/features/chat/presentation/widgets/messenger_refresh_lifecycle.dart';
-import 'package:jospar/features/collaboration/data/collaboration_models.dart';
+import 'package:jospar/features/collaboration/domain/entities/space_member.dart';
 
 const conversation = ChatConversationModel(
   id: 'dm:a:b',

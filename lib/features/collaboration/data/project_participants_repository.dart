@@ -1,6 +1,7 @@
+import 'models/space_member_dto.dart';
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
-import 'collaboration_models.dart';
+import '../domain/entities/space_member.dart';
 import 'collaboration_repository_impl.dart';
 import '../domain/collaboration_repository.dart';
 
@@ -74,7 +75,11 @@ class ProjectParticipantsRepository {
     )).data!;
     return (
       members: (data['members'] as List)
-          .map((e) => SpaceMember.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+            (e) => SpaceMemberDto.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ).toEntity(),
+          )
           .toList(),
       invitations: (data['pendingInvites'] as List? ?? [])
           .map(

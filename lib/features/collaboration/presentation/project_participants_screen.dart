@@ -15,7 +15,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/widgets/app_dialog.dart';
 import '../../../core/widgets/user_avatar.dart';
-import '../data/collaboration_models.dart';
+import '../domain/entities/space_member.dart';
+import '../domain/entities/member_role.dart';
 import '../data/project_participants_repository.dart';
 import 'project_participants_cubit.dart';
 
@@ -326,8 +327,7 @@ class _AddParticipantState extends State<_AddParticipant> {
     });
     final cubit = context.read<ProjectParticipantsCubit>();
     try {
-      final workspaceId =
-          cubit.state.space!.raw['workspaceId']?.toString() ?? '';
+      final workspaceId = cubit.state.space!.workspaceId ?? '';
       if (workspaceId.isEmpty) throw const FormatException();
       final candidates = await cubit.repository.collaboration.candidates(
         workspaceId,

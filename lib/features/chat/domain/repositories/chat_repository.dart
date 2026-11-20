@@ -1,4 +1,4 @@
-import '../../../collaboration/data/collaboration_models.dart';
+import '../../../collaboration/domain/entities/space_member.dart';
 import '../../data/models/chat_conversation_model.dart';
 import '../../data/models/chat_message_model.dart';
 import '../../data/models/chat_interaction_models.dart';

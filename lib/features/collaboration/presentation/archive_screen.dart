@@ -7,7 +7,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/theme/app_icon_sizes.dart';
 import '../../../core/widgets/app_action_menu.dart';
-import '../data/collaboration_models.dart';
+import '../domain/entities/managed_space.dart';
+import '../domain/entities/space_kind.dart';
 import '../domain/collaboration_repository.dart';
 
 class ArchiveState extends Equatable {

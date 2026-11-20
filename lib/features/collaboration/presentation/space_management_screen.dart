@@ -15,7 +15,9 @@ import '../../../core/theme/app_icon_sizes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_action_menu.dart';
 import '../../../core/widgets/app_form_surface.dart';
-import '../data/collaboration_models.dart';
+import '../domain/entities/managed_space.dart';
+import '../domain/entities/space_kind.dart';
+import '../domain/entities/member_role.dart';
 import '../domain/collaboration_repository.dart';
 import 'collaboration_cubit.dart';
 import 'workspace_participants_panel.dart';
@@ -317,9 +319,7 @@ class _ManagementBody extends StatelessWidget {
   ) async {
     try {
       final candidates = await cubit.repository.candidates(
-        cubit.kind == SpaceKind.project
-            ? state.space!.raw['workspaceId']?.toString() ?? ''
-            : '',
+        cubit.kind == SpaceKind.project ? state.space!.workspaceId ?? '' : '',
       );
       if (!context.mounted) return;
       final available = candidates
@@ -393,19 +393,15 @@ class _SpaceFields extends StatefulWidget {
 
 class _SpaceFieldsState extends State<_SpaceFields> {
   late final _name = TextEditingController(text: widget.space.name);
-  late final _code = TextEditingController(
-    text: widget.space.raw['code']?.toString() ?? '',
-  );
+  late final _code = TextEditingController(text: widget.space.code ?? '');
   late final _description = TextEditingController(
-    text: widget.space.raw['description']?.toString() ?? '',
+    text: widget.space.description ?? '',
   );
   late final _color = TextEditingController(
-    text: widget.space.raw['color']?.toString() ?? '#6D5FE0',
+    text: widget.space.color ?? '#6D5FE0',
   );
-  late final _logo = TextEditingController(
-    text: widget.space.raw['logoUrl']?.toString() ?? '',
-  );
-  late bool _pinned = widget.space.raw['isPinned'] == true;
+  late final _logo = TextEditingController(text: widget.space.logoUrl ?? '');
+  late bool _pinned = widget.space.isPinned;
   bool _pickingLogo = false;
   int _logoRequest = 0;
   String? _error;
@@ -541,8 +537,7 @@ class _SpaceFieldsState extends State<_SpaceFields> {
                   },
                   if (widget.kind == SpaceKind.workspace) ...{
                     'color': _color.text.trim(),
-                    if (_logo.text !=
-                        (widget.space.raw['logoUrl']?.toString() ?? ''))
+                    if (_logo.text != (widget.space.logoUrl ?? ''))
                       'logoUrl': _logo.text.isEmpty ? null : _logo.text,
                   },
                 });

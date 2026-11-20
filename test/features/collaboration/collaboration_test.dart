@@ -1,8 +1,9 @@
+import 'package:jospar/features/collaboration/data/models/space_member_dto.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/collaboration/data/collaboration_models.dart';
+import 'package:jospar/features/collaboration/domain/entities/space_kind.dart';
 import 'package:jospar/features/collaboration/data/collaboration_repository_impl.dart';
 import 'package:jospar/features/collaboration/domain/collaboration_repository.dart';
 import 'package:jospar/features/collaboration/presentation/collaboration_cubit.dart';
@@ -11,7 +12,9 @@ import 'package:jospar/features/collaboration/presentation/archive_screen.dart';
 void main() {
   test('failed refresh after saving does not report full success', () async {
     final adapter = _Adapter();
-    final repo = CollaborationRepositoryImpl(Dio()..httpClientAdapter = adapter);
+    final repo = CollaborationRepositoryImpl(
+      Dio()..httpClientAdapter = adapter,
+    );
     final cubit = CollaborationCubit(repo, SpaceKind.workspace, 'w');
     addTearDown(cubit.close);
     await cubit.load();
@@ -52,12 +55,12 @@ void main() {
   test(
     'wrapped project members and flattened workspace members preserve ids and roles',
     () {
-      final project = SpaceMember.fromJson({
+      final project = SpaceMemberDto.fromJson({
         'userId': 'u',
         'role': 'ADMIN',
         'user': {'id': 'u', 'name': 'Имя', 'email': 'a@b.test'},
       });
-      final workspace = SpaceMember.fromJson({
+      final workspace = SpaceMemberDto.fromJson({
         'id': 'u',
         'name': 'Имя',
         'role': 'EXECUTOR',

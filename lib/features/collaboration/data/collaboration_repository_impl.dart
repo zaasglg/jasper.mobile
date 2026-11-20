@@ -1,6 +1,11 @@
+import 'models/space_kind_path.dart';
+import 'models/managed_space_dto.dart';
+import 'models/space_member_dto.dart';
 import 'package:dio/dio.dart';
 import '../domain/collaboration_repository.dart';
-import 'collaboration_models.dart';
+import '../domain/entities/managed_space.dart';
+import '../domain/entities/space_member.dart';
+import '../domain/entities/space_kind.dart';
 
 class CollaborationRepositoryImpl implements CollaborationRepository {
   const CollaborationRepositoryImpl(this.dio);
@@ -59,13 +64,13 @@ class CollaborationRepositoryImpl implements CollaborationRepository {
 
   @override
   Future<ManagedSpace> getSpace(SpaceKind kind, String id) => _request(
-    () async => ManagedSpace.fromJson(
+    () async => ManagedSpaceDto.fromJson(
       _object(
         (await dio.get<dynamic>(
           '${kind.path}/${Uri.encodeComponent(id)}',
         )).data,
       ),
-    ),
+    ).toEntity(),
   );
   @override
   Future<void> updateSpace(
@@ -88,7 +93,7 @@ class CollaborationRepositoryImpl implements CollaborationRepository {
                 ? {'workspaceId': workspaceId}
                 : null,
           )).data,
-          ManagedSpace.fromJson,
+          (json) => ManagedSpaceDto.fromJson(json).toEntity(),
         ),
       );
   @override
@@ -109,14 +114,17 @@ class CollaborationRepositoryImpl implements CollaborationRepository {
         final data = (await dio.get<dynamic>(
           '${kind.path}/${Uri.encodeComponent(id)}/members',
         )).data;
-        final members = _list(data, SpaceMember.fromJson);
+        final members = _list(
+          data,
+          (json) => SpaceMemberDto.fromJson(json).toEntity(),
+        );
         if (kind == SpaceKind.workspace && data is Map) {
           if (data['guests'] is List) {
             for (final guest in (data['guests'] as List).whereType<Map>()) {
-              final member = SpaceMember.fromJson({
+              final member = SpaceMemberDto.fromJson({
                 ...Map<String, dynamic>.from(guest),
                 'access': 'GUEST',
-              });
+              }).toEntity();
               if (!members.any((m) => m.userId == member.userId)) {
                 members.add(member);
               }
@@ -126,10 +134,10 @@ class CollaborationRepositoryImpl implements CollaborationRepository {
             for (final invite
                 in (data['pendingInvites'] as List).whereType<Map>()) {
               members.add(
-                SpaceMember.fromJson({
+                SpaceMemberDto.fromJson({
                   ...Map<String, dynamic>.from(invite),
                   'access': 'INVITATION',
-                }),
+                }).toEntity(),
               );
             }
           }
@@ -144,7 +152,7 @@ class CollaborationRepositoryImpl implements CollaborationRepository {
             ? 'users'
             : 'workspaces/${Uri.encodeComponent(workspaceId)}/members',
       )).data,
-      SpaceMember.fromJson,
+      (json) => SpaceMemberDto.fromJson(json).toEntity(),
     ),
   );
   @override

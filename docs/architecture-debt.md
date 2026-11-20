@@ -7,3 +7,11 @@
 | `AuthException` | `lib/features/auth/presentation/cubit/auth_cubit.dart` → `lib/features/auth/data/repositories/auth_repository_impl.dart` | Перенести исключение в `lib/features/auth/domain/exceptions/auth_exception.dart`; обновить импорты реализации, Cubit и тестов. |
 | `ProfileException` | `lib/features/profile/presentation/cubit/profile_cubit.dart` → `lib/features/profile/data/repositories/profile_repository_impl.dart` | Перенести исключение в `lib/features/profile/domain/exceptions/profile_exception.dart`; обновить импорты реализации, Cubit и тестов. |
 | `WorkspaceException` | `lib/features/workspaces/presentation/cubit/workspace_cubit.dart` → `lib/features/workspaces/data/repositories/workspace_repository_impl.dart` | Перенести исключение в `lib/features/workspaces/domain/exceptions/workspace_exception.dart`; обновить импорты реализации, Cubit и тестов. |
+
+## Участники проектов: presentation → data
+
+`lib/features/collaboration/presentation/project_participants_cubit.dart` и `project_participants_screen.dart` используют конкретный `ProjectParticipantsRepository`, а также `ProjectInvitation` / `ProjectAccessLink` из `lib/features/collaboration/data/project_participants_repository.dart`. Отдельной задачей выделить domain-интерфейс репозитория и чистые сущности, оставив Dio и сериализацию в data. `CollaborationException` уже находится в domain и переноса не требует.
+
+## Формат активности участника
+
+SpaceMember.lastActiveAt — формат не установлен (ISO или готовый текст). Уточнить у API участников; если ISO — парсить в DateTime в SpaceMemberDto, форматирование — в presentation; если готовая строка — оставить String?.

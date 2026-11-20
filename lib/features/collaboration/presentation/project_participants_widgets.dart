@@ -4,7 +4,8 @@ import '../../../core/theme/app_icon_sizes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_ui_tokens.dart';
 import '../../../core/widgets/user_avatar.dart';
-import '../data/collaboration_models.dart';
+import '../domain/entities/space_member.dart';
+import '../domain/entities/member_role.dart';
 
 class ParticipantBadge extends StatelessWidget {
   const ParticipantBadge(this.label, {this.accent = false, super.key});

@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../data/collaboration_models.dart';
+import '../domain/entities/managed_space.dart';
+import '../domain/entities/space_member.dart';
+import '../domain/entities/space_kind.dart';
 import '../domain/collaboration_repository.dart';
 
 class CollaborationState extends Equatable {

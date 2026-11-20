@@ -5,7 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/widgets/app_action_menu.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_form_surface.dart';
-import '../../../collaboration/data/collaboration_models.dart';
+import '../../../collaboration/domain/entities/space_member.dart';
 import '../../../storage/data/storage_models.dart';
 import '../../data/models/chat_conversation_model.dart';
 import '../../domain/repositories/chat_repository.dart';

@@ -13,7 +13,7 @@ import '../../features/storage/presentation/storage_summary_screen.dart';
 import '../../features/chat/presentation/screens/messenger_settings_screen.dart';
 import '../../features/activity/data/activity_repository.dart';
 import '../../features/activity/presentation/activity_screen.dart';
-import '../../features/collaboration/data/collaboration_models.dart';
+import '../../features/collaboration/domain/entities/space_kind.dart';
 import '../../features/collaboration/presentation/space_management_screen.dart';
 import '../../features/collaboration/presentation/archive_screen.dart';
 import '../../features/assistant/presentation/cubit/assistant_cubit.dart';

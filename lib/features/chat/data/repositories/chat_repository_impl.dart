@@ -1,4 +1,5 @@
-import '../../../collaboration/data/collaboration_models.dart';
+import '../../../collaboration/data/models/space_member_dto.dart';
+import '../../../collaboration/domain/entities/space_member.dart';
 import 'package:dio/dio.dart';
 
 import '../../../../core/storage/workspace_selection_storage.dart';
@@ -196,7 +197,11 @@ class ChatRepositoryImpl
             )).data,
           )
           .whereType<Map>()
-          .map((e) => SpaceMember.fromJson(Map<String, dynamic>.from(e)))
+          .map(
+            (e) => SpaceMemberDto.fromJson(
+              Map<String, dynamic>.from(e),
+            ).toEntity(),
+          )
           .toList();
     } on DioException {
       throw const ChatException('Не удалось загрузить участников канала.');

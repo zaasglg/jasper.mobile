@@ -1,3 +1,5 @@
+import 'package:jospar/core/network/api_constants.dart';
+import 'package:jospar/features/collaboration/data/models/space_member_dto.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:dio/dio.dart';
@@ -5,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/collaboration/data/collaboration_models.dart';
+import 'package:jospar/features/collaboration/domain/entities/space_kind.dart';
 import 'package:jospar/features/collaboration/data/project_participants_repository.dart';
 import 'package:jospar/features/collaboration/domain/collaboration_repository.dart';
 import 'package:jospar/features/collaboration/presentation/project_participants_cubit.dart';
@@ -22,7 +24,7 @@ void main() {
   test(
     'flat members preserve project role, guest access, avatar and profile',
     () {
-      final member = SpaceMember.fromJson({
+      final member = SpaceMemberDto.fromJson({
         'id': 'guest',
         'name': 'Guest',
         'email': 'guest@test.dev',
@@ -33,8 +35,11 @@ void main() {
       });
       expect(member.userId, 'guest');
       expect(member.access, 'project');
-      expect(member.avatarUrl, '/avatar.png');
-      expect(SpaceMember.fromJson(member.toJson()), member);
+      expect(
+        member.avatarUrl,
+        ApiConstants.origin.resolve('/avatar.png').toString(),
+      );
+      expect(SpaceMemberDto.fromJson(member.toJson()), member);
       expect(member.copyWith(role: 'EXECUTOR').about, 'Designer');
     },
   );
