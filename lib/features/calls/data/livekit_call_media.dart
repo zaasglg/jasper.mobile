@@ -9,7 +9,7 @@ import 'call_background_service.dart';
 import 'package:livekit_client/livekit_client.dart';
 import '../domain/call_media.dart';
 import '../domain/call_repository.dart';
-import 'call_models.dart';
+import '../domain/entities/call_connection.dart';
 
 class LiveKitCallMedia extends CallMedia {
   LiveKitCallMedia({this.beforeCapture});

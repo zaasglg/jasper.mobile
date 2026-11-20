@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../data/system_incoming_calls.dart';
-import '../data/call_models.dart';
+import '../domain/entities/call_room.dart';
 import 'call_cubit.dart';
 
 /// Keeps one OS call paired with one server room, including remote cancellation.

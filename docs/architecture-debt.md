@@ -15,3 +15,12 @@
 ## Формат активности участника
 
 SpaceMember.lastActiveAt — формат не установлен (ISO или готовый текст). Уточнить у API участников; если ISO — парсить в DateTime в SpaceMemberDto, форматирование — в presentation; если готовая строка — оставить String?.
+
+## Звонки: зависимости presentation → data
+
+- `lib/features/calls/presentation/call_screen.dart` → `lib/features/calls/data/livekit_call_media.dart` (`LiveKitCallMedia`). Отдельной задачей расширить domain-интерфейс медиасессии нужными представлению возможностями и скрыть LiveKit за адаптером data; SDK-объекты оставить в data.
+- `lib/features/calls/presentation/system_call_controller.dart` и `calls_host.dart` → `lib/features/calls/data/system_incoming_calls.dart` (`SystemIncomingCalls`). Отдельной задачей ввести domain-интерфейс системных звонков, платформенную реализацию оставить в data и подключить через DI.
+- `lib/features/calls/presentation/calls_host.dart` → `lib/features/calls/data/call_events.dart`. Отдельной задачей выделить domain-контракт потока событий звонков, платформенные источники и декодирование оставить в data.
+- `lib/features/calls/presentation/call_cubit.dart` → `lib/features/calls/data/call_message_changes.dart`. Отдельной задачей выделить domain-интерфейс уведомления об изменениях звонка, конкретный канал обновления сообщений оставить в data и внедрять через DI.
+
+`CallException` уже находится в domain и переноса не требует.

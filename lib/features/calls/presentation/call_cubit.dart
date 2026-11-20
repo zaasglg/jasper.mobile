@@ -1,7 +1,7 @@
 import '../data/call_message_changes.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../data/call_models.dart';
+import '../domain/entities/call_room.dart';
 import '../domain/call_repository.dart';
 import '../domain/call_media.dart';
 

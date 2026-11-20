@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'call_models.dart';
+import '../domain/entities/call_room.dart';
 import 'call_background_service.dart';
 
 /// Platform UI only. Detection/delivery still belongs to the authenticated app.

@@ -1,7 +1,10 @@
+import 'models/call_room_dto.dart';
+import 'models/call_connection_dto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../domain/call_repository.dart';
-import 'call_models.dart';
+import '../domain/entities/call_room.dart';
+import '../domain/entities/call_connection.dart';
 
 class CallRepositoryImpl implements CallRepository {
   const CallRepositoryImpl(this.dio);
@@ -43,9 +46,9 @@ class CallRepositoryImpl implements CallRepository {
   }
 
   CallConnection connection(dynamic data) {
-    final result = CallConnection.fromJson(
+    final result = CallConnectionDto.fromJson(
       Map<String, dynamic>.from(data as Map),
-    );
+    ).toEntity();
     final uri = Uri.tryParse(result.url);
     if (result.token.isEmpty ||
         uri == null ||
@@ -86,7 +89,9 @@ class CallRepositoryImpl implements CallRepository {
         .whereType<Map>()
         .map((e) => e['room'])
         .whereType<Map>()
-        .map((e) => CallRoom.fromJson(Map<String, dynamic>.from(e)))
+        .map(
+          (e) => CallRoomDto.fromJson(Map<String, dynamic>.from(e)).toEntity(),
+        )
         .where(
           (e) =>
               e.id.isNotEmpty &&
@@ -103,12 +108,12 @@ class CallRepositoryImpl implements CallRepository {
     await request('POST', path(room, 'join'), workspaceId: room.workspaceId),
   );
   @override
-  Future<CallRoom> state(CallRoom room) async => CallRoom.fromJson(
+  Future<CallRoom> state(CallRoom room) async => CallRoomDto.fromJson(
     Map<String, dynamic>.from(
       await request('GET', path(room, 'state'), workspaceId: room.workspaceId)
           as Map,
     ),
-  );
+  ).toEntity();
   @override
   Future<void> decline(CallRoom room) async {
     await request('POST', path(room, 'decline'), workspaceId: room.workspaceId);

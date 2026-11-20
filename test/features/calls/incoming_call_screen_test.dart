@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/calls/data/call_models.dart';
+import 'package:jospar/features/calls/domain/entities/call_room.dart';
 import 'package:jospar/features/calls/presentation/incoming_call_screen.dart';
 
 void main() {

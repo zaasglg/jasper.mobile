@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../../core/widgets/user_avatar.dart';
-import '../data/call_models.dart';
+import '../domain/entities/call_room.dart';
 
 abstract final class IncomingCallStyle {
   static const background = Color(0xff202c33);

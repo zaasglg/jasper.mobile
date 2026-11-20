@@ -1,8 +1,10 @@
+import 'package:jospar/features/calls/data/models/call_room_dto.dart';
+import 'package:jospar/features/calls/data/models/call_connection_dto.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/calls/data/call_models.dart';
+import 'package:jospar/features/calls/domain/entities/call_room.dart';
 import 'package:jospar/features/calls/data/call_repository_impl.dart';
 import 'package:jospar/features/calls/domain/call_repository.dart';
 
@@ -21,7 +23,7 @@ void main() {
     'creates same livekit room as website with unique invitees and workspace header',
     () async {
       server.reply = {
-        'room': room.toJson(),
+        'room': CallRoomDto.fromEntity(room).toJson(),
         'token': 'jwt',
         'wsUrl': 'wss://rtc.example',
       };
@@ -42,7 +44,12 @@ void main() {
       });
       expect(server.request!.headers['X-Workspace-Id'], 'workspace');
       expect(result.room!.id, 'room');
-      expect(CallConnection.fromJson(result.toJson()), result);
+      expect(
+        CallConnectionDto.fromJson(
+          CallConnectionDto.fromEntity(result).toJson(),
+        ).toEntity(),
+        result,
+      );
     },
   );
   test('incoming parses room and avatar rather than invite id', () async {
@@ -50,7 +57,7 @@ void main() {
       {
         'id': 'invite',
         'room': {
-          ...room.toJson(),
+          ...CallRoomDto.fromEntity(room).toJson(),
           'createdBy': {
             'id': 'user',
             'name': 'Коллега',
@@ -63,7 +70,12 @@ void main() {
     expect(incoming.single.id, 'room');
     expect(incoming.single.callerName, 'Коллега');
     expect(incoming.single.callerAvatar, 'https://example.test/avatar.png');
-    expect(CallRoom.fromJson(incoming.single.toJson()), incoming.single);
+    expect(
+      CallRoomDto.fromJson(
+        CallRoomDto.fromEntity(incoming.single).toJson(),
+      ).toEntity(),
+      incoming.single,
+    );
   });
   test('join, reject, mode and hangup use website endpoints', () async {
     server.reply = {'token': 'jwt', 'wsUrl': 'wss://rtc.example'};

@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../data/call_models.dart';
+import 'entities/call_connection.dart';
 
 abstract class CallMedia extends ChangeNotifier {
   bool get ended;

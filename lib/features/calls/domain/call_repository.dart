@@ -1,4 +1,5 @@
-import '../data/call_models.dart';
+import 'entities/call_room.dart';
+import 'entities/call_connection.dart';
 
 abstract interface class CallRepository {
   Future<CallConnection> create({

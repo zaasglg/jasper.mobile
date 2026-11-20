@@ -1,7 +1,7 @@
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../widgets/messenger_refresh_lifecycle.dart';
 import '../widgets/message_interactions.dart';
-import '../../../calls/data/call_models.dart';
+import '../../../calls/domain/entities/call_room.dart';
 import '../../../calls/presentation/call_cubit.dart';
 import '../../../../core/storage/workspace_selection_storage.dart';
 import '../../../storage/data/storage_models.dart';

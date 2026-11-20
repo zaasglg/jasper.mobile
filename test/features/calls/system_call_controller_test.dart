@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/calls/data/call_models.dart';
+import 'package:jospar/features/calls/domain/entities/call_room.dart';
+import 'package:jospar/features/calls/domain/entities/call_connection.dart';
 import 'package:jospar/features/calls/data/system_incoming_calls.dart';
 import 'package:jospar/features/calls/domain/call_media.dart';
 import 'package:jospar/features/calls/domain/call_repository.dart';
