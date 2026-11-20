@@ -3,7 +3,7 @@ import '../../data/services/assistant_task_changes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/storage/workspace_selection_storage.dart';
 import '../../../workspaces/domain/repositories/workspace_repository.dart';
-import '../../data/models/assistant_message_model.dart';
+import '../../domain/entities/assistant_message_model.dart';
 import '../../domain/repositories/assistant_repository.dart';
 import 'assistant_state.dart';
 
@@ -98,7 +98,7 @@ class AssistantCubit extends Cubit<AssistantState> {
     );
     try {
       await actions?.checkWorkspace(state.workspaceId);
-      final draft = await actions?.extract(
+      final draft = await actions?.extractDraft(
         state.workspaceId,
         content,
         images,
@@ -133,12 +133,12 @@ class AssistantCubit extends Cubit<AssistantState> {
       await actions?.checkWorkspace(state.workspaceId);
       if (isClosed || revision != _revision) return;
       if (reply.tools.any((tool) {
-        final result = tool['result'];
-        final updated = result is Map ? result['updated'] : null;
-        return tool['name'] == 'update_task' &&
-            result is Map &&
-            !result.containsKey('error') &&
-            updated is Map &&
+        final result = tool.result;
+        final updated = result?.updated;
+        return tool.name == 'update_task' &&
+            result != null &&
+            !result.hasError &&
+            updated != null &&
             updated['workspaceId'] == state.workspaceId;
       })) {
         notifyAssistantTaskChanges();

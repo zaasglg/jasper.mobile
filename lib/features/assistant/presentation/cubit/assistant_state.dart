@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../data/models/assistant_message_model.dart';
+import '../../domain/entities/assistant_message_model.dart';
 
 enum AssistantStatus { loading, ready, sending, failure }
 

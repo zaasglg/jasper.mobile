@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../domain/repositories/assistant_repository.dart';
-import '../models/assistant_message_model.dart';
+import '../../domain/entities/assistant_message_model.dart';
+import '../models/assistant_message_dto.dart';
 
 class AssistantRepositoryImpl implements AssistantRepository {
   const AssistantRepositoryImpl(this._dio);
@@ -38,10 +39,10 @@ class AssistantRepositoryImpl implements AssistantRepository {
           'Помощник вернул пустой ответ. Попробуйте ещё раз.',
         );
       }
-      return AssistantMessageModel.fromJson({
+      return AssistantMessageDto.fromJson({
         ...Map<String, dynamic>.from(json),
         'role': 'assistant',
-      });
+      }).toEntity();
     } on DioException catch (error) {
       throw AssistantException(
         error.response?.statusCode == 403

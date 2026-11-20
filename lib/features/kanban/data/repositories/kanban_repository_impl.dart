@@ -1,6 +1,6 @@
 import 'dart:convert';
 import '../../../assistant/data/repositories/assistant_repository_impl.dart';
-import '../../../assistant/data/models/assistant_message_model.dart';
+import '../../../assistant/domain/entities/assistant_message_model.dart';
 import '../../../assistant/domain/repositories/assistant_repository.dart';
 import '../models/task_translation.dart';
 import 'package:dio/dio.dart';

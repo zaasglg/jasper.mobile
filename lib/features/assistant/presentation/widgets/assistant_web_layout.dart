@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../storage/presentation/storage_file_screen.dart';
-import '../../data/models/assistant_message_model.dart';
+import '../../domain/entities/assistant_message_model.dart';
 
 abstract final class _AiColors {
   static const ink = Color(0xFF1C1C2B);

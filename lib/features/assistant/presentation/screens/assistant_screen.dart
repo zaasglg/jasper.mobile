@@ -226,12 +226,12 @@ class _AssistantScreenState extends State<AssistantScreen>
         _handledResponse = state.responseRevision;
         final ids = <String>{};
         for (final tool in state.messages.last.tools) {
-          final result = tool['result'];
-          final action = result is Map ? result['action'] : null;
-          if (tool['name'] == 'open_task' &&
-              result is Map &&
-              !result.containsKey('error') &&
-              action is Map &&
+          final result = tool.result;
+          final action = result?.action;
+          if (tool.name == 'open_task' &&
+              result != null &&
+              !result.hasError &&
+              action != null &&
               action['type'] == 'open_task' &&
               action['workspaceId'] == state.workspaceId &&
               action['taskId'] is String &&

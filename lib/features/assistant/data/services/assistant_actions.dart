@@ -1,3 +1,5 @@
+import '../../domain/entities/assistant_draft.dart';
+import '../models/assistant_draft_dto.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/storage/workspace_selection_storage.dart';
 import '../../domain/repositories/assistant_repository.dart';
@@ -21,6 +23,35 @@ class AssistantActions {
     }
   }
 
+  Future<AssistantDraft?> extractDraft(
+    String workspaceId,
+    String text,
+    List<String> images,
+    String? projectId,
+  ) async {
+    final value = await extract(workspaceId, text, images, projectId);
+    return value == null ? null : AssistantDraftDto.fromJson(value).toEntity();
+  }
+
+  static bool validDraftEdit(AssistantDraft draft, String workspaceId) =>
+      draft.previous?.hasValidValues != false &&
+      validEdit(AssistantDraftDto.fromEntity(draft).toJson(), workspaceId);
+  Future<void> applyDraft(String workspaceId, AssistantDraft draft) async {
+    if (!validDraftEdit(draft, workspaceId)) {
+      throw const AssistantException('Некорректный черновик изменений.');
+    }
+    await apply(workspaceId, AssistantDraftDto.fromEntity(draft).toJson());
+  }
+
+  Future<void> createDraft(
+    String workspaceId,
+    String projectId,
+    AssistantDraft draft,
+  ) => create(
+    workspaceId,
+    projectId,
+    AssistantDraftDto.fromEntity(draft).toJson(),
+  );
   Options options(String id) => Options(headers: {'X-Workspace-Id': id});
   Future<Map<String, dynamic>?> extract(
     String workspaceId,

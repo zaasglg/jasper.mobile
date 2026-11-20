@@ -1,3 +1,4 @@
+import 'package:jospar/features/assistant/data/models/assistant_message_dto.dart';
 import 'package:jospar/features/assistant/data/services/assistant_actions.dart';
 import 'package:jospar/features/assistant/presentation/widgets/assistant_action_cards.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,7 +12,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/core/di/service_locator.dart';
 import 'package:jospar/core/storage/workspace_selection_storage.dart';
-import 'package:jospar/features/assistant/data/models/assistant_message_model.dart';
+import 'package:jospar/features/assistant/domain/entities/assistant_message_model.dart';
 import 'package:jospar/features/assistant/data/repositories/assistant_repository_impl.dart';
 import 'package:jospar/features/assistant/domain/repositories/assistant_repository.dart';
 import 'package:jospar/features/assistant/domain/services/assistant_voice.dart';
@@ -65,8 +66,13 @@ void main() {
       messages: const [],
       currentProjectId: 'project',
     );
-    expect(reply.tools.single['name'], 'open_task');
-    expect(AssistantMessageModel.fromJson(reply.toJson()), reply);
+    expect(reply.tools.single.name, 'open_task');
+    expect(
+      AssistantMessageDto.fromJson(
+        AssistantMessageDto.fromEntity(reply).toJson(),
+      ).toEntity(),
+      reply,
+    );
   });
   testWidgets('draft cancel never creates a task and survives rebuilding', (
     tester,
@@ -83,7 +89,7 @@ void main() {
     await cubit.ask('Создай задачу');
     expect(repo.imageRequests, isEmpty);
     final message = cubit.state.messages.last;
-    expect(message.draft!['title'], 'Проверить');
+    expect(message.draft!.title, 'Проверить');
     Widget page() => MaterialApp(
       home: BlocProvider.value(
         value: cubit,
@@ -138,7 +144,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(320, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final repo = _Repository()
-      ..reply = const AssistantMessageModel(
+      ..reply = AssistantMessageDto(
         role: 'assistant',
         content: 'Подготовлено',
         tools: [
@@ -171,7 +177,7 @@ void main() {
             },
           },
         ],
-      );
+      ).toEntity();
     final actions = _Actions()..detect = false;
     final cubit = AssistantCubit(
       repo,
@@ -256,7 +262,12 @@ void main() {
         content: 'Что на изображении?',
         images: [image],
       );
-      expect(AssistantMessageModel.fromJson(message.toJson()), message);
+      expect(
+        AssistantMessageDto.fromJson(
+          AssistantMessageDto.fromEntity(message).toJson(),
+        ).toEntity(),
+        message,
+      );
       await repo.chat(
         workspaceId: 'workspace',
         messages: [message],

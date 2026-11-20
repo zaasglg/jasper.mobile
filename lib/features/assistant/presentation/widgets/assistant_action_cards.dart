@@ -1,3 +1,4 @@
+import '../../domain/entities/assistant_draft.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../data/services/assistant_task_changes.dart';
 import 'package:mime/mime.dart';
@@ -5,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../data/models/assistant_message_model.dart';
+import '../../domain/entities/assistant_message_model.dart';
 import '../../data/services/assistant_actions.dart';
 import '../../domain/repositories/assistant_repository.dart';
 import '../cubit/assistant_cubit.dart';
@@ -39,14 +40,14 @@ class AssistantActionCards extends StatelessWidget {
     final workspaceId = context.read<AssistantCubit>().state.workspaceId;
     final activity = <String>{};
     final files = <String, Map>{};
-    final edits = <String, Map<String, dynamic>>{};
+    final edits = <String, AssistantDraft>{};
     for (final tool in message.tools) {
-      final result = tool['result'];
-      if (result is! Map || result.containsKey('error')) continue;
-      final label = _toolLabels[tool['name']];
+      final result = tool.result;
+      if (result == null || result.hasError) continue;
+      final label = _toolLabels[tool.name];
       if (label != null) activity.add(label);
-      if (tool['name'] == 'search_messages' && result['results'] is List) {
-        for (final row in result['results'] as List) {
+      if (tool.name == 'search_messages' && result.results != null) {
+        for (final row in result.results!) {
           final file = row is Map ? row['attachment'] : null;
           if (file is Map &&
               file['messageId'] is String &&
@@ -55,12 +56,11 @@ class AssistantActionCards extends StatelessWidget {
           }
         }
       }
-      final draft = result['draft'];
-      if (tool['name'] == 'prepare_task_edit' &&
-          draft is Map &&
-          AssistantActions.validEdit(draft, workspaceId)) {
-        edits['${draft['taskId']}:${draft['patch']}'] =
-            Map<String, dynamic>.from(draft);
+      final draft = result.draft;
+      if (tool.name == 'prepare_task_edit' &&
+          draft != null &&
+          AssistantActions.validDraftEdit(draft, workspaceId)) {
+        edits['${draft.taskId}:${draft.patch}'] = draft;
       }
     }
     return Column(
@@ -163,7 +163,7 @@ class AssistantActionCards extends StatelessWidget {
           ),
         for (final draft in edits.values)
           _DraftCard(
-            key: ValueKey('edit-$index-${draft['taskId']}-${draft['patch']}'),
+            key: ValueKey('edit-$index-${draft.taskId}-${draft.patch}'),
             draft: draft,
             index: index,
             edit: true,
@@ -180,7 +180,7 @@ class _DraftCard extends StatefulWidget {
     required this.index,
     this.edit = false,
   });
-  final Map<String, dynamic> draft;
+  final AssistantDraft draft;
   final int index;
   final bool edit;
   @override
@@ -192,7 +192,7 @@ class _DraftCardState extends State<_DraftCard> {
   String? _projectId, _error, _resolved;
   bool _busy = false, _loading = false;
   String get actionKey => widget.edit
-      ? 'edit:${widget.draft['taskId']}:${widget.draft['patch']}'
+      ? 'edit:${widget.draft.taskId}:${widget.draft.patch}'
       : 'create';
   AssistantCubit get cubit => context.read<AssistantCubit>();
   @override
@@ -233,9 +233,9 @@ class _DraftCardState extends State<_DraftCard> {
     });
     try {
       if (widget.edit) {
-        await cubit.actions!.apply(cubit.state.workspaceId, widget.draft);
+        await cubit.actions!.applyDraft(cubit.state.workspaceId, widget.draft);
       } else {
-        await cubit.actions!.create(
+        await cubit.actions!.createDraft(
           cubit.state.workspaceId,
           _projectId!,
           widget.draft,
@@ -279,10 +279,8 @@ class _DraftCardState extends State<_DraftCard> {
   @override
   Widget build(BuildContext context) {
     final draft = widget.draft;
-    final patch = draft['patch'] is Map ? draft['patch'] as Map : const {};
-    final previous = draft['previous'] is Map
-        ? draft['previous'] as Map
-        : const {};
+    final patch = draft.patch;
+    final previous = draft.previous;
     final labels = {
       'title': 'Название',
       'start': 'Начало',
@@ -301,7 +299,7 @@ class _DraftCardState extends State<_DraftCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            '${draft['title']}',
+            '${draft.title}',
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
@@ -316,33 +314,33 @@ class _DraftCardState extends State<_DraftCard> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  '${labels[key]}: ${_value(key, previous[key])} → ${_value(key, patch[key])}',
+                  '${labels[key]}: ${_value(key, previous?.value(key))} → ${_value(key, patch[key])}',
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
           ],
           if (!widget.edit) ...[
-            if ('${draft['description'] ?? ''}'.isNotEmpty)
+            if ((draft.description ?? '').isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  '${draft['description']}',
+                  draft.description!,
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
-            if (draft['dueDate'] != null)
+            if (draft.dueDate != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Срок: ${draft['dueDate']}',
+                  'Срок: ${draft.dueDate}',
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
-            if (draft['suggestedAssigneeName'] != null)
+            if (draft.suggestedAssigneeName != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Участник: ${draft['suggestedAssigneeName']}${draft['resolvedAssigneeId'] == null ? ' (не найден)' : ''}',
+                  'Участник: ${draft.suggestedAssigneeName}${draft.resolvedAssigneeId == null ? ' (не найден)' : ''}',
                   style: const TextStyle(fontSize: 12),
                 ),
               ),

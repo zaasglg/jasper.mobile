@@ -24,3 +24,22 @@ SpaceMember.lastActiveAt — формат не установлен (ISO или 
 - `lib/features/calls/presentation/call_cubit.dart` → `lib/features/calls/data/call_message_changes.dart`. Отдельной задачей выделить domain-интерфейс уведомления об изменениях звонка, конкретный канал обновления сообщений оставить в data и внедрять через DI.
 
 `CallException` уже находится в domain и переноса не требует.
+
+## Помощник: динамические данные и зависимости
+
+- AssistantDraft.patch — динамическая карта, UI перебирает ключи; типизировать после уточнения структуры patch отдельной задачей.
+- `AssistantToolResult.updated`, `action`, `attachment` остаются nullable `Map<String, dynamic>`, а `results` — nullable `List<dynamic>`: результаты инструментов имеют разные формы, включая вложенные attachment. Уточнить отдельные контракты инструментов и типизировать отдельно; неизвестные верхнеуровневые поля tool/result/draft сохраняются только в DTO. `error` сохраняется как `Object?`; `hasError` отличает отсутствующий ключ от явного null, чтобы не выполнять ошибочный tool-result.
+- `assistant/presentation/cubit/assistant_cubit.dart` и `presentation/widgets/assistant_action_cards.dart` используют `data/services/assistant_actions.dart` (`AssistantActions`), а также `data/services/assistant_task_changes.dart`; screen использует data image-picker. Отдельной задачей выделить domain-интерфейсы действий, уведомлений и выбора вложений; преобразование черновиков в HTTP-body и платформенные реализации оставить в data.
+
+## Известные падения тестов: базовый уровень группы 6–10
+
+Отдельной задачей исправить тестовую инфраструктуру и несоответствия ожиданий UI. Эти падения зафиксированы до разделения моделей; их нельзя учитывать как новые регрессии при неизменном составе и причине:
+
+- `test/features/chat/conversation_menu_test.dart`: 5 падений, отсутствует `Provider<ProfileCubit>`.
+- `test/features/inbox/inbox_screen_test.dart`: 1 падение (`creates a quick inbox task on a narrow screen`).
+- Тесты dashboard: 4 падения базового уровня:
+  - `dashboard_editor_test.dart`: `header buttons edit shared dashboard, add, cancel and save on a narrow phone`;
+  - `dashboard_resource_widget_test.dart`: `resource rings aggregate pairs, switch to task rings and filter labels`;
+  - `dashboard_widget_panel_test.dart`: `AI renders teammate overdue recommendations instead of a quote`;
+  - `dashboard_widget_panel_test.dart`: `swiping inside expanded recommendations scrolls dashboard`.
+  При шаге dashboard сравнить также причины падений, а не только количество.
