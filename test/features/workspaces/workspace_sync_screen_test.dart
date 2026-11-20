@@ -14,8 +14,8 @@ import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart'
 import 'package:jospar/features/projects/presentation/cubit/projects_state.dart';
 import 'package:jospar/features/shell/presentation/widgets/app_drawer.dart';
 import 'package:jospar/features/shell/presentation/screens/main_shell.dart';
-import 'package:jospar/features/workspaces/data/models/create_workspace_request.dart';
-import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/domain/entities/create_workspace_request.dart';
+import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 import 'package:jospar/features/workspaces/domain/repositories/workspace_repository.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';

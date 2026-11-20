@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../../projects/data/models/project_model.dart';
 import '../../../tasks/data/models/kanban_column_model.dart';
-import '../../../workspaces/data/models/workspace_model.dart';
+import '../../../workspaces/domain/entities/workspace_model.dart';
 import '../entities/task_move_target.dart';
 
 abstract interface class TaskMoveRepository {

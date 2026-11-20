@@ -1,8 +1,9 @@
+import '../../../workspaces/data/models/workspace_dto.dart';
 import 'package:equatable/equatable.dart';
 import '../../../profile/domain/entities/user_profile.dart';
 import '../../../profile/data/models/user_profile_dto.dart';
 import '../../../projects/data/models/project_task_model.dart';
-import '../../../workspaces/data/models/workspace_model.dart';
+import '../../../workspaces/domain/entities/workspace_model.dart';
 import 'kanban_column_model.dart';
 import 'task_detail_model.dart';
 
@@ -14,14 +15,20 @@ class TaskCreationCatalog extends Equatable {
       TaskCreationCatalog(
         workspaces: (json['workspaces'] as List? ?? [])
             .whereType<Map>()
-            .map((e) => WorkspaceModel.fromJson(Map<String, dynamic>.from(e)))
+            .map(
+              (e) => WorkspaceDto.fromJson(
+                Map<String, dynamic>.from(e),
+              ).toEntity(),
+            )
             .toList(),
         user: UserProfileDto.fromJson(
           Map<String, dynamic>.from(json['user'] as Map),
         ).toEntity(),
       );
   Map<String, dynamic> toJson() => {
-    'workspaces': workspaces.map((e) => e.toJson()).toList(),
+    'workspaces': workspaces
+        .map((e) => WorkspaceDto.fromEntity(e).toJson())
+        .toList(),
     'user': UserProfileDto.fromEntity(user).toJson(),
   };
   TaskCreationCatalog copyWith({

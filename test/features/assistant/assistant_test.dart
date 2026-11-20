@@ -17,8 +17,8 @@ import 'package:jospar/features/assistant/domain/repositories/assistant_reposito
 import 'package:jospar/features/assistant/domain/services/assistant_voice.dart';
 import 'package:jospar/features/assistant/presentation/cubit/assistant_cubit.dart';
 import 'package:jospar/features/assistant/presentation/screens/assistant_screen.dart';
-import 'package:jospar/features/workspaces/data/models/create_workspace_request.dart';
-import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/domain/entities/create_workspace_request.dart';
+import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 import 'package:jospar/features/workspaces/domain/repositories/workspace_repository.dart';
 
 void main() {

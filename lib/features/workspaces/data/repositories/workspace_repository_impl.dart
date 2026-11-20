@@ -1,8 +1,10 @@
+import '../models/workspace_dto.dart';
+import '../models/create_workspace_request_dto.dart';
 import 'package:dio/dio.dart';
 
 import '../../domain/repositories/workspace_repository.dart';
-import '../models/create_workspace_request.dart';
-import '../models/workspace_model.dart';
+import '../../domain/entities/create_workspace_request.dart';
+import '../../domain/entities/workspace_model.dart';
 
 class WorkspaceRepositoryImpl implements WorkspaceRepository {
   const WorkspaceRepositoryImpl(this._dio);
@@ -26,7 +28,9 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
       return items
           .whereType<Map>()
           .map(
-            (item) => WorkspaceModel.fromJson(Map<String, dynamic>.from(item)),
+            (item) => WorkspaceDto.fromJson(
+              Map<String, dynamic>.from(item),
+            ).toEntity(),
           )
           .where((workspace) => workspace.id.isNotEmpty)
           .toList(growable: false);
@@ -44,10 +48,10 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
     try {
       final response = await _dio.post<dynamic>(
         'workspaces',
-        data: request.toJson(),
+        data: CreateWorkspaceRequestDto.fromEntity(request).toJson(),
       );
       final payload = _unwrapWorkspace(response.data);
-      final parsed = WorkspaceModel.fromJson(payload);
+      final parsed = WorkspaceDto.fromJson(payload).toEntity();
       if (parsed.id.isEmpty) {
         throw const WorkspaceException('Сервер не вернул созданный workspace.');
       }

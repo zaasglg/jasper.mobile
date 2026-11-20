@@ -21,7 +21,7 @@ import 'package:jospar/features/tasks/domain/repositories/my_tasks_repository.da
 import 'package:jospar/features/tasks/presentation/cubit/my_tasks_cubit.dart';
 import 'package:jospar/features/tasks/data/models/kanban_column_model.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
-import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';
 import 'dashboard_layout_test.dart' show FakeDashboardRepository;

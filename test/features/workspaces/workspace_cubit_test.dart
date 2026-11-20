@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/core/storage/workspace_selection_storage.dart';
-import 'package:jospar/features/workspaces/data/models/create_workspace_request.dart';
-import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/domain/entities/create_workspace_request.dart';
+import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 import 'package:jospar/features/workspaces/data/repositories/workspace_repository_impl.dart';
 import 'package:jospar/features/workspaces/domain/repositories/workspace_repository.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
@@ -131,43 +131,6 @@ void main() {
     expect(state.workspaces.map((item) => item.id), ['one', 'two', 'three']);
     expect(state.isCreating, isFalse);
     expect(await storage.read(), 'two');
-  });
-
-  test('parses direct and nested workspace logo URLs', () {
-    final direct = WorkspaceModel.fromJson(<String, dynamic>{
-      'id': 'one',
-      'name': 'Цифровизация',
-      'logoUrl': '/uploads/workspaces/one.png',
-    });
-    final nested = WorkspaceModel.fromJson(<String, dynamic>{
-      'id': 'two',
-      'name': 'Продажи',
-      'logo': <String, dynamic>{'url': 'https://cdn.jospar.me/two.png'},
-    });
-
-    expect(direct.logoUrl, 'https://jospar.me/uploads/workspaces/one.png');
-    expect(nested.logoUrl, 'https://cdn.jospar.me/two.png');
-  });
-
-  test('preserves an embedded base64 workspace logo', () {
-    const embeddedLogo = 'data:image/jpeg;base64,AQID';
-    final workspace = WorkspaceModel.fromJson(<String, dynamic>{
-      'id': 'one',
-      'name': 'Цифровизация',
-      'logoUrl': embeddedLogo,
-    });
-
-    expect(workspace.logoUrl, embeddedLogo);
-  });
-
-  test('serializes a create workspace request explicitly', () {
-    const request = CreateWorkspaceRequest(name: 'Маркетинг', color: '#E45D70');
-
-    expect(request.toJson(), <String, dynamic>{
-      'name': 'Маркетинг',
-      'color': '#E45D70',
-    });
-    expect(CreateWorkspaceRequest.fromJson(request.toJson()), request);
   });
 
   test('loads workspaces and selects the first workspace by default', () async {

@@ -9,7 +9,7 @@ import 'package:jospar/features/chat/data/models/chat_message_model.dart';
 import 'package:jospar/features/chat/domain/repositories/chat_repository.dart';
 import 'package:jospar/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:jospar/features/chat/presentation/screens/chat_screen.dart';
-import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';
 

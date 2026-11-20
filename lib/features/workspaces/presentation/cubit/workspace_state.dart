@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-import '../../data/models/workspace_model.dart';
+import '../../domain/entities/workspace_model.dart';
 
 sealed class WorkspaceState extends Equatable {
   const WorkspaceState();

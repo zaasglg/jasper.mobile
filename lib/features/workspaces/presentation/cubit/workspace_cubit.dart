@@ -1,8 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/storage/workspace_selection_storage.dart';
-import '../../data/models/create_workspace_request.dart';
-import '../../data/models/workspace_model.dart';
+import '../../domain/entities/create_workspace_request.dart';
+import '../../domain/entities/workspace_model.dart';
 import '../../data/repositories/workspace_repository_impl.dart';
 import '../../domain/repositories/workspace_repository.dart';
 import 'workspace_state.dart';

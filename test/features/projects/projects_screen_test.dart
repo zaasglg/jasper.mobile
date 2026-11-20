@@ -8,7 +8,7 @@ import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_state.dart';
 import 'package:jospar/features/projects/presentation/screens/projects_screen.dart';
-import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';
 

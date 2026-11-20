@@ -12,7 +12,7 @@ import 'package:jospar/features/tasks/presentation/cubit/task_creation_cubit.dar
 import 'package:jospar/features/profile/domain/entities/user_profile.dart';
 import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
-import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 
 void main() {
   test(

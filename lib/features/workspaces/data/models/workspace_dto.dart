@@ -1,18 +1,20 @@
 import '../../../../core/network/api_constants.dart';
 import 'package:equatable/equatable.dart';
 
-class WorkspaceModel extends Equatable {
-  const WorkspaceModel({
+import '../../domain/entities/workspace_model.dart';
+
+class WorkspaceDto extends Equatable {
+  const WorkspaceDto({
     required this.id,
     required this.name,
     this.color,
     this.logoUrl,
   });
 
-  factory WorkspaceModel.fromJson(Map<String, dynamic> json) {
+  factory WorkspaceDto.fromJson(Map<String, dynamic> json) {
     final rawLogoUrl = _readLogoUrl(json);
 
-    return WorkspaceModel(
+    return WorkspaceDto(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       color: json['color']?.toString(),
@@ -21,6 +23,16 @@ class WorkspaceModel extends Equatable {
           : null,
     );
   }
+
+  factory WorkspaceDto.fromEntity(WorkspaceModel entity) => WorkspaceDto(
+    id: entity.id,
+    name: entity.name,
+    color: entity.color,
+    logoUrl: entity.logoUrl,
+  );
+
+  WorkspaceModel toEntity() =>
+      WorkspaceModel(id: id, name: name, color: color, logoUrl: logoUrl);
 
   final String id;
   final String name;
@@ -59,13 +71,13 @@ class WorkspaceModel extends Equatable {
     'logoUrl': logoUrl,
   };
 
-  WorkspaceModel copyWith({
+  WorkspaceDto copyWith({
     String? id,
     String? name,
     String? color,
     String? logoUrl,
   }) {
-    return WorkspaceModel(
+    return WorkspaceDto(
       id: id ?? this.id,
       name: name ?? this.name,
       color: color ?? this.color,

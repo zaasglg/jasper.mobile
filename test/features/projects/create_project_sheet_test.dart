@@ -6,7 +6,7 @@ import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/domain/repositories/project_repository.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart';
 import 'package:jospar/features/projects/presentation/widgets/create_project_sheet.dart';
-import 'package:jospar/features/workspaces/data/models/workspace_model.dart';
+import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 
 void main() {
   const sales = WorkspaceModel(id: 'w1', name: 'Продажи', color: '#2ab870');

@@ -15,7 +15,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/storage/auth_token_storage.dart';
-import '../../../workspaces/data/models/workspace_model.dart';
+import '../../../workspaces/domain/entities/workspace_model.dart';
 import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
 import '../../../workspaces/presentation/cubit/workspace_state.dart';
 
