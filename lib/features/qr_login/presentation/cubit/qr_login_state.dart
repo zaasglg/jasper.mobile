@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-import '../../data/models/qr_login_details.dart';
+import '../../domain/entities/qr_login_details.dart';
 
 sealed class QrLoginState extends Equatable {
   const QrLoginState();

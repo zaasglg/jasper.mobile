@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-import '../../data/models/qr_session_model.dart';
+import '../../domain/entities/qr_session_model.dart';
 
 sealed class QrSessionsState extends Equatable {
   const QrSessionsState();

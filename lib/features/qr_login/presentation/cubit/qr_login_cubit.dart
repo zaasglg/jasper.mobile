@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/auth/auth_session.dart';
-import '../../data/models/qr_login_details.dart';
-import '../../data/models/qr_login_payload.dart';
+import '../../domain/entities/qr_login_details.dart';
+import '../../domain/entities/qr_login_payload.dart';
 import '../../domain/qr_login_repository.dart';
 import 'qr_login_state.dart';
 
@@ -28,7 +28,7 @@ class QrLoginCubit extends Cubit<QrLoginState> {
     }
     late final QrLoginPayload payload;
     try {
-      payload = QrLoginPayload.parse(raw);
+      payload = _repository.parsePayload(raw);
     } on FormatException {
       emit(const QrLoginReady(message: 'Некорректный QR-код.'));
       return;

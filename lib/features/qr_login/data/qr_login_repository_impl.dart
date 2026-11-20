@@ -1,13 +1,20 @@
 import 'package:dio/dio.dart';
 
 import '../domain/qr_login_repository.dart';
-import 'models/qr_login_details.dart';
-import 'models/qr_login_payload.dart';
-import 'models/qr_session_model.dart';
+import '../domain/entities/qr_login_details.dart';
+import 'models/qr_login_details_dto.dart';
+import '../domain/entities/qr_login_payload.dart';
+import 'models/qr_login_payload_dto.dart';
+import '../domain/entities/qr_session_model.dart';
+import 'models/qr_session_model_dto.dart';
 
 class QrLoginRepositoryImpl implements QrLoginRepository, QrSessionsRepository {
   const QrLoginRepositoryImpl(this._dio);
   final Dio _dio;
+
+  @override
+  QrLoginPayload parsePayload(String raw) =>
+      QrLoginPayloadDto.parse(raw).toEntity();
 
   @override
   Future<QrLoginDetails> scan(QrLoginPayload payload) async {
@@ -16,7 +23,7 @@ class QrLoginRepositoryImpl implements QrLoginRepository, QrSessionsRepository {
         'auth/qr/${payload.id}/scan',
         data: <String, dynamic>{'scanToken': payload.scanToken},
       );
-      return QrLoginDetails.fromJson(_map(response.data));
+      return QrLoginDetailsDto.fromJson(_map(response.data)).toEntity();
     } on DioException catch (error) {
       throw _exception(error);
     } on FormatException {
@@ -45,8 +52,9 @@ class QrLoginRepositoryImpl implements QrLoginRepository, QrSessionsRepository {
       if (items is! List) throw const FormatException();
       return items
           .map(
-            (item) =>
-                QrSessionModel.fromJson(Map<String, dynamic>.from(item as Map)),
+            (item) => QrSessionModelDto.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ).toEntity(),
           )
           .toList(growable: false);
     } on DioException catch (error) {

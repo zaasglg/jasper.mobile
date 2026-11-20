@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../data/models/qr_session_model.dart';
+import '../../domain/entities/qr_session_model.dart';
 import '../cubit/qr_sessions_cubit.dart';
 import '../cubit/qr_sessions_state.dart';
 

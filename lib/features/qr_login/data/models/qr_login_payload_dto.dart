@@ -1,11 +1,12 @@
+import '../../domain/entities/qr_login_payload.dart';
 import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
 
-class QrLoginPayload extends Equatable {
-  const QrLoginPayload({required this.id, required this.scanToken});
+class QrLoginPayloadDto extends Equatable {
+  const QrLoginPayloadDto({required this.id, required this.scanToken});
 
-  factory QrLoginPayload.fromJson(Map<String, dynamic> json) {
+  factory QrLoginPayloadDto.fromJson(Map<String, dynamic> json) {
     if (json['type'] != 'orbita:qr-login' || json['version'] != 1) {
       throw const FormatException('Некорректный QR-код');
     }
@@ -20,19 +21,22 @@ class QrLoginPayload extends Equatable {
         !safe.hasMatch(scanToken)) {
       throw const FormatException('Некорректный QR-код');
     }
-    return QrLoginPayload(id: id, scanToken: scanToken);
+    return QrLoginPayloadDto(id: id, scanToken: scanToken);
   }
 
-  factory QrLoginPayload.parse(String raw) {
+  factory QrLoginPayloadDto.parse(String raw) {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! Map) throw const FormatException();
-      return QrLoginPayload.fromJson(Map<String, dynamic>.from(decoded));
+      return QrLoginPayloadDto.fromJson(Map<String, dynamic>.from(decoded));
     } catch (_) {
       throw const FormatException('Некорректный QR-код');
     }
   }
 
+  factory QrLoginPayloadDto.fromEntity(QrLoginPayload entity) =>
+      QrLoginPayloadDto(id: entity.id, scanToken: entity.scanToken);
+  QrLoginPayload toEntity() => QrLoginPayload(id: id, scanToken: scanToken);
   final String id;
   final String scanToken;
 
@@ -43,8 +47,11 @@ class QrLoginPayload extends Equatable {
     'scanToken': scanToken,
   };
 
-  QrLoginPayload copyWith({String? id, String? scanToken}) =>
-      QrLoginPayload(id: id ?? this.id, scanToken: scanToken ?? this.scanToken);
+  QrLoginPayloadDto copyWith({String? id, String? scanToken}) =>
+      QrLoginPayloadDto(
+        id: id ?? this.id,
+        scanToken: scanToken ?? this.scanToken,
+      );
 
   @override
   List<Object?> get props => <Object?>[id, scanToken];

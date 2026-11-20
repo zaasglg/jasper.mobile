@@ -1,7 +1,8 @@
+import '../../domain/entities/qr_session_model.dart';
 import 'package:equatable/equatable.dart';
 
-class QrSessionModel extends Equatable {
-  const QrSessionModel({
+class QrSessionModelDto extends Equatable {
+  const QrSessionModelDto({
     required this.id,
     required this.deviceInfo,
     required this.ipAddress,
@@ -9,7 +10,7 @@ class QrSessionModel extends Equatable {
     required this.lastActiveAt,
   });
 
-  factory QrSessionModel.fromJson(Map<String, dynamic> json) {
+  factory QrSessionModelDto.fromJson(Map<String, dynamic> json) {
     final idValue = json['id'];
     final id = idValue?.toString();
     final createdValue = json['createdAt'] ?? json['created_at'];
@@ -23,7 +24,7 @@ class QrSessionModel extends Equatable {
     if (id == null || id.isEmpty || createdAt == null || lastActiveAt == null) {
       throw const FormatException('Некорректный QR-сеанс');
     }
-    return QrSessionModel(
+    return QrSessionModelDto(
       id: id,
       deviceInfo:
           (json['deviceInfo'] ?? json['userAgent'] ?? json['device'])
@@ -35,6 +36,21 @@ class QrSessionModel extends Equatable {
     );
   }
 
+  factory QrSessionModelDto.fromEntity(QrSessionModel entity) =>
+      QrSessionModelDto(
+        id: entity.id,
+        deviceInfo: entity.deviceInfo,
+        ipAddress: entity.ipAddress,
+        createdAt: entity.createdAt,
+        lastActiveAt: entity.lastActiveAt,
+      );
+  QrSessionModel toEntity() => QrSessionModel(
+    id: id,
+    deviceInfo: deviceInfo,
+    ipAddress: ipAddress,
+    createdAt: createdAt,
+    lastActiveAt: lastActiveAt,
+  );
   final String id;
   final String deviceInfo;
   final String ipAddress;
@@ -49,13 +65,13 @@ class QrSessionModel extends Equatable {
     'lastActiveAt': lastActiveAt.toIso8601String(),
   };
 
-  QrSessionModel copyWith({
+  QrSessionModelDto copyWith({
     String? id,
     String? deviceInfo,
     String? ipAddress,
     DateTime? createdAt,
     DateTime? lastActiveAt,
-  }) => QrSessionModel(
+  }) => QrSessionModelDto(
     id: id ?? this.id,
     deviceInfo: deviceInfo ?? this.deviceInfo,
     ipAddress: ipAddress ?? this.ipAddress,

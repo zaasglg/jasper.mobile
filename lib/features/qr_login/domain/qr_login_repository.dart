@@ -1,8 +1,9 @@
-import '../data/models/qr_login_details.dart';
-import '../data/models/qr_login_payload.dart';
-import '../data/models/qr_session_model.dart';
+import 'entities/qr_login_details.dart';
+import 'entities/qr_login_payload.dart';
+import 'entities/qr_session_model.dart';
 
 abstract interface class QrLoginRepository {
+  QrLoginPayload parsePayload(String raw);
   Future<QrLoginDetails> scan(QrLoginPayload payload);
   Future<void> approve(QrLoginPayload payload);
   Future<void> reject(QrLoginPayload payload);

@@ -1,8 +1,9 @@
+import 'package:jospar/features/qr_login/data/models/qr_login_payload_dto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/core/auth/auth_session.dart';
-import 'package:jospar/features/qr_login/data/models/qr_login_details.dart';
-import 'package:jospar/features/qr_login/data/models/qr_login_payload.dart';
+import 'package:jospar/features/qr_login/domain/entities/qr_login_details.dart';
+import 'package:jospar/features/qr_login/domain/entities/qr_login_payload.dart';
 import 'package:jospar/features/qr_login/data/qr_login_repository_impl.dart';
 import 'package:jospar/features/qr_login/domain/qr_login_repository.dart';
 import 'package:jospar/features/qr_login/presentation/cubit/qr_login_cubit.dart';
@@ -15,11 +16,11 @@ const validJson =
     '"scanToken":"$validToken"}';
 
 void main() {
-  group('QrLoginPayload', () {
+  group('QrLoginPayloadDto', () {
     test('accepts only the documented JSON contract', () {
-      final payload = QrLoginPayload.parse(validJson);
+      final payload = QrLoginPayloadDto.parse(validJson);
       expect(payload.id, validId);
-      expect(QrLoginPayload.fromJson(payload.toJson()), payload);
+      expect(QrLoginPayloadDto.fromJson(payload.toJson()), payload);
       expect(payload.copyWith(id: validId), payload);
     });
 
@@ -30,7 +31,7 @@ void main() {
       '{"type":"orbita:qr-login","version":1,"id":"short","scanToken":"$validToken"}',
     ]) {
       test('rejects invalid QR without API access: $invalid', () {
-        expect(() => QrLoginPayload.parse(invalid), throwsFormatException);
+        expect(() => QrLoginPayloadDto.parse(invalid), throwsFormatException);
       });
     }
   });
@@ -95,7 +96,7 @@ void main() {
       expect(repository.approveCalls, 1);
     });
 
-    test('invalid QR never reaches repository', () async {
+    test('invalid QR never reaches scan API', () async {
       final repository = _FakeRepository();
       final cubit = QrLoginCubit(repository);
       addTearDown(cubit.close);
@@ -149,6 +150,10 @@ class _FakeRepository implements QrLoginRepository {
   int scanCalls = 0;
   int approveCalls = 0;
   int rejectCalls = 0;
+
+  @override
+  QrLoginPayload parsePayload(String raw) =>
+      QrLoginPayloadDto.parse(raw).toEntity();
 
   @override
   Future<QrLoginDetails> scan(QrLoginPayload payload) async {
