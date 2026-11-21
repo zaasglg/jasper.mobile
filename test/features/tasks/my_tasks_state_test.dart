@@ -1,5 +1,5 @@
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 import 'package:jospar/features/tasks/presentation/cubit/my_tasks_state.dart';
 

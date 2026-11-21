@@ -1,9 +1,14 @@
+import '../../../projects/domain/entities/project_task_model.dart';
+import '../../../projects/data/models/project_task_dto.dart';
+import '../../../projects/domain/entities/task_assignee_model.dart';
+import '../../../projects/data/models/task_assignee_dto.dart';
+import '../../../projects/domain/entities/task_epic_model.dart';
+import '../../../projects/data/models/task_epic_dto.dart';
 import 'kanban_column_dto.dart';
 import '../../../workspaces/data/models/workspace_dto.dart';
 import 'package:equatable/equatable.dart';
 import '../../../profile/domain/entities/user_profile.dart';
 import '../../../profile/data/models/user_profile_dto.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../../workspaces/domain/entities/workspace_model.dart';
 import '../../domain/entities/kanban_column_model.dart';
 import 'task_detail_model.dart';
@@ -66,24 +71,34 @@ class TaskCreationOptions extends Equatable {
         .toList(),
     epics: (json['epics'] as List? ?? [])
         .whereType<Map>()
-        .map((e) => TaskEpicModel.fromJson(Map<String, dynamic>.from(e)))
+        .map(
+          (e) => TaskEpicDto.fromJson(Map<String, dynamic>.from(e)).toEntity(),
+        )
         .toList(),
     members: (json['members'] as List? ?? [])
         .whereType<Map>()
-        .map((e) => TaskAssigneeModel.fromJson(Map<String, dynamic>.from(e)))
+        .map(
+          (e) =>
+              TaskAssigneeDto.fromJson(Map<String, dynamic>.from(e)).toEntity(),
+        )
         .toList(),
     tasks: (json['tasks'] as List? ?? [])
         .whereType<Map>()
-        .map((e) => ProjectTaskModel.fromJson(Map<String, dynamic>.from(e)))
+        .map(
+          (e) =>
+              ProjectTaskDto.fromJson(Map<String, dynamic>.from(e)).toEntity(),
+        )
         .toList(),
   );
   Map<String, dynamic> toJson() => {
     'columns': columns
         .map((e) => KanbanColumnDto.fromEntity(e).toJson())
         .toList(),
-    'epics': epics.map((e) => e.toJson()).toList(),
-    'members': members.map((e) => e.toJson()).toList(),
-    'tasks': tasks.map((e) => e.toJson()).toList(),
+    'epics': epics.map((e) => TaskEpicDto.fromEntity(e).toJson()).toList(),
+    'members': members
+        .map((e) => TaskAssigneeDto.fromEntity(e).toJson())
+        .toList(),
+    'tasks': tasks.map((e) => ProjectTaskDto.fromEntity(e).toJson()).toList(),
   };
   TaskCreationOptions copyWith({
     List<KanbanColumnModel>? columns,
@@ -211,14 +226,14 @@ class TaskCreationResult extends Equatable {
   final bool orderWarning;
   factory TaskCreationResult.fromJson(Map<String, dynamic> json) =>
       TaskCreationResult(
-        task: ProjectTaskModel.fromJson(
+        task: ProjectTaskDto.fromJson(
           Map<String, dynamic>.from(json['task'] as Map),
-        ),
+        ).toEntity(),
         workspaceId: json['workspaceId']?.toString() ?? '',
         orderWarning: json['orderWarning'] == true,
       );
   Map<String, dynamic> toJson() => {
-    'task': task.toJson(),
+    'task': ProjectTaskDto.fromEntity(task).toJson(),
     'workspaceId': workspaceId,
     'orderWarning': orderWarning,
   };

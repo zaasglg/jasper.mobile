@@ -1,8 +1,8 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 import 'package:jospar/features/tasks/data/repositories/my_tasks_repository_impl.dart';
 import 'package:jospar/features/tasks/domain/entities/task_extra_field.dart';

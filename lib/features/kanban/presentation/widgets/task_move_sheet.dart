@@ -1,11 +1,11 @@
+import '../../../projects/domain/entities/project_model.dart';
+import '../../../projects/domain/entities/project_task_model.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_form_surface.dart';
-import '../../../projects/data/models/project_model.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../../workspaces/domain/entities/workspace_model.dart';
 import '../../domain/entities/task_move_target.dart';

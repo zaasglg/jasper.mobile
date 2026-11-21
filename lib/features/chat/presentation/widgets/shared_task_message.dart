@@ -1,9 +1,9 @@
+import '../../../projects/domain/entities/project_task_model.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../kanban/presentation/widgets/task_card.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/domain/repositories/task_details_repository.dart';
 
 typedef SharedTaskLink = ({

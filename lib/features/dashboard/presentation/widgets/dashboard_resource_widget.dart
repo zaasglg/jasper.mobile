@@ -1,3 +1,4 @@
+import '../../../projects/domain/entities/project_model.dart';
 import '../utils/dashboard_options_changes.dart';
 import '../../domain/entities/dashboard_widget_options.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
@@ -9,7 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
-import '../../../projects/data/models/project_model.dart';
 import 'dashboard_task_list_sheet.dart';
 import 'dashboard_widget_panel.dart'
     show dashboardObject, flattenDashboardProjects;

@@ -1,9 +1,9 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:jospar/features/dashboard/presentation/utils/dashboard_options_changes.dart';
 import 'package:jospar/features/dashboard/domain/entities/dashboard_widget_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_resource_widget.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/dashboard/presentation/cubit/dashboard_layout_cubit.dart';
 import 'dashboard_layout_test.dart' show FakeDashboardRepository, fixture;
 

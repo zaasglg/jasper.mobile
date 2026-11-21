@@ -1,10 +1,11 @@
+import '../../domain/entities/project_model.dart';
+import '../../domain/entities/create_project_request.dart';
+import '../../domain/entities/project_task_model.dart';
+import '../../domain/entities/task_assignee_model.dart';
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../data/models/create_project_request.dart';
-import '../../data/models/project_model.dart';
-import '../../data/models/project_task_model.dart';
 import '../../data/repositories/project_repository_impl.dart';
 import '../../domain/repositories/project_repository.dart';
 import '../../domain/repositories/project_task_repository.dart';

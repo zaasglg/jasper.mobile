@@ -1,8 +1,8 @@
+import '../../../projects/domain/entities/project_model.dart';
+import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../assistant/data/services/assistant_task_changes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../projects/data/models/project_model.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../domain/entities/kanban_column_model.dart';
 import '../../data/repositories/my_tasks_repository_impl.dart';
 import '../../domain/entities/task_extra_field.dart';

@@ -1,3 +1,6 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
+import 'package:jospar/features/projects/domain/entities/task_epic_model.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -17,8 +20,6 @@ import 'package:jospar/features/kanban/presentation/cubit/kanban_cubit.dart';
 import 'package:jospar/features/kanban/presentation/cubit/kanban_state.dart';
 import 'package:jospar/features/kanban/presentation/widgets/kanban_board.dart';
 import 'package:jospar/features/kanban/domain/utils/kanban_utils.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 import 'package:jospar/features/planner/data/models/planner_item_model.dart';
 import 'package:jospar/features/planner/domain/repositories/planner_repository.dart';

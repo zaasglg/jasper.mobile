@@ -94,3 +94,15 @@ TaskLabelModel.unknownLabelFields — Map<String, dynamic> неизвестны�
 `TaskLabelCatalog` заменён record-ответом репозитория с `shared/personal: List<TaskLabelModel>`; отдельной domain-сущности каталога нет. JSON-каталог находится в `TaskLabelCatalogDto`; нормализация ключа и уникальность — в domain/utils/task_label_utils.dart.
 
 Пока детали задачи остаются в data до шага 13, `TaskDetailsCubit`, `TaskDetailsState` и `TaskLabelsEditor` точечно используют `TaskLabelDto` для вложенных карт personalLabels/labelCatalog. На шаге 13 перенести эти преобразования за границу data вместе с разделением TaskDetailModel; UI и domain не должны разбирать исходные detail-карты.
+
+## Projects: снимок detail задачи до шага 13
+
+`ProjectTaskDetailSnapshot.unknownDetailFields: Map<String, dynamic>` — согласованное временное исключение до шага 13. `cover`, общие `labels`, `personalLabelsByUser` (ключ — строковый userId) и старый список `legacyPersonalLabels` типизированы. `files`, `comments`, `checklists`/`checklist`, `description`, ресурсы и остальные расширения сохраняются без изменения вложенных значений для round-trip. DTO вычисляет счётчики из коллекций при отсутствии явных значений; файлы и комментарии также используются DTO для поиска обложки. Некорректные значения известных полей остаются в карте, если не были декодированы. Типизированные поля при сериализации накладываются поверх неизвестных. На шаге 13 согласовать снимок с полной моделью деталей и уменьшить динамическую часть без потери HTTP-данных.
+
+`ProjectTaskDetailSnapshot.legacyText: String?` сохраняет старый текстовый detail и строки, не содержащие JSON-объект. Это осознанное исключение совместимости API; декодирование и обратная сериализация остаются в `ProjectTaskDetailSnapshotDto`. Уточнить миграцию старых описаний на шаге 13, не удалять текст при сохранении задачи.
+
+`ProjectTaskCover.url/imageUrl` — исходные значения для API; `displayUrl` — подготовленный DTO URL для отображения, включая поиск вложений в files/comments и резолвинг относительно ApiConstants.origin. `displayUrl` не сериализуется. Прямые конструкторы domain не нормализуют данные.
+
+## Projects: presentation → data
+
+`lib/features/projects/presentation/cubit/projects_cubit.dart` → `lib/features/projects/data/repositories/project_repository_impl.dart` (`ProjectException`). Отдельной задачей перенести исключение в `domain/exceptions/project_exception.dart`, сохранив обработку ошибок и публичное имя.

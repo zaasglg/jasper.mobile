@@ -1,3 +1,6 @@
+import '../../../projects/domain/entities/project_task_model.dart';
+import '../../../projects/domain/entities/task_assignee_model.dart';
+import '../../../projects/domain/entities/task_epic_model.dart';
 import '../../domain/entities/task_label_model.dart';
 import '../../data/models/task_label_dto.dart';
 import '../../domain/utils/task_label_utils.dart';
@@ -5,7 +8,6 @@ import '../../../assistant/data/services/assistant_task_changes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../profile/domain/repositories/profile_repository.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../data/models/task_detail_model.dart';
 import '../../domain/repositories/task_details_repository.dart';
 import '../../domain/utils/task_completion.dart';

@@ -1,8 +1,8 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
+import 'package:jospar/features/projects/domain/entities/create_project_request.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/projects/data/models/create_project_request.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/domain/repositories/project_repository.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart';
 import 'package:jospar/features/projects/presentation/widgets/create_project_sheet.dart';

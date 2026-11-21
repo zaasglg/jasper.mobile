@@ -1,3 +1,7 @@
+import '../../../projects/domain/entities/task_assignee_model.dart';
+import '../../../projects/data/models/task_assignee_dto.dart';
+import '../../../projects/domain/entities/task_epic_model.dart';
+import '../../../projects/data/models/task_epic_dto.dart';
 import '../../domain/entities/task_label_model.dart';
 import '../models/kanban_column_dto.dart';
 import '../models/task_label_catalog_dto.dart';
@@ -6,7 +10,6 @@ import 'package:dio/dio.dart';
 import '../../domain/repositories/task_details_repository.dart';
 import '../../domain/entities/kanban_column_model.dart';
 import '../models/task_detail_model.dart';
-import '../../../projects/data/models/project_task_model.dart';
 
 class TaskDetailsRepositoryImpl
     implements
@@ -153,7 +156,9 @@ class TaskDetailsRepositoryImpl
       return (items as List)
           .whereType<Map>()
           .map(
-            (item) => TaskEpicModel.fromJson(Map<String, dynamic>.from(item)),
+            (item) => TaskEpicDto.fromJson(
+              Map<String, dynamic>.from(item),
+            ).toEntity(),
           )
           .toList();
     } on DioException {
@@ -286,9 +291,9 @@ class TaskDetailsRepositoryImpl
       return _list(response.data)
           .whereType<Map>()
           .map(
-            (user) => TaskAssigneeModel.fromJson({
+            (user) => TaskAssigneeDto.fromJson({
               'user': Map<String, dynamic>.from(user),
-            }),
+            }).toEntity(),
           )
           .where((user) => user.userId.isNotEmpty)
           .toList();

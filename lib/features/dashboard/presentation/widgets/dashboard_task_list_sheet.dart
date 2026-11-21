@@ -1,8 +1,8 @@
+import '../../../projects/domain/entities/project_model.dart';
 import '../../../tasks/domain/utils/task_column_label.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../projects/data/models/project_model.dart';
 import 'dashboard_widget_panel.dart'
     show dashboardObject, dashboardDone, flattenDashboardProjects;
 

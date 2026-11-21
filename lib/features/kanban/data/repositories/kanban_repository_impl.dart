@@ -1,3 +1,5 @@
+import '../../../projects/domain/entities/project_task_model.dart';
+import '../../../projects/data/models/project_task_dto.dart';
 import '../../../tasks/data/models/kanban_column_dto.dart';
 import 'dart:convert';
 import '../../../assistant/data/repositories/assistant_repository_impl.dart';
@@ -6,7 +8,6 @@ import '../../../assistant/domain/repositories/assistant_repository.dart';
 import '../models/task_translation.dart';
 import 'package:dio/dio.dart';
 
-import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../domain/entities/kanban_board_data.dart';
 import '../../domain/repositories/kanban_repository.dart';
@@ -49,9 +50,9 @@ class KanbanRepositoryImpl implements KanbanRepository {
           final page = _list(response.data);
           var advanced = false;
           for (final item in page.whereType<Map>()) {
-            final task = ProjectTaskModel.fromJson(
+            final task = ProjectTaskDto.fromJson(
               Map<String, dynamic>.from(item),
-            );
+            ).toEntity();
             if (task.id.isNotEmpty && seenIds.add(task.id)) advanced = true;
             if (task.id.isNotEmpty &&
                 task.projectId == projectId &&
@@ -141,7 +142,7 @@ class KanbanRepositoryImpl implements KanbanRepository {
           for (final id in epicIds) {'id': id},
         ],
       );
-      return ProjectTaskModel.fromJson(data);
+      return ProjectTaskDto.fromJson(data).toEntity();
     } on DioException catch (error) {
       throw _exception(error, 'создать задачу');
     } on KanbanException {
@@ -202,7 +203,7 @@ class KanbanRepositoryImpl implements KanbanRepository {
           'detail': detail,
         },
       );
-      return ProjectTaskModel.fromJson(_object(response.data));
+      return ProjectTaskDto.fromJson(_object(response.data)).toEntity();
     } on DioException catch (error) {
       throw _exception(error, 'дублировать задачу');
     }
@@ -259,7 +260,7 @@ class KanbanRepositoryImpl implements KanbanRepository {
         'project-tasks/${Uri.encodeComponent(taskId)}',
         data: {'detail': detail},
       );
-      return ProjectTaskModel.fromJson(_object(response.data));
+      return ProjectTaskDto.fromJson(_object(response.data)).toEntity();
     } on DioException catch (error) {
       throw _exception(error, 'сохранить обложку');
     }
@@ -311,7 +312,7 @@ class KanbanRepositoryImpl implements KanbanRepository {
         'project-tasks/${Uri.encodeComponent(taskId)}',
         data: {'title': translation.title, 'detail': detail},
       );
-      return ProjectTaskModel.fromJson(_object(response.data));
+      return ProjectTaskDto.fromJson(_object(response.data)).toEntity();
     } on DioException catch (error) {
       throw _exception(error, 'сохранить перевод');
     }

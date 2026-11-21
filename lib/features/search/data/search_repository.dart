@@ -1,10 +1,12 @@
+import '../../projects/domain/entities/project_model.dart';
+import '../../projects/data/models/project_dto.dart';
+import '../../projects/domain/entities/project_task_model.dart';
+import '../../projects/data/models/project_task_dto.dart';
 import '../../inbox/data/models/inbox_task_dto.dart';
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
 
 import '../../inbox/domain/entities/inbox_task_model.dart';
-import '../../projects/data/models/project_model.dart';
-import '../../projects/data/models/project_task_model.dart';
 
 class SearchResults extends Equatable {
   const SearchResults({
@@ -106,12 +108,17 @@ class SearchRepositoryImpl implements SearchRepository {
         ),
       ],
     ];
-    final projects = flatten(initial[0].map(ProjectModel.fromJson).toList())
-        .where(
-          (project) =>
-              workspaceId.isEmpty || project.workspaceId == workspaceId,
-        )
-        .toList();
+    final projects =
+        flatten(
+              initial[0]
+                  .map((json) => ProjectDto.fromJson(json).toEntity())
+                  .toList(),
+            )
+            .where(
+              (project) =>
+                  workspaceId.isEmpty || project.workspaceId == workspaceId,
+            )
+            .toList();
     final ids = projects
         .map((project) => project.id)
         .where((id) => id.isNotEmpty)
@@ -161,7 +168,7 @@ class SearchRepositoryImpl implements SearchRepository {
     final tasks = <String, ProjectTaskModel>{};
     for (var page = 0; page < taskPages.length; page++) {
       for (final json in taskPages[page]) {
-        final task = ProjectTaskModel.fromJson(json);
+        final task = ProjectTaskDto.fromJson(json).toEntity();
         if (task.id.isNotEmpty && ids.contains(task.projectId)) {
           tasks[task.id] = page == 1 ? task.copyWith(archived: true) : task;
         }

@@ -1,3 +1,4 @@
+import '../../../projects/domain/entities/task_assignee_model.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_form_surface.dart';
@@ -6,7 +7,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../data/models/task_detail_model.dart';
 import '../cubit/task_details_cubit.dart';
 

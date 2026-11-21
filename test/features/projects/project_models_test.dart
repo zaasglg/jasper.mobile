@@ -1,13 +1,15 @@
+import 'package:jospar/features/projects/data/models/create_project_request_dto.dart';
+import 'package:jospar/features/projects/data/models/project_dto.dart';
+import 'package:jospar/features/projects/domain/entities/create_project_request.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
+import 'package:jospar/features/projects/data/models/project_task_dto.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/projects/data/models/create_project_request.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 
 void main() {
   test(
     'personal labels are included alongside shared labels and preserved after moving',
     () {
-      final task = ProjectTaskModel.fromJson({
+      final task = ProjectTaskDto.fromJson({
         'detail': {
           'labels': [
             {'id': 'shared', 'text': 'Общая', 'color': '#6366F1'},
@@ -16,13 +18,13 @@ void main() {
             {'id': 'private', 'text': 'Личная', 'color': '#d09835'},
           ],
         },
-      });
+      }).toEntity();
       expect(task.labels.length, 2);
       expect(task.labels.first.isPersonal, false);
       expect(task.labels.last.isPersonal, true);
-      final restored = ProjectTaskModel.fromJson(
-        task.copyWith(status: 'DONE').toJson(),
-      );
+      final restored = ProjectTaskDto.fromJson(
+        ProjectTaskDto.fromEntity(task.copyWith(status: 'DONE')).toJson(),
+      ).toEntity();
       expect(restored.labels.last.text, 'Личная');
       expect(restored.labels.last.isPersonal, true);
       expect(restored.labels.last.color, '#d09835');
@@ -30,7 +32,7 @@ void main() {
   );
 
   test('checklist count includes items and sections across multiple lists', () {
-    final task = ProjectTaskModel.fromJson({
+    final task = ProjectTaskDto.fromJson({
       'detail': {
         'checklists': [
           {
@@ -53,17 +55,17 @@ void main() {
           },
         ],
       },
-    });
+    }).toEntity();
     expect(task.checklistTotal, 4);
     expect(task.checklistCompleted, 2);
-    final restored = ProjectTaskModel.fromJson(
-      task.copyWith(status: 'DONE').toJson(),
-    );
+    final restored = ProjectTaskDto.fromJson(
+      ProjectTaskDto.fromEntity(task.copyWith(status: 'DONE')).toJson(),
+    ).toEntity();
     expect(restored.checklistTotal, 4);
     expect(restored.checklistCompleted, 2);
-    final legacy = ProjectTaskModel.fromJson({
+    final legacy = ProjectTaskDto.fromJson({
       'detail': '{"checklist":[{"done":true},{"done":false}]}',
-    });
+    }).toEntity();
     expect(legacy.checklistTotal, 2);
     expect(legacy.checklistCompleted, 1);
   });
@@ -71,7 +73,7 @@ void main() {
   test(
     'discussion count reads active detail comments and legacy summaries',
     () {
-      final task = ProjectTaskModel.fromJson({
+      final task = ProjectTaskDto.fromJson({
         'detail': {
           'comments': [
             {'id': '1', 'text': 'Обсуждение'},
@@ -79,24 +81,32 @@ void main() {
             {'id': '3', 'deleted_at': '2026-10-05T10:00:00Z'},
           ],
         },
-      });
+      }).toEntity();
       expect(task.commentCount, 1);
       expect(
-        ProjectTaskModel.fromJson(
-          task.copyWith(status: 'DONE').toJson(),
-        ).commentCount,
+        ProjectTaskDto.fromJson(
+          ProjectTaskDto.fromEntity(task.copyWith(status: 'DONE')).toJson(),
+        ).toEntity().commentCount,
         1,
       );
-      expect(ProjectTaskModel.fromJson({'comments': 4}).commentCount, 4);
-      expect(ProjectTaskModel.fromJson({'commentsCount': '3'}).commentCount, 3);
       expect(
-        ProjectTaskModel.fromJson({
+        ProjectTaskDto.fromJson({'comments': 4}).toEntity().commentCount,
+        4,
+      );
+      expect(
+        ProjectTaskDto.fromJson({'commentsCount': '3'}).toEntity().commentCount,
+        3,
+      );
+      expect(
+        ProjectTaskDto.fromJson({
           'detail': '{"comments":[{"id":"1"}]}',
-        }).commentCount,
+        }).toEntity().commentCount,
         1,
       );
       expect(
-        ProjectTaskModel.fromJson({'detail': 'Обычный текст'}).commentCount,
+        ProjectTaskDto.fromJson({
+          'detail': 'Обычный текст',
+        }).toEntity().commentCount,
         0,
       );
     },
@@ -115,21 +125,27 @@ void main() {
         },
         '{"files":[{"id":"1"},{"id":"2"},null]}',
       ]) {
-        final task = ProjectTaskModel.fromJson({'detail': detail});
+        final task = ProjectTaskDto.fromJson({'detail': detail}).toEntity();
         expect(task.fileCount, 2);
         expect(
-          ProjectTaskModel.fromJson(
-            task.copyWith(status: 'DONE').toJson(),
-          ).fileCount,
+          ProjectTaskDto.fromJson(
+            ProjectTaskDto.fromEntity(task.copyWith(status: 'DONE')).toJson(),
+          ).toEntity().fileCount,
           2,
         );
       }
-      expect(ProjectTaskModel.fromJson({'filesCount': '5'}).fileCount, 5);
-      expect(ProjectTaskModel.fromJson({'detail': 'text'}).fileCount, 0);
       expect(
-        ProjectTaskModel.fromJson({
+        ProjectTaskDto.fromJson({'filesCount': '5'}).toEntity().fileCount,
+        5,
+      );
+      expect(
+        ProjectTaskDto.fromJson({'detail': 'text'}).toEntity().fileCount,
+        0,
+      );
+      expect(
+        ProjectTaskDto.fromJson({
           'detail': {'files': []},
-        }).fileCount,
+        }).toEntity().fileCount,
         0,
       );
     },
@@ -138,7 +154,7 @@ void main() {
   test(
     'board task reads nested labels and colored epics without losing them on copy or JSON round trip',
     () {
-      final task = ProjectTaskModel.fromJson({
+      final task = ProjectTaskDto.fromJson({
         'id': 'task',
         'projectId': 'p',
         'status': 'TODO',
@@ -155,37 +171,39 @@ void main() {
           },
           {'id': 'e2', 'name': 'Релиз', 'color': '#6366F1'},
         ],
-      });
+      }).toEntity();
       expect(task.labels.single.text, 'Личная метка');
       expect(task.labels.single.color, '#e19b31');
       expect(task.epics.first.color, '#128867');
       expect(task.epics.last.id, 'e2');
       final moved = task.copyWith(status: 'DONE', order: 2);
-      final restored = ProjectTaskModel.fromJson(moved.toJson());
+      final restored = ProjectTaskDto.fromJson(
+        ProjectTaskDto.fromEntity(moved).toJson(),
+      ).toEntity();
       expect(restored.labels, task.labels);
       expect(restored.epics, task.epics);
     },
   );
 
   test('labels support JSON detail and ignore malformed legacy detail', () {
-    final task = ProjectTaskModel.fromJson({
+    final task = ProjectTaskDto.fromJson({
       'detail': '{"labels":[{"id":"l","text":"Метка"}]}',
-    });
+    }).toEntity();
     expect(task.labels.single.text, 'Метка');
     expect(
-      ProjectTaskModel.fromJson({'detail': 'Обычный текст'}).labels,
+      ProjectTaskDto.fromJson({'detail': 'Обычный текст'}).toEntity().labels,
       isEmpty,
     );
     expect(
-      ProjectTaskModel.fromJson({
+      ProjectTaskDto.fromJson({
         'detail': {'labels': null},
-      }).labels,
+      }).toEntity().labels,
       isEmpty,
     );
   });
 
   test('ProjectModel parses flexible API values', () {
-    final project = ProjectModel.fromJson(<String, dynamic>{
+    final project = ProjectDto.fromJson(<String, dynamic>{
       'id': 'p1',
       'code': 'APP',
       'name': 'Приложение',
@@ -194,7 +212,7 @@ void main() {
       'end': '2026-09-21T00:00:00.000Z',
       'progress': '45',
       'is_pinned': 1,
-    });
+    }).toEntity();
 
     expect(project.workspaceId, 'w1');
     expect(project.progress, 45);
@@ -203,7 +221,7 @@ void main() {
   });
 
   test('ProjectModel parses nested child projects', () {
-    final project = ProjectModel.fromJson(<String, dynamic>{
+    final project = ProjectDto.fromJson(<String, dynamic>{
       'id': 'root',
       'name': 'Root',
       'workspaceId': 'workspace',
@@ -214,10 +232,10 @@ void main() {
           'workspaceId': 'workspace',
         },
       ],
-    });
+    }).toEntity();
 
     expect(project.children.single.id, 'child');
-    expect(project.toJson()['children'], isNotEmpty);
+    expect(ProjectDto.fromEntity(project).toJson()['children'], isNotEmpty);
   });
 
   test('ProjectTaskModel recognizes both completion rules', () {
@@ -226,12 +244,12 @@ void main() {
       projectId: 'project',
       status: 'done',
     );
-    final byProgress = ProjectTaskModel.fromJson(<String, dynamic>{
+    final byProgress = ProjectTaskDto.fromJson(<String, dynamic>{
       'id': '2',
       'project_id': 'project',
       'status': 'IN_PROGRESS',
       'progress': '100',
-    });
+    }).toEntity();
 
     expect(byStatus.isDone, isTrue);
     expect(byProgress.isDone, isTrue);
@@ -239,25 +257,25 @@ void main() {
   });
 
   test('ProjectTaskModel treats Unix epoch deadline as absent', () {
-    final fromIso = ProjectTaskModel.fromJson(<String, dynamic>{
+    final fromIso = ProjectTaskDto.fromJson(<String, dynamic>{
       'id': '1',
       'projectId': 'project',
       'status': 'TODO',
       'end': '1970-01-01T00:00:00.000Z',
-    });
-    final fromTimestamp = ProjectTaskModel.fromJson(<String, dynamic>{
+    }).toEntity();
+    final fromTimestamp = ProjectTaskDto.fromJson(<String, dynamic>{
       'id': '2',
       'projectId': 'project',
       'status': 'TODO',
       'end': 0,
-    });
+    }).toEntity();
 
     expect(fromIso.end, isNull);
     expect(fromTimestamp.end, isNull);
   });
 
   test('ProjectTaskModel parses assignee profile data', () {
-    final task = ProjectTaskModel.fromJson(<String, dynamic>{
+    final task = ProjectTaskDto.fromJson(<String, dynamic>{
       'id': '1',
       'projectId': 'project',
       'status': 'TODO',
@@ -271,7 +289,7 @@ void main() {
           },
         },
       ],
-    });
+    }).toEntity();
 
     expect(task.assignees.single.userId, 'user-1');
     expect(task.assignees.single.name, 'Анна Смирнова');
@@ -293,7 +311,7 @@ void main() {
         isPinned: true,
       );
 
-      final json = request.toJson();
+      final json = CreateProjectRequestDto.fromEntity(request).toJson();
       expect(json['code'], 'MOB');
       expect(json['name'], 'Mobile');
       expect(json['start'], endsWith('Z'));

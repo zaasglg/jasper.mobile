@@ -1,9 +1,13 @@
+import 'package:jospar/features/projects/domain/entities/project_task_cover.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_detail_snapshot.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
+import 'package:jospar/features/projects/data/models/project_task_dto.dart';
+import 'package:jospar/features/projects/domain/entities/task_epic_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:jospar/features/kanban/data/models/card_view_settings.dart';
 import 'package:jospar/features/kanban/presentation/widgets/task_card.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/domain/entities/task_label_model.dart';
 
 void main() {
@@ -26,17 +30,22 @@ void main() {
   );
 
   test('parses cover and resource counts and preserves them in copies', () {
-    final task = ProjectTaskModel.fromJson({
+    final task = ProjectTaskDto.fromJson({
       'detail': {
         'cover': {'type': 'color', 'color': '#123456'},
       },
       'resources': [
         {'id': 'r'},
       ],
-    });
-    expect(task.cover['color'], '#123456');
+    }).toEntity();
+    expect(task.cover!.color, '#123456');
     expect(task.resourceCount, 1);
-    expect(ProjectTaskModel.fromJson(task.toJson()), task);
+    expect(
+      ProjectTaskDto.fromJson(
+        ProjectTaskDto.fromEntity(task).toJson(),
+      ).toEntity(),
+      task,
+    );
     expect(task.copyWith(title: 'Новое имя').resourceCount, 1);
   });
 
@@ -56,7 +65,9 @@ void main() {
       commentCount: 4,
       resourceCount: 2,
       estimate: 60,
-      detail: '{"cover":{"type":"color","color":"#123456"}}',
+      detail: ProjectTaskDetailSnapshot(
+        cover: ProjectTaskCover(type: 'color', color: '#123456'),
+      ),
       epics: [TaskEpicModel(id: 'e', name: 'Эпик')],
       labels: [
         TaskLabelModel(id: 'l', text: 'Общая'),

@@ -1,3 +1,5 @@
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
+import 'package:jospar/features/projects/data/models/project_task_dto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +12,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/profile/domain/entities/user_profile.dart';
 import 'package:jospar/features/profile/domain/repositories/profile_repository.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/tasks/data/models/task_location_model.dart';
 import 'package:jospar/features/tasks/data/repositories/task_details_repository_impl.dart';
@@ -176,9 +177,9 @@ void main() {
       });
       expect(result.task.deps, ['PR-2']);
       expect(
-        ProjectTaskModel.fromJson(
-          result.task.toJson(),
-        ).copyWith(title: 'Changed').deps,
+        ProjectTaskDto.fromJson(
+          ProjectTaskDto.fromEntity(result.task).toJson(),
+        ).toEntity().copyWith(title: 'Changed').deps,
         ['PR-2'],
       );
     },

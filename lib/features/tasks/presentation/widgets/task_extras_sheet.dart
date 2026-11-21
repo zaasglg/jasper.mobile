@@ -1,3 +1,4 @@
+import '../../../projects/domain/entities/task_epic_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import 'task_labels_editor.dart';
 import 'task_attachment_picker.dart';
@@ -5,7 +6,6 @@ import '../../../../core/widgets/app_dialog.dart';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../domain/repositories/task_details_repository.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

@@ -1,3 +1,4 @@
+import '../../domain/entities/create_project_request.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +9,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../workspaces/domain/entities/workspace_model.dart';
 import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
 import '../../../workspaces/presentation/cubit/workspace_state.dart';
-import '../../data/models/create_project_request.dart';
 import '../cubit/projects_cubit.dart';
 import '../cubit/projects_state.dart';
 

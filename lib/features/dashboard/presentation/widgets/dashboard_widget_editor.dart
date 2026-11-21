@@ -1,3 +1,4 @@
+import '../../../projects/domain/entities/project_model.dart';
 import 'dashboard_resource_options.dart';
 import 'dashboard_selector.dart';
 import 'package:flutter/material.dart';
@@ -5,7 +6,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_action_menu.dart';
 import '../../../../core/widgets/app_dialog.dart';
-import '../../../projects/data/models/project_model.dart';
 import '../../domain/entities/dashboard_widget_slot.dart';
 import '../../domain/entities/dashboard_widget_definition.dart';
 import '../cubit/dashboard_layout_cubit.dart';

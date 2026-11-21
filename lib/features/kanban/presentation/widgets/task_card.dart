@@ -1,3 +1,7 @@
+import '../../../projects/domain/entities/project_task_cover.dart';
+import '../../../projects/domain/entities/project_task_model.dart';
+import '../../../projects/domain/entities/task_assignee_model.dart';
+import '../../../projects/domain/entities/task_epic_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import 'board_style.dart';
 import '../../../../core/theme/task_label_color.dart';
@@ -15,7 +19,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/domain/utils/my_tasks_utils.dart';
 import '../../../planner/presentation/screens/planner_screen.dart';
 
@@ -221,8 +224,8 @@ class TaskCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            if (cardView.shows(CardField.cover) && task.cover.isNotEmpty)
-              TaskCover(cover: task.cover),
+            if (cardView.shows(CardField.cover) && task.cover != null)
+              TaskCover(cover: task.cover!),
             if (boardStyle && cardView.shows(CardField.id))
               Text(
                 task.displayId.isEmpty ? task.id : task.displayId,
@@ -655,15 +658,13 @@ class _TaskAvatars extends StatelessWidget {
 
 class TaskCover extends StatelessWidget {
   const TaskCover({super.key, required this.cover});
-  final Map<dynamic, dynamic> cover;
+  final ProjectTaskCover cover;
 
   @override
   Widget build(BuildContext context) {
-    final color = cover['color'];
-    final url = resolveUserAvatarUrl(
-      (cover['url'] ?? cover['imageUrl'])?.toString(),
-    );
-    if (cover['type'] == 'color' && color is String) {
+    final color = cover.color;
+    final url = cover.displayUrl;
+    if (cover.type == 'color' && color != null) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Container(

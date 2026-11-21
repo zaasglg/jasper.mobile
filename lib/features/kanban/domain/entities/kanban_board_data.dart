@@ -1,6 +1,6 @@
+import '../../../projects/domain/entities/project_task_model.dart';
 import 'package:equatable/equatable.dart';
 
-import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/domain/entities/kanban_column_model.dart';
 
 class KanbanBoardData extends Equatable {

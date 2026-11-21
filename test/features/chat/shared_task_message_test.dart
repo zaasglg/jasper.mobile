@@ -1,10 +1,10 @@
+import 'package:jospar/features/projects/data/models/project_task_dto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jospar/core/di/service_locator.dart';
 import 'package:jospar/features/chat/presentation/widgets/shared_task_message.dart';
 import 'package:jospar/features/kanban/presentation/widgets/task_card.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/tasks/domain/repositories/task_details_repository.dart';
 
@@ -16,7 +16,7 @@ class _Tasks implements TaskDetailsRepository {
     calls.add(taskId);
     if (fail) throw const TaskDetailsException('Ошибка сети');
     return TaskDetailsPayload(
-      task: ProjectTaskModel.fromJson({
+      task: ProjectTaskDto.fromJson({
         'id': taskId,
         'projectId': 'project',
         'status': 'TODO',
@@ -37,7 +37,7 @@ class _Tasks implements TaskDetailsRepository {
             {'id': 'c'},
           ],
         },
-      }),
+      }).toEntity(),
       detail: const TaskDetailModel(),
     );
   }

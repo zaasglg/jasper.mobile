@@ -1,8 +1,8 @@
+import '../../../projects/domain/entities/project_model.dart';
+import '../../../projects/domain/entities/project_task_model.dart';
 import '../../domain/utils/task_column_label.dart';
 import 'package:equatable/equatable.dart';
 
-import '../../../projects/data/models/project_model.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../domain/entities/kanban_column_model.dart';
 import '../../domain/entities/task_extra_field.dart';
 

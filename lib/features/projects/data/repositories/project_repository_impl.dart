@@ -1,8 +1,10 @@
+import '../models/create_project_request_dto.dart';
+import '../../domain/entities/project_model.dart';
+import '../models/project_dto.dart';
+import '../../domain/entities/create_project_request.dart';
 import 'package:dio/dio.dart';
 
 import '../../domain/repositories/project_repository.dart';
-import '../models/create_project_request.dart';
-import '../models/project_model.dart';
 
 class ProjectRepositoryImpl implements ProjectRepository {
   const ProjectRepositoryImpl(this._dio);
@@ -16,7 +18,10 @@ class ProjectRepositoryImpl implements ProjectRepository {
       final items = _unwrapList(response.data);
       return items
           .whereType<Map>()
-          .map((item) => ProjectModel.fromJson(Map<String, dynamic>.from(item)))
+          .map(
+            (item) =>
+                ProjectDto.fromJson(Map<String, dynamic>.from(item)).toEntity(),
+          )
           .toList(growable: false);
     } on DioException catch (error) {
       throw ProjectException(_messageFor(error, creating: false));
@@ -32,10 +37,10 @@ class ProjectRepositoryImpl implements ProjectRepository {
     try {
       final response = await _dio.post<dynamic>(
         'projects',
-        data: request.toJson(),
+        data: CreateProjectRequestDto.fromEntity(request).toJson(),
       );
       final payload = _unwrapObject(response.data);
-      final parsed = ProjectModel.fromJson(payload);
+      final parsed = ProjectDto.fromJson(payload).toEntity();
       return ProjectModel(
         id: parsed.id,
         code: parsed.code.isEmpty ? request.code.trim() : parsed.code,

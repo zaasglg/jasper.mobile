@@ -1,3 +1,5 @@
+import '../../../projects/domain/entities/project_task_cover.dart';
+import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
@@ -11,7 +13,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../data/models/task_translation.dart';
 import '../cubit/kanban_cubit.dart';
 import 'task_card.dart';
@@ -77,7 +78,7 @@ class _CoverSheet extends StatefulWidget {
 }
 
 class _CoverSheetState extends State<_CoverSheet> {
-  Map<String, dynamic>? _cover;
+  ProjectTaskCover? _cover;
   bool _busy = false;
   String? _error;
   static const _colors = [
@@ -93,9 +94,7 @@ class _CoverSheetState extends State<_CoverSheet> {
   @override
   void initState() {
     super.initState();
-    _cover = widget.task.cover.isEmpty
-        ? null
-        : Map<String, dynamic>.from(widget.task.cover);
+    _cover = widget.task.cover;
   }
 
   Future<void> _pickImage() async {
@@ -125,12 +124,14 @@ class _CoverSheetState extends State<_CoverSheet> {
             throw const FormatException('Не удалось прочитать изображение.');
           }
           if (mounted) {
+            final url =
+                'data:image/png;base64,${base64Encode(bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes))}';
             setState(
-              () => _cover = {
-                'type': 'image',
-                'url':
-                    'data:image/png;base64,${base64Encode(bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes))}',
-              },
+              () => _cover = ProjectTaskCover(
+                type: 'image',
+                url: url,
+                displayUrl: url,
+              ),
             );
           }
         } finally {
@@ -157,7 +158,18 @@ class _CoverSheetState extends State<_CoverSheet> {
       _busy = true;
       _error = null;
     });
-    final saved = await widget.cubit.updateCover(widget.task, _cover);
+    final saved = await widget.cubit.updateCover(
+      widget.task,
+      _cover == null
+          ? null
+          : {
+              if (_cover!.type != null) 'type': _cover!.type,
+              if (_cover!.color != null) 'color': _cover!.color,
+              if (_cover!.fileId != null) 'fileId': _cover!.fileId,
+              if (_cover!.url != null) 'url': _cover!.url,
+              if (_cover!.imageUrl != null) 'imageUrl': _cover!.imageUrl,
+            },
+    );
     if (!mounted) return;
     if (saved) {
       Navigator.pop(context);
@@ -197,13 +209,16 @@ class _CoverSheetState extends State<_CoverSheet> {
                 for (final color in _colors)
                   Semantics(
                     label: 'Цвет $color',
-                    selected: _cover?['color'] == color,
+                    selected: _cover?.color == color,
                     button: true,
                     child: InkWell(
                       onTap: _busy
                           ? null
                           : () => setState(
-                              () => _cover = {'type': 'color', 'color': color},
+                              () => _cover = ProjectTaskCover(
+                                type: 'color',
+                                color: color,
+                              ),
                             ),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
@@ -215,7 +230,7 @@ class _CoverSheetState extends State<_CoverSheet> {
                           ),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: _cover?['color'] == color
+                        child: _cover?.color == color
                             ? const Icon(
                                 Icons.check,
                                 color: Colors.white,

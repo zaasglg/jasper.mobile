@@ -1,7 +1,8 @@
 import 'package:equatable/equatable.dart';
+import '../../domain/entities/create_project_request.dart';
 
-class CreateProjectRequest extends Equatable {
-  const CreateProjectRequest({
+class CreateProjectRequestDto extends Equatable {
+  const CreateProjectRequestDto({
     required this.code,
     required this.name,
     required this.workspaceId,
@@ -13,8 +14,8 @@ class CreateProjectRequest extends Equatable {
     this.isPinned = false,
   });
 
-  factory CreateProjectRequest.fromJson(Map<String, dynamic> json) {
-    return CreateProjectRequest(
+  factory CreateProjectRequestDto.fromJson(Map<String, dynamic> json) {
+    return CreateProjectRequestDto(
       code: json['code']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       description: _optional(json['description']),
@@ -61,7 +62,7 @@ class CreateProjectRequest extends Equatable {
     return json;
   }
 
-  CreateProjectRequest copyWith({
+  CreateProjectRequestDto copyWith({
     String? code,
     String? name,
     String? description,
@@ -72,7 +73,7 @@ class CreateProjectRequest extends Equatable {
     String? parentId,
     bool? isPinned,
   }) {
-    return CreateProjectRequest(
+    return CreateProjectRequestDto(
       code: code ?? this.code,
       name: name ?? this.name,
       description: description ?? this.description,
@@ -97,4 +98,28 @@ class CreateProjectRequest extends Equatable {
     parentId,
     isPinned,
   ];
+
+  factory CreateProjectRequestDto.fromEntity(CreateProjectRequest entity) =>
+      CreateProjectRequestDto(
+        code: entity.code,
+        name: entity.name,
+        description: entity.description,
+        workspaceId: entity.workspaceId,
+        start: entity.start,
+        end: entity.end,
+        progress: entity.progress,
+        parentId: entity.parentId,
+        isPinned: entity.isPinned,
+      );
+  CreateProjectRequest toEntity() => CreateProjectRequest(
+    code: code,
+    name: name,
+    description: description,
+    workspaceId: workspaceId,
+    start: start,
+    end: end,
+    progress: progress,
+    parentId: parentId,
+    isPinned: isPinned,
+  );
 }

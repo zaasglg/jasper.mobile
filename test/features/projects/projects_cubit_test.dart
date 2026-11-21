@@ -1,9 +1,9 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
+import 'package:jospar/features/projects/domain/entities/create_project_request.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jospar/features/projects/data/models/create_project_request.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/projects/data/repositories/project_repository_impl.dart';
 import 'package:jospar/features/projects/domain/repositories/project_repository.dart';
 import 'package:jospar/features/projects/domain/repositories/project_task_repository.dart';

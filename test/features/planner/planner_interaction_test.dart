@@ -1,10 +1,10 @@
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'planner_test_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/core/di/service_locator.dart';
 import 'package:jospar/features/kanban/presentation/widgets/task_card.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';

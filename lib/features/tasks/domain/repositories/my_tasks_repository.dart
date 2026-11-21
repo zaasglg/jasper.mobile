@@ -1,4 +1,4 @@
-import '../../../projects/data/models/project_task_model.dart';
+import '../../../projects/domain/entities/project_task_model.dart';
 import '../entities/kanban_column_model.dart';
 
 abstract interface class MyTasksRepository {

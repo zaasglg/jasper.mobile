@@ -1,7 +1,7 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_scrum_widget.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
 
 void main() {
   testWidgets(

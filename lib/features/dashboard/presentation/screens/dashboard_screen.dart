@@ -1,3 +1,4 @@
+import '../../../projects/domain/entities/project_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../assistant/data/services/assistant_task_changes.dart';
 import '../widgets/dashboard_expandable_content.dart';
@@ -6,7 +7,6 @@ import '../../../../core/theme/dashboard_surface.dart';
 import 'package:go_router/go_router.dart';
 import '../../../tasks/data/models/task_creation_models.dart';
 import '../../../tasks/presentation/cubit/my_tasks_state.dart';
-import '../../../projects/data/models/project_model.dart';
 import 'dart:async';
 import '../../domain/entities/dashboard_widget_slot.dart';
 import '../cubit/dashboard_layout_cubit.dart';

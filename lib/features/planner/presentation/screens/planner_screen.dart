@@ -1,3 +1,4 @@
+import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../profile/domain/repositories/profile_repository.dart';
 import '../../../tasks/domain/repositories/my_tasks_repository.dart';
@@ -21,7 +22,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../../inbox/domain/repositories/inbox_repository.dart';
 import '../../../inbox/domain/entities/inbox_task_model.dart';
 import '../../data/models/planner_item_model.dart';

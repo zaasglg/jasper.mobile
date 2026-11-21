@@ -1,12 +1,13 @@
-import '../../../tasks/data/models/task_label_dto.dart';
 import 'dart:convert';
-
 import 'package:equatable/equatable.dart';
+import '../../../tasks/data/models/task_label_dto.dart';
+import '../../domain/entities/project_task_model.dart';
+import 'task_assignee_dto.dart';
+import 'task_epic_dto.dart';
+import 'project_task_detail_snapshot_dto.dart';
 
-import '../../../tasks/domain/entities/task_label_model.dart';
-
-class ProjectTaskModel extends Equatable {
-  const ProjectTaskModel({
+class ProjectTaskDto extends Equatable {
+  const ProjectTaskDto({
     required this.id,
     required this.projectId,
     required this.status,
@@ -29,13 +30,13 @@ class ProjectTaskModel extends Equatable {
     this.resourceCount = 0,
     this.checklistCompleted = 0,
     this.checklistTotal = 0,
-    this.assignees = const <TaskAssigneeModel>[],
-    this.epics = const <TaskEpicModel>[],
-    this.labels = const <TaskLabelModel>[],
+    this.assignees = const <TaskAssigneeDto>[],
+    this.epics = const <TaskEpicDto>[],
+    this.labels = const <TaskLabelDto>[],
   });
 
-  factory ProjectTaskModel.fromJson(Map<String, dynamic> json) {
-    return ProjectTaskModel(
+  factory ProjectTaskDto.fromJson(Map<String, dynamic> json) {
+    return ProjectTaskDto(
       id: json['id']?.toString() ?? '',
       displayId:
           json['displayId']?.toString() ?? json['display_id']?.toString() ?? '',
@@ -97,50 +98,11 @@ class ProjectTaskModel extends Equatable {
   final int fileCount;
   final int resourceCount;
 
-  Map<dynamic, dynamic> get cover {
-    final object = _detailObject(detail);
-    final value = object['cover'];
-    if (value is! Map) return const {};
-    if (value['type'] == 'image' && value['fileId'] != null) {
-      final files = object['files'];
-      if (files is List) {
-        for (final file in files.whereType<Map>()) {
-          if (file['id'] == value['fileId'] && file['dataUrl'] is String) {
-            return {...value, 'url': file['dataUrl']};
-          }
-        }
-      }
-      final comments = object['comments'];
-      if (comments is List) {
-        for (final comment in comments.whereType<Map>()) {
-          final attachments = comment['files'];
-          if (attachments is! List) continue;
-          for (var index = 0; index < attachments.length; index++) {
-            final file = attachments[index];
-            if (file is Map &&
-                value['fileId'] == 'cfile__${comment['id']}__$index' &&
-                file['dataUrl'] is String) {
-              return {...value, 'url': file['dataUrl']};
-            }
-          }
-        }
-      }
-    }
-    return value;
-  }
-
   final int checklistCompleted;
   final int checklistTotal;
-  final List<TaskAssigneeModel> assignees;
-  final List<TaskEpicModel> epics;
-  final List<TaskLabelModel> labels;
-
-  bool get isDone => status.toUpperCase() == 'DONE' || (progress ?? 0) >= 100;
-
-  List<String> get epicNames => epics
-      .map((item) => item.name.trim())
-      .where((name) => name.isNotEmpty)
-      .toList(growable: false);
+  final List<TaskAssigneeDto> assignees;
+  final List<TaskEpicDto> epics;
+  final List<TaskLabelDto> labels;
 
   static Map<dynamic, dynamic> _detailObject(dynamic detail) {
     if (detail is String) {
@@ -160,34 +122,19 @@ class ProjectTaskModel extends Equatable {
     return files is List ? files.whereType<Map>().length : 0;
   }
 
-  List<TaskLabelModel> labelsForUser(String? userId) {
-    if (userId == null) return labels;
-    final personal = _detailObject(detail)['personalLabels'];
-    final values = personal is Map ? personal[userId] : null;
-    if (values is! List) return labels;
-    return [
-      ...labels.where((label) => !label.isPersonal),
-      ...values.whereType<Map>().map(
-        (value) => TaskLabelDto.fromJson(
-          Map<String, dynamic>.from(value),
-        ).toEntity().copyWith(isPersonal: true),
-      ),
-    ];
-  }
-
-  static List<TaskLabelModel> _parseLabels(Map<String, dynamic> json) {
+  static List<TaskLabelDto> _parseLabels(Map<String, dynamic> json) {
     final detail = _detailObject(json['detail']);
     final values = json['labels'] ?? detail['labels'];
     final personal = json['personalLabels'] ?? detail['personalLabels'];
-    final labels = <TaskLabelModel>[
+    final labels = <TaskLabelDto>[
       if (values is List)
         for (final value in values.whereType<Map>())
-          TaskLabelDto.fromJson(Map<String, dynamic>.from(value)).toEntity(),
+          TaskLabelDto.fromJson(Map<String, dynamic>.from(value)),
       if (personal is List)
         for (final value in personal.whereType<Map>())
           TaskLabelDto.fromJson(
             Map<String, dynamic>.from(value),
-          ).toEntity().copyWith(isPersonal: true),
+          ).copyWith(isPersonal: true),
     ];
     final seen = <String>{};
     return labels
@@ -298,21 +245,21 @@ class ProjectTaskModel extends Equatable {
     return parsed;
   }
 
-  static List<TaskAssigneeModel> _parseAssignees(dynamic value) {
-    if (value is! List) return const <TaskAssigneeModel>[];
+  static List<TaskAssigneeDto> _parseAssignees(dynamic value) {
+    if (value is! List) return const <TaskAssigneeDto>[];
     return value
         .whereType<Map>()
         .map(
-          (item) => TaskAssigneeModel.fromJson(Map<String, dynamic>.from(item)),
+          (item) => TaskAssigneeDto.fromJson(Map<String, dynamic>.from(item)),
         )
         .toList(growable: false);
   }
 
-  static List<TaskEpicModel> _parseEpics(dynamic value) {
-    if (value is! List) return const <TaskEpicModel>[];
+  static List<TaskEpicDto> _parseEpics(dynamic value) {
+    if (value is! List) return const <TaskEpicDto>[];
     return value
         .whereType<Map>()
-        .map((item) => TaskEpicModel.fromJson(Map<String, dynamic>.from(item)))
+        .map((item) => TaskEpicDto.fromJson(Map<String, dynamic>.from(item)))
         .toList(growable: false);
   }
 
@@ -341,12 +288,10 @@ class ProjectTaskModel extends Equatable {
     'checklistTotal': checklistTotal,
     'assignees': assignees.map((item) => item.toJson()).toList(growable: false),
     'epics': epics.map((item) => item.toJson()).toList(growable: false),
-    'labels': labels
-        .map((item) => TaskLabelDto.fromEntity(item).toJson())
-        .toList(growable: false),
+    'labels': labels.map((item) => item.toJson()).toList(growable: false),
   };
 
-  ProjectTaskModel copyWith({
+  ProjectTaskDto copyWith({
     String? id,
     String? displayId,
     String? title,
@@ -369,11 +314,11 @@ class ProjectTaskModel extends Equatable {
     int? resourceCount,
     int? checklistCompleted,
     int? checklistTotal,
-    List<TaskAssigneeModel>? assignees,
-    List<TaskEpicModel>? epics,
-    List<TaskLabelModel>? labels,
+    List<TaskAssigneeDto>? assignees,
+    List<TaskEpicDto>? epics,
+    List<TaskLabelDto>? labels,
   }) {
-    return ProjectTaskModel(
+    return ProjectTaskDto(
       id: id ?? this.id,
       displayId: displayId ?? this.displayId,
       title: title ?? this.title,
@@ -430,118 +375,65 @@ class ProjectTaskModel extends Equatable {
     epics,
     labels,
   ];
-}
 
-class TaskAssigneeModel extends Equatable {
-  const TaskAssigneeModel({
-    required this.userId,
-    this.name = '',
-    this.avatarUrl,
-  });
-
-  factory TaskAssigneeModel.fromJson(Map<String, dynamic> json) {
-    final nestedUser = json['user'];
-    final nestedId = nestedUser is Map ? nestedUser['id'] : null;
-    final user = nestedUser is Map
-        ? Map<String, dynamic>.from(nestedUser)
-        : const <String, dynamic>{};
-    final firstName = user['firstName']?.toString().trim() ?? '';
-    final lastName = user['lastName']?.toString().trim() ?? '';
-    final fullName = '$firstName $lastName'.trim();
-    return TaskAssigneeModel(
-      userId:
-          json['userId']?.toString() ??
-          json['user_id']?.toString() ??
-          nestedId?.toString() ??
-          '',
-      name:
-          user['name']?.toString().trim() ??
-          json['name']?.toString().trim() ??
-          fullName,
-      avatarUrl: _optionalString(
-        user['avatarUrl'] ??
-            user['avatar_url'] ??
-            user['avatar'] ??
-            json['avatarUrl'] ??
-            json['avatar_url'] ??
-            json['avatar'],
-      ),
-    );
-  }
-
-  final String userId;
-  final String name;
-  final String? avatarUrl;
-
-  static String? _optionalString(dynamic value) {
-    final text = value?.toString().trim();
-    return text == null || text.isEmpty ? null : text;
-  }
-
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'userId': userId,
-    if (name.isNotEmpty) 'name': name,
-    if (avatarUrl != null) 'avatarUrl': avatarUrl,
-  };
-
-  TaskAssigneeModel copyWith({
-    String? userId,
-    String? name,
-    String? avatarUrl,
-  }) {
-    return TaskAssigneeModel(
-      userId: userId ?? this.userId,
-      name: name ?? this.name,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
-    );
-  }
-
-  @override
-  List<Object?> get props => <Object?>[userId, name, avatarUrl];
-}
-
-class TaskEpicModel extends Equatable {
-  const TaskEpicModel({
-    required this.id,
-    required this.name,
-    this.color = '#6d5fe0',
-  });
-
-  factory TaskEpicModel.fromJson(Map<String, dynamic> json) {
-    final nestedEpic = json['epic'];
-    final epic = nestedEpic is Map
-        ? Map<String, dynamic>.from(nestedEpic)
-        : const <String, dynamic>{};
-    return TaskEpicModel(
-      id:
-          json['epicId']?.toString() ??
-          json['epic_id']?.toString() ??
-          epic['id']?.toString() ??
-          json['id']?.toString() ??
-          '',
-      name: epic['name']?.toString() ?? json['name']?.toString() ?? '',
-      color:
-          epic['color']?.toString() ?? json['color']?.toString() ?? '#6d5fe0',
-    );
-  }
-
-  final String id;
-  final String name;
-  final String color;
-
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'epicId': id,
-    'epic': <String, dynamic>{'id': id, 'name': name, 'color': color},
-  };
-
-  TaskEpicModel copyWith({String? id, String? name, String? color}) {
-    return TaskEpicModel(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      color: color ?? this.color,
-    );
-  }
-
-  @override
-  List<Object?> get props => <Object?>[id, name, color];
+  factory ProjectTaskDto.fromEntity(ProjectTaskModel entity) => ProjectTaskDto(
+    id: entity.id,
+    displayId: entity.displayId,
+    title: entity.title,
+    projectId: entity.projectId,
+    status: entity.status,
+    progress: entity.progress,
+    priority: entity.priority,
+    detail: entity.detail == null
+        ? null
+        : ProjectTaskDetailSnapshotDto.fromEntity(entity.detail!).toApiValue(),
+    deps: entity.deps,
+    start: entity.start,
+    end: entity.end,
+    order: entity.order,
+    estimate: entity.estimate,
+    timerStartedAt: entity.timerStartedAt,
+    timerElapsedMs: entity.timerElapsedMs,
+    isTimingEnabled: entity.isTimingEnabled,
+    archived: entity.archived,
+    commentCount: entity.commentCount,
+    fileCount: entity.fileCount,
+    resourceCount: entity.resourceCount,
+    checklistCompleted: entity.checklistCompleted,
+    checklistTotal: entity.checklistTotal,
+    assignees: entity.assignees
+        .map(TaskAssigneeDto.fromEntity)
+        .toList(growable: false),
+    epics: entity.epics.map(TaskEpicDto.fromEntity).toList(growable: false),
+    labels: entity.labels.map(TaskLabelDto.fromEntity).toList(growable: false),
+  );
+  ProjectTaskModel toEntity() => ProjectTaskModel(
+    id: id,
+    displayId: displayId,
+    title: title,
+    projectId: projectId,
+    status: status,
+    progress: progress,
+    priority: priority,
+    detail: detail == null
+        ? null
+        : ProjectTaskDetailSnapshotDto.parse(detail!).toEntity(),
+    deps: deps,
+    start: start,
+    end: end,
+    order: order,
+    estimate: estimate,
+    timerStartedAt: timerStartedAt,
+    timerElapsedMs: timerElapsedMs,
+    isTimingEnabled: isTimingEnabled,
+    archived: archived,
+    commentCount: commentCount,
+    fileCount: fileCount,
+    resourceCount: resourceCount,
+    checklistCompleted: checklistCompleted,
+    checklistTotal: checklistTotal,
+    assignees: assignees.map((e) => e.toEntity()).toList(growable: false),
+    epics: epics.map((e) => e.toEntity()).toList(growable: false),
+    labels: labels.map((e) => e.toEntity()).toList(growable: false),
+  );
 }

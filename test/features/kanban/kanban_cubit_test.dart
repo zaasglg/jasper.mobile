@@ -1,3 +1,6 @@
+import 'package:jospar/features/projects/domain/entities/project_task_cover.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_detail_snapshot.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'package:jospar/features/kanban/data/models/task_translation.dart';
 import 'dart:async';
 
@@ -6,7 +9,6 @@ import 'package:jospar/features/kanban/domain/entities/kanban_board_data.dart';
 import 'package:jospar/features/kanban/domain/repositories/kanban_repository.dart';
 import 'package:jospar/features/kanban/presentation/cubit/kanban_cubit.dart';
 import 'package:jospar/features/kanban/presentation/cubit/kanban_state.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 
 void main() {
@@ -264,7 +266,9 @@ class _Repository implements KanbanRepository {
       id: 'task',
       projectId: 'project',
       status: 'TODO',
-      detail: '{"cover":{"type":"color","color":"#fff"}}',
+      detail: ProjectTaskDetailSnapshot(
+        cover: ProjectTaskCover(type: 'color', color: '#fff'),
+      ),
     );
   }
 

@@ -1,7 +1,8 @@
+import '../../../projects/domain/entities/project_model.dart';
+import '../../../projects/data/models/project_dto.dart';
 import '../../../tasks/data/models/kanban_column_dto.dart';
 import '../../../workspaces/data/models/workspace_dto.dart';
 import 'package:dio/dio.dart';
-import '../../../projects/data/models/project_model.dart';
 import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../../workspaces/domain/entities/workspace_model.dart';
 import '../../domain/entities/task_move_target.dart';
@@ -91,7 +92,10 @@ class TaskMoveRepositoryImpl implements TaskMoveRepository {
       if (row['archived'] == true || row['archivedAt'] != null) return;
       final workspace = row['workspaceId']?.toString() ?? inheritedWorkspace;
       if (workspace != workspaceId) return;
-      final project = ProjectModel.fromJson({...row, 'workspaceId': workspace});
+      final project = ProjectDto.fromJson({
+        ...row,
+        'workspaceId': workspace,
+      }).toEntity();
       if (project.id.isNotEmpty) result[project.id] = project;
       final children = row['children'];
       if (children is List) {

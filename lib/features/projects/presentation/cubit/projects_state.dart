@@ -1,7 +1,6 @@
+import '../../domain/entities/project_model.dart';
+import '../../domain/entities/task_assignee_model.dart';
 import 'package:equatable/equatable.dart';
-
-import '../../data/models/project_model.dart';
-import '../../data/models/project_task_model.dart';
 
 class ProjectTaskSummary extends Equatable {
   const ProjectTaskSummary({

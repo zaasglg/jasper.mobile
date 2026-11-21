@@ -1,3 +1,7 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
+import 'package:jospar/features/projects/domain/entities/task_assignee_model.dart';
+import 'package:jospar/features/projects/domain/entities/task_epic_model.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -10,8 +14,6 @@ import 'package:jospar/features/tasks/data/repositories/task_creation_repository
 import 'package:jospar/features/tasks/domain/repositories/task_creation_repository.dart';
 import 'package:jospar/features/tasks/presentation/cubit/task_creation_cubit.dart';
 import 'package:jospar/features/profile/domain/entities/user_profile.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 
 void main() {

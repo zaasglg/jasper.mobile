@@ -1,3 +1,4 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:jospar/features/dashboard/domain/entities/dashboard_widget_options.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +11,6 @@ import 'package:jospar/features/dashboard/presentation/widgets/dashboard_widget_
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_collapsible_widget.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_expandable_content.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_widget_skeleton.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'dashboard_layout_test.dart' show FakeDashboardRepository;
 
 void main() {

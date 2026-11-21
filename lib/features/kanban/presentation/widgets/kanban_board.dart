@@ -1,3 +1,5 @@
+import '../../../projects/domain/entities/project_model.dart';
+import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_color_picker.dart';
 import 'board_style.dart';
@@ -22,8 +24,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../../projects/data/models/project_model.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../../planner/presentation/screens/planner_screen.dart';
 import 'task_card.dart';

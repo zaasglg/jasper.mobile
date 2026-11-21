@@ -1,3 +1,5 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -18,8 +20,6 @@ import 'package:jospar/features/planner/domain/repositories/planner_repository.d
 import 'package:jospar/features/planner/domain/utils/planner_dates.dart';
 import 'package:jospar/features/planner/presentation/cubit/planner_cubit.dart';
 import 'package:jospar/features/planner/presentation/screens/planner_screen.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 import 'package:jospar/features/tasks/domain/entities/task_extra_field.dart';
 import 'package:jospar/features/tasks/domain/repositories/my_task_fields_storage.dart';

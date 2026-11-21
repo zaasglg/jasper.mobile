@@ -1,3 +1,4 @@
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
@@ -6,7 +7,6 @@ import 'package:jospar/features/planner/data/models/planner_item_model.dart';
 import 'package:jospar/features/planner/data/repositories/planner_repository_impl.dart';
 import 'package:jospar/features/planner/domain/repositories/planner_repository.dart';
 import 'package:jospar/features/planner/presentation/cubit/planner_cubit.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 
 void main() {
   test(

@@ -1,9 +1,9 @@
+import '../../../projects/domain/entities/project_task_model.dart';
+import '../../../projects/data/models/project_task_dto.dart';
 import 'task_label_dto.dart';
 import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/task_label_model.dart';
-
-import '../../../projects/data/models/project_task_model.dart';
 
 const _unchangedChecklistDate = Object();
 
@@ -17,7 +17,7 @@ class TaskDetailsPayload extends Equatable {
   factory TaskDetailsPayload.fromJson(Map<String, dynamic> json) {
     final rawDetail = json['detail'];
     return TaskDetailsPayload(
-      task: ProjectTaskModel.fromJson(json),
+      task: ProjectTaskDto.fromJson(json).toEntity(),
       detail: rawDetail is Map
           ? TaskDetailModel.fromJson(Map<String, dynamic>.from(rawDetail))
           : const TaskDetailModel(),

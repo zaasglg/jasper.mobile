@@ -1,3 +1,5 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -8,8 +10,6 @@ import 'package:jospar/features/kanban/data/repositories/kanban_repository_impl.
 import 'package:jospar/features/kanban/presentation/cubit/kanban_cubit.dart';
 import 'package:jospar/features/profile/domain/entities/user_profile.dart';
 import 'package:jospar/features/profile/domain/repositories/profile_repository.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/data/repositories/my_tasks_repository_impl.dart';
 import 'package:jospar/features/tasks/data/repositories/task_details_repository_impl.dart';
 import 'package:jospar/features/tasks/domain/entities/task_extra_field.dart';

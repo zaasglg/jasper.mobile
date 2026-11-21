@@ -1,3 +1,4 @@
+import '../../../projects/domain/entities/project_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_widget_skeleton.dart';
@@ -19,7 +20,6 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../projects/data/models/project_model.dart';
 import '../../../planner/domain/repositories/planner_repository.dart';
 import '../../../planner/data/models/planner_item_model.dart';
 import '../../../storage/presentation/storage_file_screen.dart';

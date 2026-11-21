@@ -1,6 +1,10 @@
+import '../../../projects/domain/entities/project_model.dart';
+import '../../../projects/data/models/project_dto.dart';
+import '../../../projects/domain/entities/project_task_model.dart';
+import '../../../projects/data/models/project_task_dto.dart';
+import '../../../projects/domain/entities/task_assignee_model.dart';
+import '../../../projects/data/models/task_assignee_dto.dart';
 import 'package:dio/dio.dart';
-import '../../../projects/data/models/project_model.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../domain/repositories/task_creation_repository.dart';
 import '../models/task_creation_models.dart';
 
@@ -55,7 +59,7 @@ class TaskCreationRepositoryImpl implements TaskCreationRepository {
       (await dio.get<dynamic>('projects', options: _options(workspaceId))).data,
     );
     final roots = rows
-        .map(ProjectModel.fromJson)
+        .map((json) => ProjectDto.fromJson(json).toEntity())
         .where((e) => e.workspaceId == workspaceId)
         .toList();
     List<ProjectModel> flatten(List<ProjectModel> values) => [
@@ -86,11 +90,11 @@ class TaskCreationRepositoryImpl implements TaskCreationRepository {
     final user = row['user'] is Map
         ? Map<String, dynamic>.from(row['user'] as Map)
         : row;
-    return TaskAssigneeModel.fromJson({
+    return TaskAssigneeDto.fromJson({
       'userId': user['id'] ?? row['userId'],
       'name': user['name'] ?? row['name'],
       'avatarUrl': user['avatarUrl'] ?? row['avatarUrl'],
-    });
+    }).toEntity();
   }
 
   @override
@@ -137,7 +141,7 @@ class TaskCreationRepositoryImpl implements TaskCreationRepository {
       'columns': _items((result[0] as Response<dynamic>).data),
       'epics': _items((result[1] as Response<dynamic>).data),
       'members': (result[2] as List<TaskAssigneeModel>)
-          .map((e) => e.toJson())
+          .map((e) => TaskAssigneeDto.fromEntity(e).toJson())
           .toList(),
       'tasks': tasks,
     });
@@ -181,7 +185,7 @@ class TaskCreationRepositoryImpl implements TaskCreationRepository {
       options: _options(request.workspaceId),
       data: body,
     );
-    final task = ProjectTaskModel.fromJson(_object(response.data));
+    final task = ProjectTaskDto.fromJson(_object(response.data)).toEntity();
     if (task.id.isEmpty) {
       throw const TaskCreationException(
         'Сервер не вернул созданную задачу. Обновите список перед повторной попыткой.',

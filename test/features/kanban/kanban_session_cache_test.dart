@@ -1,3 +1,4 @@
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/core/auth/auth_session.dart';
@@ -5,7 +6,6 @@ import 'package:jospar/features/kanban/domain/entities/kanban_board_cache.dart';
 import 'package:jospar/features/kanban/domain/entities/kanban_board_data.dart';
 import 'package:jospar/features/kanban/domain/repositories/kanban_repository.dart';
 import 'package:jospar/features/kanban/presentation/cubit/kanban_cubit.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 
 const _board = KanbanBoardData(
   columns: [],

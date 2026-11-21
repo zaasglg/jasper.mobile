@@ -1,3 +1,4 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -11,7 +12,6 @@ import 'package:jospar/features/kanban/data/repositories/kanban_repository_impl.
 import 'package:jospar/features/kanban/domain/repositories/kanban_repository.dart';
 import 'package:jospar/features/kanban/presentation/cubit/kanban_cubit.dart';
 import 'package:jospar/features/kanban/presentation/widgets/kanban_board.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
 
 class _Adapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
@@ -130,7 +130,7 @@ void main() {
         'type': 'color',
         'color': '#6366F1',
       });
-      expect(color.cover['color'], '#6366F1');
+      expect(color.cover!.color, '#6366F1');
       final image = await repository.updateCover('task', {
         'type': 'image',
         'url': 'data:image/png;base64,AQID',
@@ -142,18 +142,18 @@ void main() {
         (detail['files'] as List).single['dataUrl'],
         'data:image/png;base64,AQID',
       );
-      expect(image.cover['url'], 'data:image/png;base64,AQID');
-      await repository.updateCover(
-        'task',
-        Map<String, dynamic>.from(image.cover),
-      );
+      expect(image.cover!.displayUrl, 'data:image/png;base64,AQID');
+      await repository.updateCover('task', {
+        'type': image.cover!.type,
+        'fileId': image.cover!.fileId,
+      });
       expect((adapter.task['detail'] as Map)['files'], hasLength(1));
       expect(detail['description'], 'Описание');
       expect(detail['checklists'], hasLength(1));
       expect(detail['comments'], hasLength(1));
       expect(detail['custom'], {'keep': true});
       final cleared = await repository.updateCover('task', null);
-      expect(cleared.cover, isEmpty);
+      expect(cleared.cover, isNull);
       expect((adapter.task['detail'] as Map)['files'], hasLength(1));
     },
   );
@@ -248,7 +248,7 @@ void main() {
         }),
         isTrue,
       );
-      expect(cubit.state.tasks.first.cover['color'], '#6366F1');
+      expect(cubit.state.tasks.first.cover!.color, '#6366F1');
       final translation = await cubit.translateTask(
         original,
         'workspace',
@@ -374,7 +374,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Цвет #6366F1'));
     await tester.tap(find.widgetWithText(FilledButton, 'Сохранить'));
     await tester.pumpAndSettle();
-    expect(cubit.state.tasks.single.cover['color'], '#6366F1');
+    expect(cubit.state.tasks.single.cover!.color, '#6366F1');
     expect(find.text('Обложка задачи'), findsNothing);
     await action(tester, 'Удалить задачу');
     await tester.tap(find.widgetWithText(FilledButton, 'Удалить'));

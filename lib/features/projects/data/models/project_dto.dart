@@ -1,7 +1,8 @@
 import 'package:equatable/equatable.dart';
+import '../../domain/entities/project_model.dart';
 
-class ProjectModel extends Equatable {
-  const ProjectModel({
+class ProjectDto extends Equatable {
+  const ProjectDto({
     required this.id,
     required this.code,
     required this.name,
@@ -12,11 +13,11 @@ class ProjectModel extends Equatable {
     this.progress = 0,
     this.parentId,
     this.isPinned = false,
-    this.children = const <ProjectModel>[],
+    this.children = const <ProjectDto>[],
   });
 
-  factory ProjectModel.fromJson(Map<String, dynamic> json) {
-    return ProjectModel(
+  factory ProjectDto.fromJson(Map<String, dynamic> json) {
+    return ProjectDto(
       id: json['id']?.toString() ?? '',
       code: json['code']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
@@ -44,13 +45,13 @@ class ProjectModel extends Equatable {
   final double progress;
   final String? parentId;
   final bool isPinned;
-  final List<ProjectModel> children;
+  final List<ProjectDto> children;
 
-  static List<ProjectModel> _parseChildren(dynamic value) {
-    if (value is! List) return const <ProjectModel>[];
+  static List<ProjectDto> _parseChildren(dynamic value) {
+    if (value is! List) return const <ProjectDto>[];
     return value
         .whereType<Map>()
-        .map((item) => ProjectModel.fromJson(Map<String, dynamic>.from(item)))
+        .map((item) => ProjectDto.fromJson(Map<String, dynamic>.from(item)))
         .toList(growable: false);
   }
 
@@ -91,7 +92,7 @@ class ProjectModel extends Equatable {
     'children': children.map((child) => child.toJson()).toList(growable: false),
   };
 
-  ProjectModel copyWith({
+  ProjectDto copyWith({
     String? id,
     String? code,
     String? name,
@@ -102,9 +103,9 @@ class ProjectModel extends Equatable {
     double? progress,
     String? parentId,
     bool? isPinned,
-    List<ProjectModel>? children,
+    List<ProjectDto>? children,
   }) {
-    return ProjectModel(
+    return ProjectDto(
       id: id ?? this.id,
       code: code ?? this.code,
       name: name ?? this.name,
@@ -133,4 +134,33 @@ class ProjectModel extends Equatable {
     isPinned,
     children,
   ];
+
+  factory ProjectDto.fromEntity(ProjectModel entity) => ProjectDto(
+    id: entity.id,
+    code: entity.code,
+    name: entity.name,
+    description: entity.description,
+    workspaceId: entity.workspaceId,
+    start: entity.start,
+    end: entity.end,
+    progress: entity.progress,
+    parentId: entity.parentId,
+    isPinned: entity.isPinned,
+    children: entity.children
+        .map((e) => ProjectDto.fromEntity(e))
+        .toList(growable: false),
+  );
+  ProjectModel toEntity() => ProjectModel(
+    id: id,
+    code: code,
+    name: name,
+    description: description,
+    workspaceId: workspaceId,
+    start: start,
+    end: end,
+    progress: progress,
+    parentId: parentId,
+    isPinned: isPinned,
+    children: children.map((e) => e.toEntity()).toList(growable: false),
+  );
 }

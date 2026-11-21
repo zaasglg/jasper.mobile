@@ -1,3 +1,5 @@
+import '../../../projects/domain/entities/project_task_model.dart';
+import '../../../projects/domain/entities/task_assignee_model.dart';
 import '../../domain/entities/task_label_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../widgets/task_detail_style.dart';
@@ -33,7 +35,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../data/models/task_detail_model.dart';
 import '../../domain/utils/my_tasks_utils.dart';
 import '../../domain/repositories/task_details_repository.dart';

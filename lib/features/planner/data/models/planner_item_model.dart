@@ -1,5 +1,6 @@
+import '../../../projects/domain/entities/project_task_model.dart';
+import '../../../projects/data/models/project_task_dto.dart';
 import 'package:equatable/equatable.dart';
-import '../../../projects/data/models/project_task_model.dart';
 
 class PlannerItemModel extends Equatable {
   const PlannerItemModel({
@@ -24,7 +25,9 @@ class PlannerItemModel extends Equatable {
     final inbox = json['inboxTask'];
     final project = json['project'];
     final task = taskJson is Map
-        ? ProjectTaskModel.fromJson(Map<String, dynamic>.from(taskJson))
+        ? ProjectTaskDto.fromJson(
+            Map<String, dynamic>.from(taskJson),
+          ).toEntity()
         : null;
     return PlannerItemModel(
       id: json['id']?.toString() ?? '',
@@ -103,7 +106,7 @@ class PlannerItemModel extends Equatable {
     'durationMinutes': durationMinutes,
     'completed': completed,
     'archived': archived,
-    if (task != null) 'task': task!.toJson(),
+    if (task != null) 'task': ProjectTaskDto.fromEntity(task!).toJson(),
     if (inboxTaskId != null) 'inboxTask': {'id': inboxTaskId, 'title': title},
   };
 

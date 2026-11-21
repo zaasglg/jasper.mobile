@@ -1,8 +1,8 @@
+import '../../../projects/domain/entities/task_assignee_model.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/user_avatar.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../domain/repositories/task_details_repository.dart';
 import '../cubit/task_details_cubit.dart';
 

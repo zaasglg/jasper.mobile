@@ -1,3 +1,4 @@
+import '../../domain/entities/project_model.dart';
 import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
@@ -12,7 +13,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../workspaces/domain/entities/workspace_model.dart';
 import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
 import '../../../workspaces/presentation/cubit/workspace_state.dart';
-import '../../data/models/project_model.dart';
 import '../cubit/projects_cubit.dart';
 import '../cubit/projects_state.dart';
 import '../widgets/create_project_sheet.dart';

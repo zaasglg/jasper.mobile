@@ -1,3 +1,5 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -14,8 +16,6 @@ import 'package:jospar/features/kanban/presentation/cubit/kanban_state.dart';
 import 'package:jospar/features/kanban/presentation/widgets/kanban_board.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_state.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_state.dart';
 import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';

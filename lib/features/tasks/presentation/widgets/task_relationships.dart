@@ -1,10 +1,10 @@
+import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../../projects/domain/repositories/project_task_repository.dart';
 import '../cubit/task_details_cubit.dart';
 

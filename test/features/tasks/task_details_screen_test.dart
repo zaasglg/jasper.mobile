@@ -1,3 +1,6 @@
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
+import 'package:jospar/features/projects/domain/entities/task_assignee_model.dart';
+import 'package:jospar/features/projects/domain/entities/task_epic_model.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:jospar/core/widgets/app_dialog.dart';
 import 'package:flutter/material.dart';
@@ -6,7 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/core/theme/app_theme.dart';
 import 'package:jospar/features/profile/domain/entities/user_profile.dart';
 import 'package:jospar/features/profile/domain/repositories/profile_repository.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/tasks/domain/repositories/task_details_repository.dart';

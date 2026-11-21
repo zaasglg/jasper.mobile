@@ -1,3 +1,4 @@
+import '../../../projects/domain/entities/project_model.dart';
 import '../../domain/entities/inbox_task_label.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_dialog.dart';
@@ -12,7 +13,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../planner/presentation/screens/planner_screen.dart';
-import '../../../projects/data/models/project_model.dart';
 import '../../../projects/presentation/cubit/projects_cubit.dart';
 import '../../domain/entities/inbox_task_model.dart';
 import '../../domain/repositories/inbox_repository.dart';

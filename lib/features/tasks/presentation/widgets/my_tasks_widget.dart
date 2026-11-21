@@ -1,3 +1,5 @@
+import '../../../projects/domain/entities/project_model.dart';
+import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widget_skeleton.dart';
@@ -12,8 +14,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
-import '../../../projects/data/models/project_model.dart';
-import '../../../projects/data/models/project_task_model.dart';
 import '../../domain/entities/task_extra_field.dart';
 import '../../domain/utils/my_tasks_utils.dart';
 import '../cubit/my_tasks_cubit.dart';

@@ -1,3 +1,4 @@
+import '../../domain/entities/project_model.dart';
 import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../kanban/presentation/widgets/board_style.dart';
@@ -14,7 +15,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../kanban/presentation/widgets/kanban_board.dart';
 import '../../../kanban/presentation/cubit/kanban_cubit.dart';
 import '../../../kanban/presentation/cubit/kanban_state.dart';
-import '../../data/models/project_model.dart';
 import '../cubit/projects_cubit.dart';
 import '../cubit/projects_state.dart';
 

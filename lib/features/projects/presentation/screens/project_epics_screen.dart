@@ -1,3 +1,5 @@
+import '../../domain/entities/project_task_model.dart';
+import '../../domain/entities/task_epic_model.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -8,7 +10,6 @@ import '../../../../core/theme/task_label_color.dart';
 import '../../../../core/widgets/app_color_picker.dart';
 import '../../../tasks/domain/repositories/task_details_repository.dart';
 import '../../../kanban/presentation/cubit/kanban_cubit.dart';
-import '../../data/models/project_task_model.dart';
 import '../../domain/repositories/project_task_repository.dart';
 
 typedef _EpicData = (List<TaskEpicModel>, List<ProjectTaskModel>);

@@ -1,10 +1,10 @@
+import '../../../projects/domain/entities/project_model.dart';
 import '../../domain/entities/dashboard_widget_options.dart';
 import 'dart:convert';
 import 'dashboard_widget_skeleton.dart';
 import 'dashboard_selector.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../projects/data/models/project_model.dart';
 import '../cubit/dashboard_layout_cubit.dart';
 import 'dashboard_widget_panel.dart';
 

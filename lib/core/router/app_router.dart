@@ -1,3 +1,5 @@
+import '../../features/projects/domain/entities/project_model.dart';
+import '../../features/projects/domain/entities/project_task_model.dart';
 import '../../features/projects/presentation/screens/project_epics_screen.dart';
 import '../../features/collaboration/presentation/project_participants_screen.dart';
 import '../../features/profile/presentation/cubit/profile_cubit.dart';
@@ -48,8 +50,6 @@ import '../../features/search/presentation/search_screen.dart';
 import '../../features/workspaces/presentation/cubit/workspace_cubit.dart';
 import '../../features/workspaces/presentation/cubit/workspace_state.dart';
 import '../../features/planner/presentation/screens/planner_screen.dart';
-import '../../features/projects/data/models/project_task_model.dart';
-import '../../features/projects/data/models/project_model.dart';
 import '../../features/kanban/presentation/cubit/kanban_cubit.dart';
 import '../../features/tasks/presentation/screens/task_details_screen.dart';
 import '../../features/tasks/presentation/cubit/task_details_cubit.dart';

@@ -1,3 +1,4 @@
+import '../../../projects/domain/entities/project_task_model.dart';
 import 'dart:async';
 
 import '../../../assistant/data/services/assistant_task_changes.dart';
@@ -8,7 +9,6 @@ import '../../domain/entities/task_move_target.dart';
 import '../../domain/repositories/task_move_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../projects/data/models/project_task_model.dart';
 import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../../tasks/domain/utils/task_completion.dart';
 import '../../domain/entities/kanban_board_data.dart';

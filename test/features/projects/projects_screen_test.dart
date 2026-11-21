@@ -1,10 +1,10 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_state.dart';
 import 'package:jospar/features/projects/presentation/screens/projects_screen.dart';

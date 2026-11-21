@@ -1,7 +1,8 @@
+import '../../../projects/domain/entities/project_task_model.dart';
+import '../../../projects/data/models/project_task_dto.dart';
 import '../models/kanban_column_dto.dart';
 import 'package:dio/dio.dart';
 
-import '../../../projects/data/models/project_task_model.dart';
 import '../../domain/repositories/my_tasks_repository.dart';
 import '../../domain/entities/kanban_column_model.dart';
 
@@ -31,8 +32,9 @@ class MyTasksRepositoryImpl implements MyTasksRepository {
       return _unwrapList(response.data)
           .whereType<Map>()
           .map(
-            (item) =>
-                ProjectTaskModel.fromJson(Map<String, dynamic>.from(item)),
+            (item) => ProjectTaskDto.fromJson(
+              Map<String, dynamic>.from(item),
+            ).toEntity(),
           )
           .where((task) => task.id.isNotEmpty && task.projectId.isNotEmpty)
           .toList(growable: false);

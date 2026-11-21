@@ -1,7 +1,8 @@
+import '../../../projects/domain/entities/task_assignee_model.dart';
+import '../../../projects/domain/entities/task_epic_model.dart';
 import '../entities/task_label_model.dart';
 import '../../data/models/task_detail_model.dart';
 import '../entities/kanban_column_model.dart';
-import '../../../projects/data/models/project_task_model.dart';
 
 abstract interface class TaskLabelCatalogRepository {
   Future<({List<TaskLabelModel> shared, List<TaskLabelModel> personal})>

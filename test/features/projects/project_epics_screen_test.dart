@@ -1,3 +1,5 @@
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
+import 'package:jospar/features/projects/domain/entities/task_epic_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/kanban/domain/entities/kanban_board_data.dart';
@@ -5,7 +7,6 @@ import 'package:jospar/features/kanban/domain/repositories/kanban_repository.dar
 import 'package:jospar/features/kanban/presentation/cubit/kanban_cubit.dart';
 import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 import 'package:jospar/core/di/service_locator.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/projects/domain/repositories/project_task_repository.dart';
 import 'package:jospar/features/projects/presentation/screens/project_epics_screen.dart';
 import 'package:jospar/features/tasks/domain/repositories/task_details_repository.dart';

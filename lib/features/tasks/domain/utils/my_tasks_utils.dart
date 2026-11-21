@@ -1,4 +1,4 @@
-import '../../../projects/data/models/project_task_model.dart';
+import '../../../projects/domain/entities/project_task_model.dart';
 
 bool isTaskOverdue(ProjectTaskModel task, DateTime now) {
   final deadline = task.end;

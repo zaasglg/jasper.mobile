@@ -1,3 +1,4 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:convert';
@@ -8,7 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/search/data/search_repository.dart';
 import 'package:jospar/features/search/presentation/search_cubit.dart';
 import 'package:jospar/features/search/presentation/search_screen.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
 
 void main() {
   test('search uses documented parameters and scopes project tasks', () async {

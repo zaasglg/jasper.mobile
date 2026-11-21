@@ -1,3 +1,4 @@
+import 'package:jospar/features/projects/data/models/project_task_dto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/tasks/data/models/kanban_column_dto.dart';
@@ -9,7 +10,6 @@ import 'package:jospar/features/tasks/domain/utils/task_label_utils.dart';
 import 'package:jospar/features/tasks/domain/utils/task_column_label.dart';
 import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/tasks/data/models/task_creation_models.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/tasks/data/repositories/task_details_repository_impl.dart';
 
 void main() {
@@ -179,14 +179,14 @@ void main() {
         'color': 'red',
         'custom': {'keep': true},
       };
-      final task = ProjectTaskModel.fromJson({
+      final task = ProjectTaskDto.fromJson({
         'id': 't',
         'projectId': 'p',
         'title': 'Title',
         'status': 'COL1',
         'labels': [label],
-      });
-      expect(task.toJson()['labels'], [label]);
+      }).toEntity();
+      expect(ProjectTaskDto.fromEntity(task).toJson()['labels'], [label]);
       expect(task.title, 'Title');
       expect(task.status, 'COL1');
       final detail = TaskDetailModel.fromJson({

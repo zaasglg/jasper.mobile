@@ -1,3 +1,5 @@
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
+import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,7 +14,6 @@ import 'package:jospar/features/inbox/presentation/cubit/inbox_cubit.dart';
 import 'package:jospar/features/profile/domain/entities/user_profile.dart';
 import 'package:jospar/features/profile/domain/repositories/profile_repository.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_cubit.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/domain/repositories/project_repository.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart';
 import 'package:jospar/features/tasks/domain/entities/task_extra_field.dart';
@@ -20,7 +21,6 @@ import 'package:jospar/features/tasks/domain/repositories/my_task_fields_storage
 import 'package:jospar/features/tasks/domain/repositories/my_tasks_repository.dart';
 import 'package:jospar/features/tasks/presentation/cubit/my_tasks_cubit.dart';
 import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
-import 'package:jospar/features/projects/data/models/project_task_model.dart';
 import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.dart';
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';

@@ -1,3 +1,5 @@
+import 'package:jospar/features/projects/data/models/project_dto.dart';
+import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -20,7 +22,6 @@ import 'package:jospar/features/kanban/domain/entities/task_move_target.dart';
 import 'package:jospar/features/kanban/domain/repositories/task_move_repository.dart';
 import 'package:jospar/features/kanban/presentation/cubit/kanban_cubit.dart';
 import 'package:jospar/features/kanban/presentation/widgets/kanban_board.dart';
-import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/tasks/data/services/task_changes.dart';
 
 const project = ProjectModel(
@@ -71,7 +72,7 @@ class _Api implements HttpClientAdapter {
         if (scope == 'w') {
           return _json({
             'data': [
-              project.toJson()
+              ProjectDto.fromEntity(project).toJson()
                 ..['children'] = [
                   {'id': 'child', 'name': 'Подпроект', 'code': 'CH'},
                 ],
