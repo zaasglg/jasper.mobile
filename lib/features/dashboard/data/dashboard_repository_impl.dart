@@ -1,6 +1,7 @@
+import '../../tasks/data/models/kanban_column_dto.dart';
 import 'models/dashboard_layout_dto.dart';
 import '../../tasks/domain/utils/task_column_label.dart';
-import '../../tasks/data/models/kanban_column_model.dart';
+import '../../tasks/domain/entities/kanban_column_model.dart';
 import 'package:dio/dio.dart';
 import '../domain/dashboard_repository.dart';
 import '../domain/entities/dashboard_layout.dart';
@@ -101,11 +102,11 @@ class DashboardRepositoryImpl implements DashboardRepository {
           );
           columnsByProject[id] = items(response.data)
               .map(
-                (raw) => KanbanColumnModel.fromJson({
+                (raw) => KanbanColumnDto.fromJson({
                   ...raw,
                   'archived':
                       raw['archived'] == true || raw['archivedAt'] != null,
-                }),
+                }).toEntity(),
               )
               .toList();
         } on DioException {

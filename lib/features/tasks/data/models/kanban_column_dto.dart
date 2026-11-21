@@ -1,7 +1,8 @@
+import '../../domain/entities/kanban_column_model.dart';
 import 'package:equatable/equatable.dart';
 
-class KanbanColumnModel extends Equatable {
-  const KanbanColumnModel({
+class KanbanColumnDto extends Equatable {
+  const KanbanColumnDto({
     required this.id,
     required this.name,
     required this.statusMap,
@@ -12,8 +13,8 @@ class KanbanColumnModel extends Equatable {
     this.archived = false,
   });
 
-  factory KanbanColumnModel.fromJson(Map<String, dynamic> json) {
-    return KanbanColumnModel(
+  factory KanbanColumnDto.fromJson(Map<String, dynamic> json) {
+    return KanbanColumnDto(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       statusMap:
@@ -63,7 +64,7 @@ class KanbanColumnModel extends Equatable {
     'archived': archived,
   };
 
-  KanbanColumnModel copyWith({
+  KanbanColumnDto copyWith({
     String? id,
     String? name,
     String? statusMap,
@@ -73,7 +74,7 @@ class KanbanColumnModel extends Equatable {
     int? order,
     bool? archived,
   }) {
-    return KanbanColumnModel(
+    return KanbanColumnDto(
       id: id ?? this.id,
       name: name ?? this.name,
       statusMap: statusMap ?? this.statusMap,
@@ -85,6 +86,27 @@ class KanbanColumnModel extends Equatable {
     );
   }
 
+  factory KanbanColumnDto.fromEntity(KanbanColumnModel entity) =>
+      KanbanColumnDto(
+        id: entity.id,
+        name: entity.name,
+        statusMap: entity.statusMap,
+        projectId: entity.projectId,
+        color: entity.color,
+        wip: entity.wip,
+        order: entity.order,
+        archived: entity.archived,
+      );
+  KanbanColumnModel toEntity() => KanbanColumnModel(
+    id: id,
+    name: name,
+    statusMap: statusMap,
+    projectId: projectId,
+    color: color,
+    wip: wip,
+    order: order,
+    archived: archived,
+  );
   @override
   List<Object?> get props => <Object?>[
     id,

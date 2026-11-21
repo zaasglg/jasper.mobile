@@ -1,8 +1,10 @@
-import '../models/task_label_catalog.dart';
+import '../../domain/entities/task_label_model.dart';
+import '../models/kanban_column_dto.dart';
+import '../models/task_label_catalog_dto.dart';
 import 'package:dio/dio.dart';
 
 import '../../domain/repositories/task_details_repository.dart';
-import '../models/kanban_column_model.dart';
+import '../../domain/entities/kanban_column_model.dart';
 import '../models/task_detail_model.dart';
 import '../../../projects/data/models/project_task_model.dart';
 
@@ -123,12 +125,13 @@ class TaskDetailsRepositoryImpl
   }
 
   @override
-  Future<TaskLabelCatalog> getLabelCatalog(String taskId) async {
+  Future<({List<TaskLabelModel> shared, List<TaskLabelModel> personal})>
+  getLabelCatalog(String taskId) async {
     try {
       final response = await _dio.get<dynamic>(
         'project-tasks/${Uri.encodeComponent(taskId)}/label-catalog',
       );
-      return TaskLabelCatalog.fromJson(_object(response.data));
+      return TaskLabelCatalogDto.fromJson(_object(response.data)).toEntity();
     } on DioException catch (e) {
       throw TaskDetailsException(_messageFor(e, 'загрузить метки'));
     }
@@ -348,8 +351,9 @@ class TaskDetailsRepositoryImpl
       return _list(response.data)
           .whereType<Map>()
           .map(
-            (item) =>
-                KanbanColumnModel.fromJson(Map<String, dynamic>.from(item)),
+            (item) => KanbanColumnDto.fromJson(
+              Map<String, dynamic>.from(item),
+            ).toEntity(),
           )
           .where((column) => column.id.isNotEmpty)
           .toList(growable: false);

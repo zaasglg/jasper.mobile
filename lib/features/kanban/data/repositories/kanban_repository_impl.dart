@@ -1,3 +1,4 @@
+import '../../../tasks/data/models/kanban_column_dto.dart';
 import 'dart:convert';
 import '../../../assistant/data/repositories/assistant_repository_impl.dart';
 import '../../../assistant/domain/entities/assistant_message_model.dart';
@@ -6,7 +7,7 @@ import '../models/task_translation.dart';
 import 'package:dio/dio.dart';
 
 import '../../../projects/data/models/project_task_model.dart';
-import '../../../tasks/data/models/kanban_column_model.dart';
+import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../domain/entities/kanban_board_data.dart';
 import '../../domain/repositories/kanban_repository.dart';
 
@@ -81,8 +82,9 @@ class KanbanRepositoryImpl implements KanbanRepository {
         columns: _list((responses[0] as Response<dynamic>).data)
             .whereType<Map>()
             .map(
-              (item) =>
-                  KanbanColumnModel.fromJson(Map<String, dynamic>.from(item)),
+              (item) => KanbanColumnDto.fromJson(
+                Map<String, dynamic>.from(item),
+              ).toEntity(),
             )
             .where((column) => column.id.isNotEmpty && !column.archived)
             .toList(growable: false),
@@ -382,7 +384,7 @@ class KanbanRepositoryImpl implements KanbanRepository {
           'order': order,
         },
       );
-      return KanbanColumnModel.fromJson(_object(response.data));
+      return KanbanColumnDto.fromJson(_object(response.data)).toEntity();
     } on DioException catch (error) {
       throw _exception(error, 'создать колонку');
     } on KanbanException {
@@ -406,7 +408,7 @@ class KanbanRepositoryImpl implements KanbanRepository {
           'color': ?color,
         },
       );
-      return KanbanColumnModel.fromJson(_object(response.data));
+      return KanbanColumnDto.fromJson(_object(response.data)).toEntity();
     } on DioException catch (error) {
       throw _exception(error, 'обновить колонку');
     } on KanbanException {

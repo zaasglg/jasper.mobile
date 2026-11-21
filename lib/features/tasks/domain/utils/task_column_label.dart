@@ -1,4 +1,4 @@
-import '../../data/models/kanban_column_model.dart';
+import '../entities/kanban_column_model.dart';
 
 /// Status codes are project-local identifiers, never user-facing column names.
 String taskColumnLabel(

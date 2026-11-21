@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:jospar/features/kanban/data/models/card_view_settings.dart';
 import 'package:jospar/features/kanban/presentation/widgets/task_card.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
-import 'package:jospar/features/tasks/data/models/task_label_model.dart';
+import 'package:jospar/features/tasks/domain/entities/task_label_model.dart';
 
 void main() {
   test(

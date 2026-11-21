@@ -1,6 +1,6 @@
 import '../../data/models/task_translation.dart';
 import '../../../projects/data/models/project_task_model.dart';
-import '../../../tasks/data/models/kanban_column_model.dart';
+import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../entities/kanban_board_data.dart';
 
 abstract interface class KanbanRepository {

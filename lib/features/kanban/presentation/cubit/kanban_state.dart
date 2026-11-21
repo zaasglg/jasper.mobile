@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../projects/data/models/project_task_model.dart';
-import '../../../tasks/data/models/kanban_column_model.dart';
+import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../domain/utils/kanban_utils.dart';
 
 enum KanbanStatus { initial, loading, success, failure }

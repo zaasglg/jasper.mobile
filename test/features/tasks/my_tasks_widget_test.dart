@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
-import 'package:jospar/features/tasks/data/models/kanban_column_model.dart';
+import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 import 'package:jospar/features/tasks/domain/entities/task_extra_field.dart';
 import 'package:jospar/features/tasks/domain/repositories/my_task_fields_storage.dart';
 import 'package:jospar/features/tasks/domain/repositories/my_tasks_repository.dart';

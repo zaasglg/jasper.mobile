@@ -1,3 +1,5 @@
+import '../../data/models/task_label_dto.dart';
+import '../../domain/utils/task_label_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -6,10 +8,14 @@ import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../../core/theme/task_label_color.dart';
 import '../../../../core/widgets/app_color_picker.dart';
 import '../../../../core/widgets/app_form_surface.dart';
-import '../../data/models/task_label_catalog.dart';
-import '../../data/models/task_label_model.dart';
+import '../../domain/entities/task_label_model.dart';
 import '../cubit/task_details_cubit.dart';
 import '../cubit/task_details_state.dart';
+
+typedef _LabelCatalog = ({
+  List<TaskLabelModel> shared,
+  List<TaskLabelModel> personal,
+});
 
 /// Selection and creation share one bottom-sheet route and one modal barrier.
 class TaskLabelsEditor extends StatefulWidget {
@@ -19,7 +25,7 @@ class TaskLabelsEditor extends StatefulWidget {
 }
 
 class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
-  late Future<TaskLabelCatalog> _future;
+  late Future<_LabelCatalog> _future;
   final _name = TextEditingController();
   String _color = '#6D5FE0';
   String? _error;
@@ -39,7 +45,7 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
     super.dispose();
   }
 
-  List<TaskLabelModel> _catalog(TaskLabelCatalog remote, bool personal) {
+  List<TaskLabelModel> _catalog(_LabelCatalog remote, bool personal) {
     final cubit = context.read<TaskDetailsCubit>();
     final raw = cubit.state.detail.raw;
     final stored = personal ? raw['personalLabelCatalog'] : raw['labelCatalog'];
@@ -50,7 +56,7 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
       ...cubit.labelsForScope(personal),
       if (values is List)
         ...values.whereType<Map>().map(
-          (e) => TaskLabelModel.fromJson(Map<String, dynamic>.from(e)),
+          (e) => TaskLabelDto.fromJson(Map<String, dynamic>.from(e)).toEntity(),
         ),
       ...(personal ? remote.personal : remote.shared),
     ]);
@@ -77,7 +83,7 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
     });
   }
 
-  Future<void> _save(TaskLabelCatalog remote) async {
+  Future<void> _save(_LabelCatalog remote) async {
     final cubit = context.read<TaskDetailsCubit>();
     if (_saving || cubit.state.isSaving) return;
     final personal = _personalForm!;
@@ -121,22 +127,17 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
       if (saved) {
         _personalForm = null;
         _editing = null;
-        _future = Future.value(
-          remote.copyWith(
-            shared: personal
-                ? null
-                : [
-                    ...catalog.where((e) => taskLabelKey(e.text) != oldKey),
-                    label,
-                  ],
-            personal: personal
-                ? [
-                    ...catalog.where((e) => taskLabelKey(e.text) != oldKey),
-                    label,
-                  ]
-                : null,
-          ),
-        );
+        _future = Future.value((
+          shared: personal
+              ? remote.shared
+              : [
+                  ...catalog.where((e) => taskLabelKey(e.text) != oldKey),
+                  label,
+                ],
+          personal: personal
+              ? [...catalog.where((e) => taskLabelKey(e.text) != oldKey), label]
+              : remote.personal,
+        ));
       } else {
         _error =
             cubit.state.actionErrorMessage ??
@@ -155,7 +156,7 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop && _personalForm != null) _back();
       },
-      child: FutureBuilder<TaskLabelCatalog>(
+      child: FutureBuilder<_LabelCatalog>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {

@@ -1,4 +1,6 @@
-import '../../data/models/task_label_catalog.dart';
+import '../../domain/entities/task_label_model.dart';
+import '../../data/models/task_label_dto.dart';
+import '../../domain/utils/task_label_utils.dart';
 import '../../../assistant/data/services/assistant_task_changes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -182,7 +184,8 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
     }
   }
 
-  Future<TaskLabelCatalog> getLabelCatalog() async {
+  Future<({List<TaskLabelModel> shared, List<TaskLabelModel> personal})>
+  getLabelCatalog() async {
     final repository = _repository;
     final task = state.task;
     if (task == null || repository is! TaskLabelCatalogRepository) {
@@ -200,7 +203,11 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
     return values is List
         ? values
               .whereType<Map>()
-              .map((e) => TaskLabelModel.fromJson(Map<String, dynamic>.from(e)))
+              .map(
+                (e) => TaskLabelDto.fromJson(
+                  Map<String, dynamic>.from(e),
+                ).toEntity(),
+              )
               .toList()
         : [];
   }
@@ -224,13 +231,13 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
             : <String, dynamic>{};
         map[userId!] = uniqueTaskLabels(
           entry.value,
-        ).map((e) => e.toJson()).toList();
+        ).map((e) => TaskLabelDto.fromEntity(e).toJson()).toList();
         raw[entry.key] = map;
       }
     } else {
       raw['labelCatalog'] = uniqueTaskLabels(
         catalog,
-      ).map((e) => e.toJson()).toList();
+      ).map((e) => TaskLabelDto.fromEntity(e).toJson()).toList();
     }
     final saved = await _saveDetail(
       state.detail.copyWith(
@@ -260,7 +267,9 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
     if (labels.isEmpty) {
       personal.remove(userId);
     } else {
-      personal[userId] = labels.map((e) => e.toJson()).toList();
+      personal[userId] = labels
+          .map((e) => TaskLabelDto.fromEntity(e).toJson())
+          .toList();
     }
     return _saveDetail(
       state.detail.copyWith(

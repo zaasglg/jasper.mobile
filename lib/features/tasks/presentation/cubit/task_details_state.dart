@@ -1,9 +1,11 @@
+import '../../domain/entities/task_label_model.dart';
+import '../../data/models/task_label_dto.dart';
 import 'package:equatable/equatable.dart';
 
 import '../../../profile/domain/entities/user_profile.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../data/models/task_detail_model.dart';
-import '../../data/models/kanban_column_model.dart';
+import '../../domain/entities/kanban_column_model.dart';
 
 enum TaskDetailsStatus { initial, loading, success, failure }
 
@@ -41,9 +43,9 @@ class TaskDetailsState extends Equatable {
       ...detail.labels,
       if (values is List)
         ...values.whereType<Map>().map(
-          (e) => TaskLabelModel.fromJson(
+          (e) => TaskLabelDto.fromJson(
             Map<String, dynamic>.from(e),
-          ).copyWith(isPersonal: true),
+          ).toEntity().copyWith(isPersonal: true),
         ),
     ];
   }

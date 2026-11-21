@@ -1,10 +1,11 @@
-import '../../data/models/task_label_catalog.dart';
+import '../entities/task_label_model.dart';
 import '../../data/models/task_detail_model.dart';
-import '../../data/models/kanban_column_model.dart';
+import '../entities/kanban_column_model.dart';
 import '../../../projects/data/models/project_task_model.dart';
 
 abstract interface class TaskLabelCatalogRepository {
-  Future<TaskLabelCatalog> getLabelCatalog(String taskId);
+  Future<({List<TaskLabelModel> shared, List<TaskLabelModel> personal})>
+  getLabelCatalog(String taskId);
 }
 
 abstract interface class TaskExtrasRepository {

@@ -1,10 +1,11 @@
+import 'kanban_column_dto.dart';
 import '../../../workspaces/data/models/workspace_dto.dart';
 import 'package:equatable/equatable.dart';
 import '../../../profile/domain/entities/user_profile.dart';
 import '../../../profile/data/models/user_profile_dto.dart';
 import '../../../projects/data/models/project_task_model.dart';
 import '../../../workspaces/domain/entities/workspace_model.dart';
-import 'kanban_column_model.dart';
+import '../../domain/entities/kanban_column_model.dart';
 import 'task_detail_model.dart';
 
 class TaskCreationCatalog extends Equatable {
@@ -58,7 +59,10 @@ class TaskCreationOptions extends Equatable {
   ) => TaskCreationOptions(
     columns: (json['columns'] as List? ?? [])
         .whereType<Map>()
-        .map((e) => KanbanColumnModel.fromJson(Map<String, dynamic>.from(e)))
+        .map(
+          (e) =>
+              KanbanColumnDto.fromJson(Map<String, dynamic>.from(e)).toEntity(),
+        )
         .toList(),
     epics: (json['epics'] as List? ?? [])
         .whereType<Map>()
@@ -74,7 +78,9 @@ class TaskCreationOptions extends Equatable {
         .toList(),
   );
   Map<String, dynamic> toJson() => {
-    'columns': columns.map((e) => e.toJson()).toList(),
+    'columns': columns
+        .map((e) => KanbanColumnDto.fromEntity(e).toJson())
+        .toList(),
     'epics': epics.map((e) => e.toJson()).toList(),
     'members': members.map((e) => e.toJson()).toList(),
     'tasks': tasks.map((e) => e.toJson()).toList(),

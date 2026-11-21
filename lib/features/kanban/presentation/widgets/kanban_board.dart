@@ -24,7 +24,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../projects/data/models/project_model.dart';
 import '../../../projects/data/models/project_task_model.dart';
-import '../../../tasks/data/models/kanban_column_model.dart';
+import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../../planner/presentation/screens/planner_screen.dart';
 import 'task_card.dart';
 import '../cubit/kanban_cubit.dart';

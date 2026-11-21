@@ -5,7 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/tasks/data/models/task_creation_models.dart';
 import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
-import 'package:jospar/features/tasks/data/models/kanban_column_model.dart';
+import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 import 'package:jospar/features/tasks/data/repositories/task_creation_repository_impl.dart';
 import 'package:jospar/features/tasks/domain/repositories/task_creation_repository.dart';
 import 'package:jospar/features/tasks/presentation/cubit/task_creation_cubit.dart';

@@ -3,7 +3,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../../projects/data/models/project_model.dart';
 import '../../../projects/data/models/project_task_model.dart';
-import '../../data/models/kanban_column_model.dart';
+import '../../domain/entities/kanban_column_model.dart';
 import '../../domain/entities/task_extra_field.dart';
 
 enum MyTasksStatus { initial, loading, success, failure }

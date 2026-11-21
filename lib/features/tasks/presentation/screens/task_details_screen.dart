@@ -1,3 +1,4 @@
+import '../../domain/entities/task_label_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../widgets/task_detail_style.dart';
 import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';

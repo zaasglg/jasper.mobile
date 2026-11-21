@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/dashboard/data/dashboard_repository_impl.dart';
-import 'package:jospar/features/tasks/data/models/kanban_column_model.dart';
+import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 import 'package:jospar/features/tasks/domain/utils/task_column_label.dart';
 
 void main() {

@@ -1,8 +1,9 @@
+import '../../../tasks/data/models/task_label_dto.dart';
 import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
 
-import '../../../tasks/data/models/task_label_model.dart';
+import '../../../tasks/domain/entities/task_label_model.dart';
 
 class ProjectTaskModel extends Equatable {
   const ProjectTaskModel({
@@ -167,9 +168,9 @@ class ProjectTaskModel extends Equatable {
     return [
       ...labels.where((label) => !label.isPersonal),
       ...values.whereType<Map>().map(
-        (value) => TaskLabelModel.fromJson(
+        (value) => TaskLabelDto.fromJson(
           Map<String, dynamic>.from(value),
-        ).copyWith(isPersonal: true),
+        ).toEntity().copyWith(isPersonal: true),
       ),
     ];
   }
@@ -181,12 +182,12 @@ class ProjectTaskModel extends Equatable {
     final labels = <TaskLabelModel>[
       if (values is List)
         for (final value in values.whereType<Map>())
-          TaskLabelModel.fromJson(Map<String, dynamic>.from(value)),
+          TaskLabelDto.fromJson(Map<String, dynamic>.from(value)).toEntity(),
       if (personal is List)
         for (final value in personal.whereType<Map>())
-          TaskLabelModel.fromJson(
+          TaskLabelDto.fromJson(
             Map<String, dynamic>.from(value),
-          ).copyWith(isPersonal: true),
+          ).toEntity().copyWith(isPersonal: true),
     ];
     final seen = <String>{};
     return labels
@@ -340,7 +341,9 @@ class ProjectTaskModel extends Equatable {
     'checklistTotal': checklistTotal,
     'assignees': assignees.map((item) => item.toJson()).toList(growable: false),
     'epics': epics.map((item) => item.toJson()).toList(growable: false),
-    'labels': labels.map((item) => item.toJson()).toList(growable: false),
+    'labels': labels
+        .map((item) => TaskLabelDto.fromEntity(item).toJson())
+        .toList(growable: false),
   };
 
   ProjectTaskModel copyWith({

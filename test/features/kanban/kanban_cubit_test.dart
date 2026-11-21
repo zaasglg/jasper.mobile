@@ -7,7 +7,7 @@ import 'package:jospar/features/kanban/domain/repositories/kanban_repository.dar
 import 'package:jospar/features/kanban/presentation/cubit/kanban_cubit.dart';
 import 'package:jospar/features/kanban/presentation/cubit/kanban_state.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
-import 'package:jospar/features/tasks/data/models/kanban_column_model.dart';
+import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 
 void main() {
   const todo = KanbanColumnModel(

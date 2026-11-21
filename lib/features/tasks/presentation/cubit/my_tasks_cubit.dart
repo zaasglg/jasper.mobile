@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../projects/data/models/project_model.dart';
 import '../../../projects/data/models/project_task_model.dart';
-import '../../data/models/kanban_column_model.dart';
+import '../../domain/entities/kanban_column_model.dart';
 import '../../data/repositories/my_tasks_repository_impl.dart';
 import '../../domain/entities/task_extra_field.dart';
 import '../../domain/repositories/my_task_fields_storage.dart';

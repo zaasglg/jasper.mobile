@@ -9,7 +9,7 @@ import '../../domain/repositories/task_move_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../projects/data/models/project_task_model.dart';
-import '../../../tasks/data/models/kanban_column_model.dart';
+import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../../tasks/domain/utils/task_completion.dart';
 import '../../domain/entities/kanban_board_data.dart';
 import '../../domain/entities/kanban_board_cache.dart';

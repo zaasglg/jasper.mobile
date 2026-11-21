@@ -1,7 +1,7 @@
+import 'task_label_dto.dart';
 import 'package:equatable/equatable.dart';
 
-import 'task_label_model.dart';
-export 'task_label_model.dart';
+import '../../domain/entities/task_label_model.dart';
 
 import '../../../projects/data/models/project_task_model.dart';
 
@@ -82,7 +82,10 @@ class TaskDetailModel extends Equatable {
         TaskCommentModel.fromJson,
       ).where((comment) => !comment.isDeleted).toList(growable: false),
       files: _modelList(json['files'], TaskFileModel.fromJson),
-      labels: _modelList(json['labels'], TaskLabelModel.fromJson),
+      labels: _modelList(
+        json['labels'],
+        (json) => TaskLabelDto.fromJson(json).toEntity(),
+      ),
       estimateMinutes: json['estimateMinutes'] is num
           ? (json['estimateMinutes'] as num).round()
           : int.tryParse(json['estimateMinutes']?.toString() ?? ''),
@@ -117,7 +120,9 @@ class TaskDetailModel extends Equatable {
         .toList(growable: false),
     'comments': comments.map((item) => item.toJson()).toList(growable: false),
     'files': files.map((item) => item.toJson()).toList(growable: false),
-    'labels': labels.map((item) => item.toJson()).toList(growable: false),
+    'labels': labels
+        .map((item) => TaskLabelDto.fromEntity(item).toJson())
+        .toList(growable: false),
     if (estimateMinutes != null) 'estimateMinutes': estimateMinutes,
   };
 

@@ -1,5 +1,5 @@
 import '../../../projects/data/models/project_task_model.dart';
-import '../../../tasks/data/models/kanban_column_model.dart';
+import '../../../tasks/domain/entities/kanban_column_model.dart';
 
 List<KanbanColumnModel> sortKanbanColumns(Iterable<KanbanColumnModel> columns) {
   return columns.toList(growable: false)..sort((left, right) {

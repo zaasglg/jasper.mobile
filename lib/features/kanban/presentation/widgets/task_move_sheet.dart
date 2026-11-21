@@ -6,7 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_form_surface.dart';
 import '../../../projects/data/models/project_model.dart';
 import '../../../projects/data/models/project_task_model.dart';
-import '../../../tasks/data/models/kanban_column_model.dart';
+import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../../workspaces/domain/entities/workspace_model.dart';
 import '../../domain/entities/task_move_target.dart';
 import '../../domain/repositories/kanban_repository.dart';

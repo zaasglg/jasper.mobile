@@ -1,7 +1,8 @@
+import '../../../tasks/data/models/kanban_column_dto.dart';
 import '../../../workspaces/data/models/workspace_dto.dart';
 import 'package:dio/dio.dart';
 import '../../../projects/data/models/project_model.dart';
-import '../../../tasks/data/models/kanban_column_model.dart';
+import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../../workspaces/domain/entities/workspace_model.dart';
 import '../../domain/entities/task_move_target.dart';
 import '../../domain/repositories/kanban_repository.dart';
@@ -122,7 +123,7 @@ class TaskMoveRepositoryImpl implements TaskMoveRepository {
               )).data,
             )
             .where((row) => row['archivedAt'] == null)
-            .map(KanbanColumnModel.fromJson)
+            .map((json) => KanbanColumnDto.fromJson(json).toEntity())
             .where(
               (column) =>
                   column.id.isNotEmpty &&

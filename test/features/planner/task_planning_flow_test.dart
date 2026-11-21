@@ -20,7 +20,7 @@ import 'package:jospar/features/planner/presentation/cubit/planner_cubit.dart';
 import 'package:jospar/features/planner/presentation/screens/planner_screen.dart';
 import 'package:jospar/features/projects/data/models/project_model.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
-import 'package:jospar/features/tasks/data/models/kanban_column_model.dart';
+import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 import 'package:jospar/features/tasks/domain/entities/task_extra_field.dart';
 import 'package:jospar/features/tasks/domain/repositories/my_task_fields_storage.dart';
 import 'package:jospar/features/tasks/domain/repositories/my_tasks_repository.dart';

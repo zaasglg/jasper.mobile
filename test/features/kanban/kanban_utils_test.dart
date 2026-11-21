@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/kanban/domain/utils/kanban_utils.dart';
 import 'package:jospar/features/projects/data/models/project_task_model.dart';
-import 'package:jospar/features/tasks/data/models/kanban_column_model.dart';
+import 'package:jospar/features/tasks/domain/entities/kanban_column_model.dart';
 
 void main() {
   const todo = KanbanColumnModel(

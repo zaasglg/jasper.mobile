@@ -84,3 +84,13 @@ SpaceMember.lastActiveAt — формат не установлен (ISO или 
 - Импорты моделей projects, planner и tasks из data в presentation остаются до соответствующих шагов разделения сущностей; не объединять их рефакторинг с dashboard.
 
 `DashboardException` уже находится в domain.
+
+## Базовые типы tasks: дополнительные поля меток
+
+TaskLabelModel.unknownLabelFields — Map<String, dynamic> неизвестных полей метки, которые backend присылает и ожидает обратно при PATCH задачи. Известные поля (id/text/color/isPersonal) типизированы. Причина: метки уходят целой картой, хранение только в DTO приводит к потере полей на DTO → entity → PATCH. Типизировать после уточнения полного контракта метки отдельной задачей.
+
+`KanbanColumnModel.statusMap` — String, код статуса колонки, несмотря на имя; Map-преобразование недопустимо без изменения контракта. DTO сохраняет aliases `statusMap/status_map` и существующее преобразование toString.
+
+`TaskLabelCatalog` заменён record-ответом репозитория с `shared/personal: List<TaskLabelModel>`; отдельной domain-сущности каталога нет. JSON-каталог находится в `TaskLabelCatalogDto`; нормализация ключа и уникальность — в domain/utils/task_label_utils.dart.
+
+Пока детали задачи остаются в data до шага 13, `TaskDetailsCubit`, `TaskDetailsState` и `TaskLabelsEditor` точечно используют `TaskLabelDto` для вложенных карт personalLabels/labelCatalog. На шаге 13 перенести эти преобразования за границу data вместе с разделением TaskDetailModel; UI и domain не должны разбирать исходные detail-карты.
