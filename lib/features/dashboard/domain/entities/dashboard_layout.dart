@@ -12,13 +12,7 @@ class DashboardLayout extends Equatable {
   final Map<String, dynamic> layouts, unknownExtra;
   static DashboardLayout defaults() => DashboardLayout(
     widgets: [
-      const DashboardWidgetSlot(
-        id: 'task-map',
-        instanceId: 'task-map',
-        visible: false,
-        options: DashboardWidgetOptions(projectIds: []),
-      ),
-      const DashboardWidgetSlot(
+      DashboardWidgetSlot(
         id: 'daily-motivation',
         instanceId: 'daily-motivation',
         size: 'full',

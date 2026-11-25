@@ -37,6 +37,7 @@ class ProjectModel extends Equatable {
     DateTime? end,
     double? progress,
     String? parentId,
+    bool clearParentId = false,
     bool? isPinned,
     List<ProjectModel>? children,
   }) {
@@ -49,7 +50,7 @@ class ProjectModel extends Equatable {
       start: start ?? this.start,
       end: end ?? this.end,
       progress: progress ?? this.progress,
-      parentId: parentId ?? this.parentId,
+      parentId: clearParentId ? null : parentId ?? this.parentId,
       isPinned: isPinned ?? this.isPinned,
       children: children ?? this.children,
     );

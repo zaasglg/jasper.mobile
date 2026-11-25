@@ -1,5 +1,8 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../core/widgets/app_back_button.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:file_picker/file_picker.dart';
@@ -52,33 +55,20 @@ class _StorageBodyState extends State<_StorageBody> {
     borderRadius: BorderRadius.all(Radius.circular(12)),
     borderSide: BorderSide.none,
   );
-  Widget _categoryTab(StorageCategory category, int count) {
+  Widget _categorySegment(StorageCategory category, int count) {
     final selected = category == _category;
-    final color = selected ? AppColors.accent : AppColors.muted;
+    final color = selected
+        ? Theme.of(context).colorScheme.onSurface
+        : AppColors.of(context).muted;
     return Semantics(
       selected: selected,
-      button: true,
-      child: InkWell(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-        onTap: () {
-          setState(() => _category = category);
-          if (category == StorageCategory.summaries) {
-            cubit.loadSummaries();
-          }
-        },
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: selected ? AppColors.accent : Colors.transparent,
-                width: 2,
-              ),
-            ),
-          ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 labels[category]!,
@@ -96,14 +86,18 @@ class _StorageBodyState extends State<_StorageBody> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: .08),
-                    borderRadius: BorderRadius.circular(5),
+                    color: selected
+                        ? AppColors.accent
+                        : (_dark ? Colors.white12 : const Color(0xFFE8E8EF)),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     '$count',
                     style: TextStyle(
                       fontSize: 10,
-                      color: color,
+                      color: selected
+                          ? Colors.white
+                          : AppColors.of(context).muted,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -144,44 +138,44 @@ class _StorageBodyState extends State<_StorageBody> {
             AppMenuAction(
               value: 'open',
               label: item.kind == StorageFileKind.link
-                  ? 'Открыть ссылку'
-                  : 'Просмотреть',
+                  ? tr(context, 'Открыть ссылку')
+                  : tr(context, 'Просмотреть'),
               icon: LucideIcons.externalLink,
             ),
           AppMenuAction(
             value: 'favorite',
             label: state.favorites.contains(item.id)
-                ? 'Убрать из избранного'
-                : 'В избранное',
+                ? tr(context, 'Убрать из избранного')
+                : tr(context, 'В избранное'),
             icon: LucideIcons.star,
           ),
           if (item.canOpen && item.kind != StorageFileKind.link)
-            const AppMenuAction(
+            AppMenuAction(
               value: 'download',
-              label: 'Скачать',
+              label: tr(context, 'Скачать'),
               icon: LucideIcons.download,
             ),
           if (item.taskId != null || item.messageId != null)
             AppMenuAction(
               value: 'source',
               label: item.taskId != null
-                  ? 'Открыть задачу'
-                  : 'Перейти к сообщению',
+                  ? tr(context, 'Открыть задачу')
+                  : tr(context, 'Перейти к сообщению'),
               icon: LucideIcons.arrowRight,
             ),
           if (item.canAnalyze && item.canOpen)
-            const AppMenuAction(
+            AppMenuAction(
               value: 'analyze',
-              label: 'Создать задачи из файла',
+              label: tr(context, 'Создать задачи из файла'),
               icon: LucideIcons.sparkles,
             ),
         ],
         [
           if (widget.scope.source == StorageSource.chat &&
               item.authorId == state.userId)
-            const AppMenuAction(
+            AppMenuAction(
               value: 'delete',
-              label: 'Удалить сообщение с файлом',
+              label: tr(context, 'Удалить сообщение с файлом'),
               icon: LucideIcons.trash2,
               destructive: true,
             ),
@@ -207,8 +201,11 @@ class _StorageBodyState extends State<_StorageBody> {
       case 'delete':
         if (await showAppConfirmation(
               context,
-              'Удалить файл?',
-              'Сообщение с этим вложением будет удалено из переписки.',
+              tr(context, 'Удалить файл?'),
+              tr(
+                context,
+                'Сообщение с этим вложением будет удалено из переписки.',
+              ),
               confirmLabel: 'Удалить',
               destructive: true,
             ) &&
@@ -218,8 +215,11 @@ class _StorageBodyState extends State<_StorageBody> {
       case 'analyze':
         if (!await showAppConfirmation(
               context,
-              'Создать задачи из файла?',
-              'Документ будет распознан, а найденные задачи появятся в инбоксе этого workspace.',
+              tr(context, 'Создать задачи из файла?'),
+              tr(
+                context,
+                'Документ будет распознан, а найденные задачи появятся в инбоксе этого workspace.',
+              ),
               confirmLabel: 'Создать задачи',
             ) ||
             !mounted) {
@@ -235,13 +235,13 @@ class _StorageBodyState extends State<_StorageBody> {
                 : AppSnackBarTone.success,
             content: Text(
               result.alreadyImported
-                  ? 'Документ уже обработан'
-                  : 'Создано задач: ${result.created}',
+                  ? tr(context, 'Документ уже обработан')
+                  : tr(context, "Создано задач: {p0}", {'p0': result.created}),
             ),
             action: result.undoBatchId == null
                 ? null
                 : SnackBarAction(
-                    label: 'Отменить',
+                    label: tr(context, 'Отменить'),
                     onPressed: () => cubit.action(
                       () => cubit.repository.undoImport(
                         widget.scope,
@@ -276,7 +276,7 @@ class _StorageBodyState extends State<_StorageBody> {
         [
           AppMenuAction(
             value: '',
-            label: 'Все участники',
+            label: tr(context, 'Все участники'),
             icon: LucideIcons.users,
             selected: _author == null,
           ),
@@ -305,7 +305,7 @@ class _StorageBodyState extends State<_StorageBody> {
           appSnackBar(
             context: context,
             tone: AppSnackBarTone.error,
-            content: Text(state.error!),
+            content: Text(tr(context, state.error!)),
           ),
         );
       }
@@ -347,7 +347,7 @@ class _StorageBodyState extends State<_StorageBody> {
       return Scaffold(
         backgroundColor: _dark
             ? Theme.of(context).colorScheme.surface
-            : AppColors.quietSurface,
+            : AppColors.of(context).quietSurface,
         appBar: AppBar(
           toolbarHeight:
               56 +
@@ -360,21 +360,20 @@ class _StorageBodyState extends State<_StorageBody> {
           scrolledUnderElevation: 0,
           centerTitle: false,
           titleSpacing: 0,
-          leading: IconButton(
-            tooltip: 'Назад',
-            onPressed: context.pop,
-            icon: const Icon(LucideIcons.arrowLeft, size: 18),
-          ),
+          leading: AppBackButton(onPressed: context.pop),
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Кладовка',
+              Text(
+                tr(context, 'Кладовка'),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
               Text(
                 widget.scope.title,
-                style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.of(context).muted,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -382,7 +381,7 @@ class _StorageBodyState extends State<_StorageBody> {
           ),
           actions: [
             IconButton(
-              tooltip: 'Обновить',
+              tooltip: tr(context, 'Обновить'),
               onPressed: state.loading
                   ? null
                   : () {
@@ -395,9 +394,16 @@ class _StorageBodyState extends State<_StorageBody> {
             ),
             if (widget.scope.source == StorageSource.chat)
               IconButton(
-                tooltip: 'Добавить файл',
+                tooltip: tr(context, 'Добавить файл'),
                 onPressed: state.busy ? null : _upload,
-                icon: const Icon(LucideIcons.plus, size: 16),
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(LucideIcons.plus, size: 20),
               ),
           ],
         ),
@@ -405,16 +411,16 @@ class _StorageBodyState extends State<_StorageBody> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
                         style: const TextStyle(fontSize: 13),
                         decoration: InputDecoration(
-                          hintText: 'Поиск файлов',
-                          hintStyle: const TextStyle(
-                            color: AppColors.muted,
+                          hintText: tr(context, 'Поиск файлов'),
+                          hintStyle: TextStyle(
+                            color: AppColors.of(context).muted,
                             fontSize: 13,
                           ),
                           isDense: true,
@@ -423,15 +429,15 @@ class _StorageBodyState extends State<_StorageBody> {
                               ? Theme.of(
                                   context,
                                 ).colorScheme.surfaceContainerHighest
-                              : AppColors.badgeSurface,
+                              : const Color(0xFFF5F5F8),
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 12,
                           ),
-                          prefixIcon: const Icon(
+                          prefixIcon: Icon(
                             LucideIcons.search,
                             size: 16,
-                            color: AppColors.muted,
+                            color: AppColors.of(context).muted,
                           ),
                           prefixIconConstraints: const BoxConstraints(
                             minWidth: 38,
@@ -456,9 +462,9 @@ class _StorageBodyState extends State<_StorageBody> {
                         backgroundColor: _author != null
                             ? AppColors.accent.withValues(alpha: .09)
                             : Colors.transparent,
-                        foregroundColor: AppColors.muted,
+                        foregroundColor: AppColors.of(context).muted,
                       ),
-                      tooltip: 'Фильтр по автору',
+                      tooltip: tr(context, 'Фильтр по автору'),
                       onPressed: () => _filter(state),
                       icon: Icon(
                         LucideIcons.slidersHorizontal,
@@ -469,7 +475,9 @@ class _StorageBodyState extends State<_StorageBody> {
                       ),
                     ),
                     IconButton(
-                      tooltip: _grid ? 'Списком' : 'Плиткой',
+                      tooltip: _grid
+                          ? tr(context, 'Списком')
+                          : tr(context, 'Плиткой'),
                       onPressed: () => setState(() => _grid = !_grid),
                       icon: Icon(
                         _grid ? LucideIcons.list : LucideIcons.layoutGrid,
@@ -479,31 +487,42 @@ class _StorageBodyState extends State<_StorageBody> {
                   ],
                 ),
               ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: _dark ? Colors.white12 : const Color(0xFFEDEDEE),
-                    ),
-                  ),
-                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
+                  child: CupertinoSlidingSegmentedControl<StorageCategory>(
+                    groupValue: _category,
+                    padding: const EdgeInsets.all(4),
+                    backgroundColor: _dark
+                        ? const Color(0xFF2C2C2E)
+                        : const Color(0xFFF1F3F7),
+                    thumbColor: _dark
+                        ? const Color(0xFF636366)
+                        : Theme.of(context).colorScheme.surface,
+                    onValueChanged: (category) {
+                      if (category == null || category == _category) return;
+                      setState(() => _category = category);
+                      if (category == StorageCategory.summaries) {
+                        cubit.loadSummaries();
+                      }
+                    },
+                    children: {
                       for (final category in categories)
-                        _categoryTab(category, count(category)),
-                    ],
+                        category: _categorySegment(category, count(category)),
+                    },
                   ),
                 ),
               ),
               if (widget.scope.source == StorageSource.project &&
                   _category == StorageCategory.favorites)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.all(12),
                   child: Text(
-                    'Избранное проекта хранится на этом устройстве',
+                    tr(
+                      context,
+                      'Избранное проекта хранится на этом устройстве',
+                    ),
                     style: TextStyle(fontSize: 11),
                   ),
                 ),
@@ -518,16 +537,16 @@ class _StorageBodyState extends State<_StorageBody> {
                 child: _category == StorageCategory.summaries
                     ? _summaries(state)
                     : state.items.isEmpty && state.loading
-                    ? const Center(child: Text('Собираем файлы…'))
+                    ? Center(child: Text(tr(context, 'Собираем файлы…')))
                     : state.items.isEmpty && state.error != null
                     ? Center(
                         child: TextButton(
                           onPressed: cubit.load,
-                          child: const Text('Повторить загрузку'),
+                          child: Text(tr(context, 'Повторить загрузку')),
                         ),
                       )
                     : items.isEmpty
-                    ? const Center(child: Text('Здесь пока нет файлов'))
+                    ? Center(child: Text(tr(context, 'Здесь пока нет файлов')))
                     : RefreshIndicator(
                         onRefresh: cubit.load,
                         child: CustomScrollView(
@@ -543,10 +562,10 @@ class _StorageBodyState extends State<_StorageBody> {
                                 sliver: SliverToBoxAdapter(
                                   child: Text(
                                     group.key,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: AppColors.muted,
+                                      color: AppColors.of(context).muted,
                                     ),
                                   ),
                                 ),
@@ -609,20 +628,22 @@ class _StorageBodyState extends State<_StorageBody> {
           state.error != null)
         TextButton(
           onPressed: () => cubit.loadSummaries(),
-          child: const Text('Повторить загрузку резюме'),
+          child: Text(tr(context, 'Повторить загрузку резюме')),
         ),
       if (state.summaries.isEmpty &&
           !state.loadingSummaries &&
           state.error == null)
-        const Padding(
+        Padding(
           padding: EdgeInsets.all(40),
-          child: Center(child: Text('Резюме встреч пока нет')),
+          child: Center(child: Text(tr(context, 'Резюме встреч пока нет'))),
         ),
       for (final item in state.summaries)
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(LucideIcons.fileText, size: 16),
-          title: Text(item.number.isEmpty ? 'Резюме встречи' : item.number),
+          title: Text(
+            item.number.isEmpty ? tr(context, 'Резюме встречи') : item.number,
+          ),
           subtitle: Text(
             '${'${item.date.day} ${storageMonth(item.date.toLocal())}'} · ${item.authorName}',
           ),
@@ -635,7 +656,7 @@ class _StorageBodyState extends State<_StorageBody> {
           onPressed: state.loadingSummaries
               ? null
               : () => cubit.loadSummaries(more: true),
-          child: const Text('Загрузить ещё'),
+          child: Text(tr(context, 'Загрузить ещё')),
         ),
     ],
   );
@@ -650,8 +671,8 @@ class _StorageBodyState extends State<_StorageBody> {
     final menu = IconButton(
       constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
       padding: EdgeInsets.zero,
-      color: AppColors.muted,
-      tooltip: 'Действия с файлом',
+      color: AppColors.of(context).muted,
+      tooltip: tr(context, 'Действия с файлом'),
       onPressed: state.busy ? null : () => _menu(item),
       icon: const Icon(LucideIcons.ellipsis, size: 16),
     );
@@ -779,7 +800,10 @@ class _StorageBodyState extends State<_StorageBody> {
                 metadata,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 10, color: AppColors.muted),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppColors.of(context).muted,
+                ),
               ),
             ),
           ],

@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -54,7 +55,7 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
           appSnackBar(
             context: context,
             tone: AppSnackBarTone.success,
-            content: Text('Задача добавлена в Инбокс'),
+            content: Text(tr(context, 'Задача добавлена в Инбокс')),
           ),
         );
       return;
@@ -119,7 +120,7 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          'Быстро в Инбокс',
+                          tr(context, 'Быстро в Инбокс'),
                           style: AppTypography.body(context)?.copyWith(
                             color: colors.onSurface,
                             fontWeight: FontWeight.w600,
@@ -127,7 +128,7 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          'Запишите сейчас, разберите позже',
+                          tr(context, 'Запишите сейчас, разберите позже'),
                           style: AppTypography.caption(
                             context,
                           )?.copyWith(color: colors.onSurfaceVariant),
@@ -142,7 +143,7 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
                 padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: Theme.of(context).brightness == Brightness.light
-                      ? AppColors.subtleSurface
+                      ? AppColors.of(context).subtleSurface
                       : colors.surfaceContainerLow,
                   border: Border.all(
                     color: _focusNode.hasFocus
@@ -165,7 +166,7 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
                         textInputAction: TextInputAction.done,
                         style: AppTypography.body(context),
                         decoration: InputDecoration(
-                          hintText: 'Что нужно не забыть?',
+                          hintText: tr(context, 'Что нужно не забыть?'),
                           filled: false,
                           contentPadding: const EdgeInsets.all(AppSpacing.sm),
                           hintStyle: AppTypography.body(
@@ -180,7 +181,7 @@ class _DashboardInboxComposerState extends State<DashboardInboxComposer> {
                     ),
                     IconButton.filled(
                       key: const Key('dashboard-inbox-add'),
-                      tooltip: 'Добавить в Инбокс',
+                      tooltip: tr(context, 'Добавить в Инбокс'),
                       onPressed: canSubmit ? _createTask : null,
                       style: IconButton.styleFrom(
                         minimumSize: const Size.square(AppSpacing.touchTarget),

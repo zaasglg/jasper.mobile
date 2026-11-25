@@ -5,9 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:jospar/core/voice/assistant_launch_service.dart';
 
 void main() {
-  testWidgets(
-    'cold Siri launch waits for splash/login and then opens the assistant once',
-    (tester) async {
+  for (final voice in [true, false]) {
+    testWidgets('cold assistant launch waits for login, voice: $voice', (
+      tester,
+    ) async {
       const channel = MethodChannel('test/assistant_launch');
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         channel,
@@ -34,6 +35,7 @@ void main() {
       addTearDown(launch.dispose);
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       await launch.initialize();
+      if (!voice) launch.requestLaunch(voice: false);
       await tester.pumpAndSettle();
       expect(router.routeInformationProvider.value.uri.path, '/splash');
       router.go('/login');
@@ -47,45 +49,50 @@ void main() {
             .matches
             .uri
             .toString(),
-        '/assistant?voice=true',
+        voice ? '/assistant?voice=true' : '/assistant?keyboard=true',
       );
       router.pop();
       await tester.pumpAndSettle();
       expect(router.routeInformationProvider.value.uri.path, '/dashboard');
-    },
-  );
-  testWidgets(
-    'repeated Siri invocation activates the current assistant without duplicate pages',
-    (tester) async {
-      const channel = MethodChannel('test/repeated_launch');
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        channel,
-        (call) async => false,
-      );
-      addTearDown(
-        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+    });
+  }
+  for (final voice in [true, false]) {
+    testWidgets(
+      'repeated assistant launch avoids duplicate pages, voice: $voice',
+      (tester) async {
+        const channel = MethodChannel('test/repeated_launch');
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           channel,
-          null,
-        ),
-      );
-      final router = GoRouter(
-        initialLocation: '/assistant',
-        routes: [
-          GoRoute(path: '/assistant', builder: (_, _) => const Scaffold()),
-        ],
-      );
-      final launch = AssistantLaunchService(router, channel: channel);
-      addTearDown(router.dispose);
-      addTearDown(launch.dispose);
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-      await launch.initialize();
-      var calls = 0;
-      final subscription = launch.repeatedLaunches.listen((_) => calls++);
-      addTearDown(subscription.cancel);
-      launch.requestLaunch();
-      await tester.pumpAndSettle();
-      expect(calls, 1);
-      expect(router.canPop(), isFalse);
-    },
-  );
+          (call) async => false,
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            channel,
+            null,
+          ),
+        );
+        final router = GoRouter(
+          initialLocation: '/assistant',
+          routes: [
+            GoRoute(path: '/assistant', builder: (_, _) => const Scaffold()),
+          ],
+        );
+        final launch = AssistantLaunchService(router, channel: channel);
+        addTearDown(router.dispose);
+        addTearDown(launch.dispose);
+        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await launch.initialize();
+        var calls = 0;
+        final subscription =
+            (voice ? launch.repeatedLaunches : launch.textLaunches).listen(
+              (_) => calls++,
+            );
+        addTearDown(subscription.cancel);
+        launch.requestLaunch(voice: voice);
+        await tester.pumpAndSettle();
+        expect(calls, 1);
+        expect(router.canPop(), isFalse);
+      },
+    );
+  }
 }

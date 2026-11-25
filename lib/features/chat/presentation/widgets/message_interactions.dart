@@ -1,10 +1,11 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import 'reaction_emoji.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/widgets/app_dialog.dart';
-import '../../../../core/widgets/app_form_surface.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/chat_message_model.dart';
-import '../../data/models/chat_conversation_model.dart';
+import 'forward_message_sheet.dart';
 import '../cubit/conversation_cubit.dart';
 
 Future<void> showMessageReactions(
@@ -12,54 +13,90 @@ Future<void> showMessageReactions(
   ChatMessageModel message,
 ) async {
   final cubit = context.read<ConversationCubit>();
-  final emoji = await showAppDialog<String>(
+  final emoji = await showModalBottomSheet<String>(
     context: context,
-    builder: (context) => AppDialog(
-      title: const Text('Реакция'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: [
-              for (final emoji in [
-                '👍',
-                '❤️',
-                '😂',
-                '😮',
-                '😢',
-                '🔥',
-                '✅',
-                '🎉',
-              ])
-                TextButton(
-                  onPressed: () => Navigator.pop(context, emoji),
-                  child: Text(emoji, style: const TextStyle(fontSize: 26)),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            maxLength: 16,
-            textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(
-              hintText: 'Другой эмодзи',
-              counterText: '',
-            ),
-            onSubmitted: (value) {
-              final emoji = value.trim();
-              if (emoji.isNotEmpty) Navigator.pop(context, emoji);
-            },
-          ),
-        ],
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    builder: (context) => Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        MediaQuery.viewInsetsOf(context).bottom + 16,
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Отмена'),
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .5,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              tr(context, 'Выберите реакцию'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: GridView.extent(
+                maxCrossAxisExtent: 60,
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                children: [
+                  for (final value in [
+                    '👍',
+                    '❤️',
+                    '😂',
+                    '😮',
+                    '😢',
+                    '🙏',
+                    '🔥',
+                    '✅',
+                    '🎉',
+                    '😍',
+                    '👏',
+                    '😁',
+                    '🤔',
+                    '💯',
+                    '🤝',
+                    '👀',
+                    '🙌',
+                    '💜',
+                    '💪',
+                    '🥰',
+                    '🤗',
+                    '😎',
+                    '🤩',
+                    '👌',
+                  ])
+                    Semantics(
+                      button: true,
+                      label: value,
+                      child: InkWell(
+                        key: ValueKey('reaction-picker-$value'),
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => Navigator.pop(context, value),
+                        child: Center(child: ReactionEmoji(value, size: 38)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            TextField(
+              maxLength: 16,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                hintText: tr(context, 'Другой эмодзи'),
+                counterText: '',
+              ),
+              onSubmitted: (value) {
+                if (value.trim().isNotEmpty) {
+                  Navigator.pop(context, value.trim());
+                }
+              },
+            ),
+          ],
         ),
-      ],
+      ),
     ),
   );
   if (emoji != null && !cubit.isClosed) {
@@ -72,135 +109,15 @@ Future<void> showForwardMessage(
   ChatMessageModel message,
 ) {
   final cubit = context.read<ConversationCubit>();
-  return showAppDialog<void>(
+  return showModalBottomSheet<void>(
     context: context,
-    barrierDismissible: false,
-    builder: (_) => _ForwardDialog(cubit: cubit, message: message),
-  );
-}
-
-class _ForwardDialog extends StatefulWidget {
-  const _ForwardDialog({required this.cubit, required this.message});
-  final ConversationCubit cubit;
-  final ChatMessageModel message;
-  @override
-  State<_ForwardDialog> createState() => _ForwardDialogState();
-}
-
-class _ForwardDialogState extends State<_ForwardDialog> {
-  late Future<List<ChatConversationModel>> _targets;
-  String _query = '';
-  String? _error, _sending;
-  @override
-  void initState() {
-    super.initState();
-    _targets = widget.cubit.forwardTargets();
-  }
-
-  @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: _sending == null,
-    child: AppDialog(
-      title: const Text('Переслать сообщение'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppFormSurface(
-            child: TextField(
-              enabled: _sending == null,
-              onChanged: (v) => setState(() => _query = v),
-              decoration: const InputDecoration(
-                hintText: 'Найти чат',
-                prefixIcon: Icon(Icons.search, size: 18),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 280,
-            width: double.maxFinite,
-            child: FutureBuilder<List<ChatConversationModel>>(
-              future: _targets,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: TextButton(
-                      onPressed: () => setState(
-                        () => _targets = widget.cubit.forwardTargets(),
-                      ),
-                      child: const Text('Повторить загрузку чатов'),
-                    ),
-                  );
-                }
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final targets = snapshot.data!
-                    .where(
-                      (e) =>
-                          e.title.toLowerCase().contains(_query.toLowerCase()),
-                    )
-                    .toList();
-                if (targets.isEmpty) {
-                  return const Center(child: Text('Чаты не найдены'));
-                }
-                return ListView(
-                  children: [
-                    for (final target in targets)
-                      ListTile(
-                        leading: Icon(
-                          target.isChannel ? Icons.tag : Icons.person_outline,
-                          size: 20,
-                        ),
-                        title: Text(target.title),
-                        trailing: _sending == target.id
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : null,
-                        enabled: _sending == null,
-                        onTap: () async {
-                          setState(() {
-                            _sending = target.id;
-                            _error = null;
-                          });
-                          final success = await widget.cubit.forward(
-                            widget.message,
-                            target,
-                          );
-                          if (!context.mounted) return;
-                          if (success) {
-                            Navigator.pop(context);
-                          } else {
-                            setState(() {
-                              _sending = null;
-                              _error =
-                                  widget.cubit.state.error ??
-                                  'Не удалось переслать сообщение';
-                            });
-                          }
-                        },
-                      ),
-                  ],
-                );
-              },
-            ),
-          ),
-          if (_error != null)
-            Text(_error!, style: const TextStyle(color: AppColors.error)),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: _sending == null ? () => Navigator.pop(context) : null,
-          child: const Text('Отмена'),
-        ),
-      ],
-    ),
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    isDismissible: false,
+    enableDrag: false,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    builder: (_) => ForwardMessageSheet(cubit: cubit, message: message),
   );
 }
 
@@ -208,41 +125,91 @@ class MessageReactionBar extends StatelessWidget {
   const MessageReactionBar({super.key, required this.message});
   final ChatMessageModel message;
   @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 5,
-    runSpacing: 4,
-    children: [
-      for (final reaction in message.reactions)
-        Tooltip(
-          message: reaction.authors.join(', '),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => context.read<ConversationCubit>().interact(
-              message.id,
-              emoji: reaction.emoji,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final reactions = message.reactions.where((r) => r.count > 0).toList();
+    if (reactions.isEmpty) return const SizedBox.shrink();
+    final count = reactions.fold<int>(
+      0,
+      (sum, reaction) => sum + reaction.count,
+    );
+    return Material(
+      key: ValueKey('message-reactions-${message.id}'),
+      color: colors.surface,
+      shape: StadiumBorder(
+        side: BorderSide(
+          color: colors.outlineVariant.withValues(alpha: dark ? .5 : .35),
+          width: .75,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 24 + (reactions.length - 1) * 18.0,
+              height: 24,
+              child: Stack(
+                children: [
+                  for (var i = 0; i < reactions.length; i++)
+                    Positioned(
+                      left: i * 18.0,
+                      top: 0,
+                      child: Tooltip(
+                        message: reactions[i].authors.join(', '),
+                        child: Semantics(
+                          label: '${reactions[i].emoji} ${reactions[i].count}',
+                          button: true,
+                          selected: reactions[i].reacted,
+                          child: InkWell(
+                            key: ValueKey(
+                              'reaction-chip-${message.id}-${reactions[i].emoji}',
+                            ),
+                            customBorder: const CircleBorder(),
+                            onTap: () =>
+                                context.read<ConversationCubit>().interact(
+                                  message.id,
+                                  emoji: reactions[i].emoji,
+                                ),
+                            child: SizedBox.square(
+                              dimension: 24,
+                              child: Center(
+                                child: ReactionEmoji(
+                                  reactions[i].emoji,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: reaction.reacted
-                    ? AppColors.accent.withValues(alpha: .12)
-                    : const Color(0xfff3f3f6),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: reaction.reacted
-                      ? AppColors.accent.withValues(alpha: .4)
-                      : Colors.transparent,
+            if (count > 1) ...[
+              const SizedBox(width: 3),
+              Padding(
+                padding: const EdgeInsets.only(right: 2),
+                child: Text(
+                  count > 999 ? '999+' : '$count',
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.15,
+                    fontWeight: FontWeight.w500,
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ),
-              child: Text(
-                '${reaction.emoji} ${reaction.count}',
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-          ),
+            ],
+          ],
         ),
-    ],
-  );
+      ),
+    );
+  }
 }
 
 class PinnedMessagesBar extends StatelessWidget {
@@ -257,60 +224,136 @@ class PinnedMessagesBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final pinned = messages.where((m) => m.pinned).toList();
     if (pinned.isEmpty) return const SizedBox();
-    return ListTile(
-      dense: true,
-      leading: const Icon(
-        Icons.push_pin_outlined,
-        size: 18,
-        color: AppColors.accent,
-      ),
-      title: Text(
-        'Закреплённые · ${pinned.length}',
-        style: const TextStyle(fontSize: 12, color: AppColors.accent),
-      ),
-      subtitle: Text(
-        pinned.last.preview,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: const Icon(Icons.chevron_right, size: 18),
-      onTap: () async {
-        if (pinned.length == 1) {
-          onSelect(pinned.single.id);
-          return;
-        }
-        final id = await showAppDialog<String>(
-          context: context,
-          builder: (context) => AppDialog(
-            title: const Text('Закреплённые сообщения'),
-            content: SizedBox(
-              width: double.maxFinite,
-              height: 280,
-              child: ListView(
-                children: [
-                  for (final m in pinned)
-                    ListTile(
-                      title: Text(m.authorName),
-                      subtitle: Text(
-                        m.preview,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+    return Material(
+      color: AppColors.of(context).canvas,
+      child: InkWell(
+        onTap: () async {
+          if (pinned.length == 1) {
+            onSelect(pinned.single.id);
+            return;
+          }
+          final id = await showAppDialog<String>(
+            context: context,
+            builder: (context) => AppDialog(
+              title: Text(tr(context, 'Закреплённые сообщения')),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 280,
+                child: ListView(
+                  children: [
+                    for (final m in pinned)
+                      ListTile(
+                        title: Text(m.authorName),
+                        subtitle: Text(
+                          m.preview,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => Navigator.pop(context, m.id),
                       ),
-                      onTap: () => Navigator.pop(context, m.id),
-                    ),
-                ],
+                  ],
+                ),
               ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(tr(context, 'Закрыть')),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Закрыть'),
+          );
+          if (id != null) onSelect(id);
+        },
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: AppColors.of(context).border),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 3,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.push_pin_rounded,
+                          size: 12,
+                          color: AppColors.accent,
+                        ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            tr(context, 'Закреплённые'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.3,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.of(context).outgoingMessage,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            '${pinned.length}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      pinned.last.preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: AppColors.of(context).ink,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.of(context).muted,
               ),
             ],
           ),
-        );
-        if (id != null) onSelect(id);
-      },
+        ),
+      ),
     );
   }
 }

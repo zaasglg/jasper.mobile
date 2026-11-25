@@ -1,3 +1,5 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../workspaces/presentation/widgets/workspace_access_gate.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:async';
@@ -12,8 +14,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../projects/presentation/cubit/projects_cubit.dart';
 import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
 import '../../../workspaces/presentation/cubit/workspace_state.dart';
-import '../../../settings/presentation/screens/settings_screen.dart';
-import '../widgets/app_drawer.dart';
+import '../../../profile/presentation/widgets/profile_settings_sections.dart';
 import '../widgets/app_bottom_navigation.dart';
 import '../../../profile/presentation/cubit/profile_cubit.dart';
 
@@ -34,8 +35,6 @@ class MainShell extends StatefulWidget {
   static final GlobalKey<ScaffoldState> scaffoldKey =
       GlobalKey<ScaffoldState>();
 
-  static void openDrawer() => scaffoldKey.currentState?.openDrawer();
-
   static void openAssistant(BuildContext context) {
     final shell = context.findAncestorStateOfType<_MainShellState>();
     if (shell != null) {
@@ -43,6 +42,24 @@ class MainShell extends StatefulWidget {
     } else {
       context.push('/assistant');
     }
+  }
+
+  static Future<void> openProfile(BuildContext context) async {
+    final shell = context.findAncestorStateOfType<_MainShellState>();
+    await context.push(
+      '/profile',
+      extra: shell == null
+          ? null
+          : (
+              workspace: shell._workspaceCubit,
+              voice: shell._voice == null
+                  ? null
+                  : VoiceSettingsController(
+                      isListening: shell._voiceListeningNotifier,
+                      onToggleListening: shell._toggleVoiceWake,
+                    ),
+            ),
+    );
   }
 
   static const Color _inactive = Color(0xFF9AA0A6);
@@ -62,8 +79,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   bool _openingAssistant = false;
   final ValueNotifier<bool> _voiceListeningNotifier = ValueNotifier(false);
 
-  Timer? _workspaceRefreshTimer;
-  bool _drawerOpen = false;
   bool _foreground = true;
 
   Future<void> _refreshWorkspaces({bool refreshProjects = false}) async {
@@ -80,29 +95,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
   }
 
-  void _onDrawerChanged(bool opened) {
-    _drawerOpen = opened;
-    _workspaceRefreshTimer?.cancel();
-    if (!opened || !_foreground) return;
-    unawaited(_refreshWorkspaces(refreshProjects: true));
-    _workspaceRefreshTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => unawaited(_refreshWorkspaces()),
-    );
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
-    _workspaceRefreshTimer?.cancel();
     if (!_foreground) return;
     unawaited(_refreshWorkspaces(refreshProjects: true));
-    if (_drawerOpen) {
-      _workspaceRefreshTimer = Timer.periodic(
-        const Duration(seconds: 30),
-        (_) => unawaited(_refreshWorkspaces()),
-      );
-    }
   }
 
   Future<void> _openAssistant({bool voice = false, String? command}) async {
@@ -140,7 +137,10 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           context: context,
           tone: AppSnackBarTone.info,
           content: Text(
-            'Откройте Дашборд или Ежедневник для голосового вызова.',
+            tr(
+              context,
+              'Откройте Дашборд или Ежедневник для голосового вызова.',
+            ),
           ),
         ),
       );
@@ -217,7 +217,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _workspaceRefreshTimer?.cancel();
     _wakeSubscription?.cancel();
     if (_wakeArmed) unawaited(_voice?.stop());
     _workspaceCubit.close();
@@ -228,7 +227,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    const destinations = [
+    final destinations = [
       NavigationDestination(
         icon: Icon(
           LucideIcons.layoutDashboard,
@@ -240,7 +239,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           color: MainShell._active,
           size: AppIconSizes.standard,
         ),
-        label: 'Дашборд',
+        label: tr(context, 'Дашборд'),
       ),
       NavigationDestination(
         icon: Icon(
@@ -253,7 +252,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           color: MainShell._active,
           size: AppIconSizes.standard,
         ),
-        label: 'Проекты',
+        label: tr(context, 'Проекты'),
       ),
       NavigationDestination(
         icon: Icon(
@@ -266,7 +265,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           color: MainShell._active,
           size: AppIconSizes.standard,
         ),
-        label: 'Мессенджер',
+        label: tr(context, 'Мессенджер'),
       ),
       NavigationDestination(
         icon: Icon(
@@ -279,7 +278,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           color: MainShell._active,
           size: AppIconSizes.standard,
         ),
-        label: 'Инбокс',
+        label: tr(context, 'Инбокс'),
       ),
       NavigationDestination(
         icon: Icon(
@@ -292,7 +291,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           color: MainShell._active,
           size: AppIconSizes.standard,
         ),
-        label: 'Ежедневник',
+        label: tr(context, 'Ежедневник'),
       ),
     ];
 
@@ -323,26 +322,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         child: Builder(
           builder: (shellContext) => Scaffold(
             key: MainShell.scaffoldKey,
-            onDrawerChanged: _onDrawerChanged,
-            // Leave the leading edge to the navigator's native back gesture.
-            drawerEnableOpenDragGesture: false,
-            drawer: AppDrawer(
-              onOpenSettings: () {
-                MainShell.scaffoldKey.currentState?.closeDrawer();
-                shellContext.push(
-                  '/settings',
-                  extra: (
-                    workspace: _workspaceCubit,
-                    voice: _voice == null
-                        ? null
-                        : VoiceSettingsController(
-                            isListening: _voiceListeningNotifier,
-                            onToggleListening: _toggleVoiceWake,
-                          ),
-                  ),
-                );
-              },
-            ),
             body: Column(
               children: [
                 if (_wakeListening)
@@ -357,9 +336,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                           color: MainShell._active,
                           size: AppIconSizes.standard,
                         ),
-                        title: const Text('Скажите «Ok, Jospar»'),
+                        title: Text(tr(context, 'Скажите «Ok, Jospar»')),
                         trailing: IconButton(
-                          tooltip: 'Остановить',
+                          tooltip: tr(context, 'Остановить'),
                           onPressed: _toggleVoiceWake,
                           icon: const Icon(
                             Icons.close,
@@ -369,22 +348,33 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
-                Expanded(child: widget.child),
+                Expanded(
+                  child: WorkspaceAccessGate(
+                    onOpenMenu: () => MainShell.openProfile(shellContext),
+                    child: widget.child,
+                  ),
+                ),
               ],
             ),
-            bottomNavigationBar:
-                GoRouterState.of(
-                  shellContext,
-                ).uri.path.startsWith('/messenger/')
-                ? null
-                : AppBottomNavigation(
-                    selectedIndex: widget.currentIndex.clamp(
-                      0,
-                      destinations.length - 1,
-                    ),
-                    onSelected: widget.onTap,
-                    destinations: destinations,
-                  ),
+            bottomNavigationBar: BlocBuilder<WorkspaceCubit, WorkspaceState>(
+              builder: (context, state) {
+                if (state is! WorkspaceLoaded || state.selected == null) {
+                  return const SizedBox.shrink();
+                }
+                return GoRouterState.of(
+                      shellContext,
+                    ).uri.path.startsWith('/messenger/')
+                    ? const SizedBox.shrink()
+                    : AppBottomNavigation(
+                        selectedIndex: widget.currentIndex.clamp(
+                          0,
+                          destinations.length - 1,
+                        ),
+                        onSelected: widget.onTap,
+                        destinations: destinations,
+                      );
+              },
+            ),
           ),
         ),
       ),

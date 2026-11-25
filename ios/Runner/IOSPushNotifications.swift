@@ -53,6 +53,13 @@ final class IOSPushNotifications: NSObject, MessagingDelegate {
                 }
                 UserDefaults.standard.set(id, forKey: self.accountKey)
                 result(nil)
+            case "setPreferences":
+                guard let args = call.arguments as? [String: Any], let owner = args["userId"] as? String,
+                      let preferences = args["preferences"] as? [String: Any], !owner.isEmpty else {
+                    result(FlutterError(code: "invalid_preferences", message: "Invalid preferences", details: nil)); return
+                }
+                UserDefaults.standard.set(preferences, forKey: "jospar.push.preferences.\(owner)")
+                result(["timeZone": TimeZone.current.identifier])
             case "clearAccount":
                 UserDefaults.standard.removeObject(forKey: self.accountKey)
                 self.pending = nil
@@ -102,6 +109,25 @@ final class IOSPushNotifications: NSObject, MessagingDelegate {
         data["messageId"] = values["eventId"] ?? values["gcm.message_id"] ?? values["messageId"]
         if opened { pending = data }
         channel.invokeMethod(opened ? "opened" : "message", arguments: data)
-        return true
+        return opened || allows(values["type"] ?? "")
+    }
+    private func allows(_ type: String) -> Bool {
+        if type == "call" { return true }
+        guard let owner = UserDefaults.standard.string(forKey: accountKey) else { return false }
+        guard let preferences = UserDefaults.standard.dictionary(forKey: "jospar.push.preferences.\(owner)") else { return true }
+        let components = Calendar.current.dateComponents([.hour, .minute], from: Date())
+        let minute = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+        let start = preferences["quietStart"] as? Int ?? 1320
+        let end = preferences["quietEnd"] as? Int ?? 480
+        if preferences["quietEnabled"] as? Bool == true {
+            let quiet = start == end || (start < end ? minute >= start && minute < end : minute >= start || minute < end)
+            if quiet { return false }
+        }
+        switch type {
+        case "message": return preferences["messages"] as? Bool ?? true
+        case "mention": return preferences["mentions"] as? Bool ?? true
+        case "deadline", "reminder", "planner": return preferences["deadlines"] as? Bool ?? true
+        default: return true
+        }
     }
 }

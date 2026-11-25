@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_task_model.dart';
 import 'package:flutter/material.dart';
 
@@ -140,15 +141,21 @@ class _SharedTaskMessageState extends State<SharedTaskMessage> {
           padding: const EdgeInsets.only(top: 4),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Не удалось обновить задачу',
-                  style: TextStyle(fontSize: 11, color: AppColors.muted),
+                  tr(context, 'Не удалось обновить задачу'),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.of(context).muted,
+                  ),
                 ),
               ),
               TextButton(
                 onPressed: _load,
-                child: const Text('Повторить', style: TextStyle(fontSize: 11)),
+                child: Text(
+                  tr(context, 'Повторить'),
+                  style: TextStyle(fontSize: 11),
+                ),
               ),
             ],
           ),

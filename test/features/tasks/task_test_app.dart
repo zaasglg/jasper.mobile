@@ -7,15 +7,16 @@ import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.da
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';
 
 class TaskTestApp extends StatelessWidget {
-  const TaskTestApp({super.key, required this.home});
+  const TaskTestApp({super.key, required this.home, this.theme});
   final Widget home;
+  final ThemeData? theme;
   @override
   Widget build(BuildContext context) => MultiBlocProvider(
     providers: [
       BlocProvider<ProfileCubit>(create: (_) => _Profile()),
       BlocProvider<WorkspaceCubit>(create: (_) => _Workspace()),
     ],
-    child: MaterialApp(theme: AppTheme.light, home: home),
+    child: MaterialApp(theme: theme ?? AppTheme.light, home: home),
   );
 }
 

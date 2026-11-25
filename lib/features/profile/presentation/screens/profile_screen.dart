@@ -1,5 +1,14 @@
+import '../../../../core/widgets/app_settings_group.dart';
+import '../../../profile/presentation/widgets/profile_settings_sections.dart';
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../../core/localization/locale_cubit.dart';
+import '../../../../core/localization/language_selector.dart';
+import '../../../../core/theme/theme_cubit.dart';
+import '../../../../core/theme/theme_selector.dart';
+import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/theme/app_theme.dart';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
@@ -19,7 +28,8 @@ import '../cubit/profile_state.dart';
 import '../widgets/profile_avatar.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.settings});
+  final ProfileNavigationData? settings;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +48,7 @@ class ProfileScreen extends StatelessWidget {
                 appSnackBar(
                   context: context,
                   tone: AppSnackBarTone.error,
-                  content: Text(state.message),
+                  content: Text(tr(context, state.message)),
                 ),
               );
           }
@@ -55,36 +65,31 @@ class _ProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppSettingsGroup.pageColor(context),
       appBar: AppBar(
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 20),
-            child: Center(child: Text('Jospar')),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.of(context).border
+                : const Color(0xFFE5E7EB),
           ),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: AppSettingsGroup.pageColor(context),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
-        leading: IconButton(
+        leading: AppBackButton(
           onPressed: () => context.pop(),
-          icon: const Icon(
-            LucideIcons.arrowLeft,
-            color: Color(0xFF1A1A1A),
-            size: AppIconSizes.standard,
-          ),
+          color: AppColors.of(context).ink,
         ),
         title: Text(
-          'Профиль',
-          style: GoogleFonts.manrope(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF1A1A1A),
+          tr(context, 'Профиль'),
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.of(context).ink,
           ),
         ),
       ),
@@ -109,7 +114,7 @@ class _ProfileView extends StatelessWidget {
           }
           return const Center(
             child: CircularProgressIndicator(
-              color: Color(0xFF6D5FE0),
+              color: AppColors.accent,
               strokeWidth: 2.5,
             ),
           );
@@ -129,6 +134,15 @@ class _ProfileContent extends StatefulWidget {
 }
 
 class _ProfileContentState extends State<_ProfileContent> {
+  Color get _mutedText => Theme.of(context).brightness == Brightness.dark
+      ? AppColors.of(context).muted
+      : const Color(0xFF64748B);
+  Color get _subtleText => Theme.of(context).brightness == Brightness.dark
+      ? AppColors.of(context).muted
+      : const Color(0xFF94A3B8);
+  static const _dangerFg = Color(0xFFD92D45);
+  static const _appVersionLabel = 'Версия 1.4.2 (Сборка 240)';
+
   bool _isPicking = false;
 
   Future<void> _pickPhoto() async {
@@ -172,7 +186,10 @@ class _ProfileContentState extends State<_ProfileContent> {
             content: Text(
               error is FormatException && error.message.isNotEmpty
                   ? error.message
-                  : 'Не удалось открыть фото. Выберите другое изображение.',
+                  : tr(
+                      context,
+                      'Не удалось открыть фото. Выберите другое изображение.',
+                    ),
             ),
           ),
         );
@@ -182,260 +199,441 @@ class _ProfileContentState extends State<_ProfileContent> {
     }
   }
 
+  Future<void> _copyEmail(String email) async {
+    await Clipboard.setData(ClipboardData(text: email));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        appSnackBar(
+          context: context,
+          tone: AppSnackBarTone.success,
+          content: Text(tr(context, 'Почта скопирована')),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = widget.profile.profile;
     final busy = _isPicking || widget.profile.isSavingPhoto;
     final displayName = user.name.isNotEmpty ? user.name : 'Пользователь';
+    final isKazakh = Localizations.localeOf(context).languageCode == 'kk';
 
     return RefreshIndicator(
-      color: const Color(0xFF6D5FE0),
+      color: AppColors.accent,
       onRefresh: context.read<ProfileCubit>().load,
-      child: ListView(
+      child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
-        children: [
-          Row(
-            children: [
-              ProfileAvatar(size: 52, avatarUrl: user.avatarUrl),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+            sliver: SliverList.list(
+              children: [
+                _buildHeroCard(
+                  displayName: displayName,
+                  email: user.email,
+                  avatarUrl: user.avatarUrl,
+                  busy: busy,
+                ),
+                const SizedBox(height: 16),
+                _buildSectionTitle(tr(context, 'Учётная запись')),
+
+                AppSettingsGroup(
+                  dividerInset: 58,
                   children: [
-                    Text(
-                      displayName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    _buildProfileItem(
+                      icon: LucideIcons.user,
+
+                      label: 'Имя',
+                      value: user.name.isNotEmpty ? user.name : 'Не указано',
                     ),
-                    if (user.email.isNotEmpty)
-                      Text(
-                        user.email,
-                        style: Theme.of(context).textTheme.bodySmall,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    _buildProfileItem(
+                      icon: LucideIcons.mail,
+
+                      label: 'Электронная почта',
+                      value: user.email.isNotEmpty ? user.email : 'Не указана',
+                      trailing: user.email.isEmpty
+                          ? null
+                          : IconButton(
+                              key: const Key('profile_copy_email_button'),
+                              tooltip: tr(context, 'Скопировать почту'),
+                              onPressed: () => _copyEmail(user.email),
+                              style: IconButton.styleFrom(
+                                foregroundColor: _mutedText,
+                                minimumSize: const Size.square(44),
+                              ),
+                              icon: const Icon(LucideIcons.copy, size: 17),
+                            ),
+                    ),
+                    _buildProfileItem(
+                      icon: LucideIcons.shieldCheck,
+
+                      label: 'Роль в системе',
+                      value: tr(context, user.roleLabel),
+                    ),
                   ],
                 ),
-              ),
-              TextButton(
-                key: const Key('profile_change_photo_button'),
-                onPressed: busy ? null : _pickPhoto,
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant,
-                  padding: EdgeInsets.zero,
-                  alignment: Alignment.centerLeft,
+                const SizedBox(height: 12),
+                if (sl.isRegistered<ThemeCubit>()) ...[
+                  _buildSectionTitle(tr(context, 'Внешний вид')),
+                  _buildThemeSetting(isKazakh),
+                  const SizedBox(height: 16),
+                ],
+                if (sl.isRegistered<LocaleCubit>()) ...[
+                  const SizedBox(height: 16),
+                  LanguageSelector(cubit: sl<LocaleCubit>()),
+                  const SizedBox(height: 16),
+                ],
+                ProfileSettingsSections(
+                  voiceController: context
+                      .findAncestorWidgetOfExactType<ProfileScreen>()
+                      ?.settings
+                      ?.voice,
+                  workspaceCubit: context
+                      .findAncestorWidgetOfExactType<ProfileScreen>()
+                      ?.settings
+                      ?.workspace,
                 ),
-                child: Text(
-                  busy
-                      ? 'Сохраняем…'
-                      : user.avatarUrl == null
-                      ? 'Добавить фото'
-                      : 'Изменить фото',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 32),
-          Text(
-            'УЧЁТНАЯ ЗАПИСЬ',
-            style: GoogleFonts.manrope(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF858297),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                _ProfileDataRow(
-                  icon: LucideIcons.userRound,
-                  label: 'Имя',
-                  value: user.name.isNotEmpty ? user.name : 'Не указано',
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Divider(height: 1, color: Color(0xFFF0EEF5)),
-                ),
-                _ProfileDataRow(
-                  icon: LucideIcons.mail,
-                  label: 'Электронная почта',
-                  value: user.email.isNotEmpty ? user.email : 'Не указана',
-                  onCopy: user.email.isEmpty
-                      ? null
-                      : () async {
-                          await Clipboard.setData(
-                            ClipboardData(text: user.email),
-                          );
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              appSnackBar(
-                                context: context,
-                                tone: AppSnackBarTone.success,
-                                content: Text('Почта скопирована'),
-                              ),
-                            );
-                        },
-                ),
-                const Divider(height: 1),
-                _ProfileDataRow(
-                  icon: LucideIcons.shield,
-                  label: 'Роль',
-                  value: user.roleLabel,
-                ),
-                const Divider(height: 1),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-          Text('БЕЗОПАСНОСТЬ', style: Theme.of(context).textTheme.labelMedium),
-          const SizedBox(height: 12),
-          Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            child: ListTile(
-              key: const Key('profile_qr_login_button'),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 0,
-                vertical: 6,
-              ),
-              leading: const Icon(
-                LucideIcons.monitor,
-                color: Color(0xFF55565C),
-              ),
-              title: Text(
-                Localizations.localeOf(context).languageCode == 'kk'
-                    ? 'QR сеанстары'
-                    : 'Активные сеансы',
-                style: GoogleFonts.manrope(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                Localizations.localeOf(context).languageCode == 'kk'
-                    ? 'Қосылған құрылғыларды басқару'
-                    : 'Подключённые устройства',
-              ),
-              trailing: const Icon(
-                LucideIcons.chevronRight,
-                size: AppIconSizes.standard,
-              ),
-              onTap: () => context.push(
-                '/qr-sessions',
-                extra: (name: displayName, email: user.email),
-              ),
-            ),
-          ),
-          const Divider(height: 1),
-          const SizedBox(height: 28),
-          BlocBuilder<AuthCubit, AuthState>(
-            builder: (context, state) {
-              final isLoading = state is AuthLoading;
-              return SizedBox(
-                height: 54,
-                child: OutlinedButton.icon(
-                  key: const Key('profile_logout_button'),
-                  onPressed: isLoading
-                      ? null
-                      : () => context.read<AuthCubit>().logout(),
-                  icon: isLoading
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Color(0xFFD64545),
-                          ),
-                        )
-                      : const Icon(
-                          LucideIcons.logOut,
-                          size: AppIconSizes.standard,
-                        ),
-                  label: Text(isLoading ? 'Выходим…' : 'Выйти из аккаунта'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFC44E58),
-                    disabledForegroundColor: const Color(0xFFC44E58),
-                    backgroundColor: Colors.transparent,
-                    alignment: Alignment.centerLeft,
-                    padding: EdgeInsets.zero,
-                    side: BorderSide.none,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                const SizedBox(height: 24),
+                _buildSectionTitle(tr(context, 'Безопасность')),
+
+                Material(
+                  color: AppSettingsGroup.surfaceColor(context),
+                  borderRadius: BorderRadius.circular(10),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    key: const Key('profile_qr_login_button'),
+                    onTap: () => context.push(
+                      '/qr-sessions',
+                      extra: (name: displayName, email: user.email),
                     ),
-                    textStyle: GoogleFonts.manrope(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                    child: _buildSecurityItem(
+                      icon: LucideIcons.monitor,
+
+                      title: isKazakh ? 'QR сеанстары' : 'Активные сеансы',
+                      subtitle: isKazakh
+                          ? 'Қосылған құрылғыларды басқару'
+                          : 'Подключённые устройства',
                     ),
                   ),
                 ),
-              );
-            },
+                const SizedBox(height: 16),
+                _buildLogoutButton(),
+                const SizedBox(height: 14),
+                _buildVersionFooter(),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-class _ProfileDataRow extends StatelessWidget {
-  const _ProfileDataRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.onCopy,
-  });
+  Widget _buildThemeSetting(bool isKazakh) {
+    final cubit = sl<ThemeCubit>();
+    return BlocBuilder<ThemeCubit, ThemeMode>(
+      bloc: cubit,
+      builder: (context, mode) {
+        final colors = AppColors.of(context);
+        return Material(
+          color: AppSettingsGroup.surfaceColor(context),
+          borderRadius: BorderRadius.circular(10),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: const Key('profile_theme_button'),
+            onTap: () => showModalBottomSheet<void>(
+              context: context,
+              showDragHandle: true,
+              backgroundColor: colors.canvas,
+              constraints: const BoxConstraints(maxWidth: 480),
+              isScrollControlled: true,
+              builder: (sheetContext) => SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: ThemeSelector(
+                    cubit: cubit,
+                    onSelected: () => Navigator.of(sheetContext).pop(),
+                  ),
+                ),
+              ),
+            ),
+            child: _buildProfileItem(
+              icon: switch (mode) {
+                ThemeMode.system => LucideIcons.monitor,
+                ThemeMode.light => LucideIcons.sun,
+                ThemeMode.dark => LucideIcons.moon,
+              },
 
-  final IconData icon;
-  final String label;
-  final String value;
-  final VoidCallback? onCopy;
+              label: isKazakh ? 'Қолданба тақырыбы' : 'Тема приложения',
+              value: switch (mode) {
+                ThemeMode.system => isKazakh ? 'Жүйелік' : 'Как на устройстве',
+                ThemeMode.light => isKazakh ? 'Ашық' : 'Светлая',
+                ThemeMode.dark => isKazakh ? 'Қараңғы' : 'Тёмная',
+              },
+              trailing: Icon(
+                LucideIcons.chevronRight,
+                size: 18,
+                color: colors.muted,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildHeroCard({
+    required String displayName,
+    required String email,
+    required String? avatarUrl,
+    required bool busy,
+  }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: GoogleFonts.manrope(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
+          SizedBox(
+            width: 76,
+            height: 76,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.of(context).border
+                          : const Color(0xFFE5E7EB),
+                      width: 2,
+                    ),
+                  ),
+                  child: ProfileAvatar(size: 68, avatarUrl: avatarUrl),
+                ),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Tooltip(
+                    message: avatarUrl == null
+                        ? tr(context, 'Добавить фото')
+                        : tr(context, 'Изменить фото'),
+                    child: Material(
+                      color: const Color(0xFF5B4FE9),
+                      shape: const CircleBorder(
+                        side: BorderSide(color: Colors.white, width: 2),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        key: const Key('profile_change_photo_button'),
+                        onTap: busy ? null : _pickPhoto,
+                        child: SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: Center(
+                            child: busy
+                                ? const SizedBox.square(
+                                    dimension: 13,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(
+                                    LucideIcons.camera,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+          const SizedBox(width: 16),
           Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: GoogleFonts.manrope(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF292735),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.of(context).ink,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (email.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(fontSize: 13, color: _mutedText),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (onCopy != null)
-            IconButton(
-              tooltip: 'Скопировать почту',
-              onPressed: onCopy,
-              icon: const Icon(
-                LucideIcons.copy,
-                size: AppIconSizes.standard,
-                color: Color(0xFF858297),
-              ),
-            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(
+        title,
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: _mutedText,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    Widget? trailing,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: _mutedText),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.inter(fontSize: 11, color: _mutedText),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.of(context).ink,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 8), trailing],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSecurityItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: _mutedText),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.of(context).ink,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(fontSize: 12, color: _mutedText),
+                ),
+              ],
+            ),
+          ),
+          Icon(LucideIcons.chevronRight, size: 18, color: _subtleText),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, state) {
+        final isLoading = state is AuthLoading;
+        return SizedBox(
+          height: 48,
+          child: OutlinedButton.icon(
+            key: const Key('profile_logout_button'),
+            onPressed: isLoading
+                ? null
+                : () => context.read<AuthCubit>().logout(),
+            icon: isLoading
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _dangerFg,
+                    ),
+                  )
+                : const Icon(LucideIcons.logOut, size: 18),
+            label: Text(
+              isLoading
+                  ? tr(context, 'Выходим…')
+                  : tr(context, 'Выйти из аккаунта'),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _dangerFg,
+              disabledForegroundColor: _dangerFg.withValues(alpha: 0.6),
+              backgroundColor: AppSettingsGroup.surfaceColor(context),
+              side: BorderSide.none,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              textStyle: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVersionFooter() {
+    return Text(
+      _appVersionLabel,
+      textAlign: TextAlign.center,
+      style: GoogleFonts.inter(fontSize: 12, color: _subtleText),
     );
   }
 }
@@ -462,7 +660,7 @@ class _ProfileError extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.inter(
                 fontSize: 14,
                 color: const Color(0xFF6F7682),
               ),
@@ -470,7 +668,7 @@ class _ProfileError extends StatelessWidget {
             const SizedBox(height: 16),
             TextButton(
               onPressed: context.read<ProfileCubit>().load,
-              child: const Text('Повторить'),
+              child: Text(tr(context, 'Повторить')),
             ),
           ],
         ),

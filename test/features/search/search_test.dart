@@ -1,3 +1,5 @@
+import 'package:google_fonts/google_fonts.dart';
+import 'package:jospar/core/theme/app_theme.dart';
 import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'dart:async';
 import 'dart:typed_data';
@@ -11,6 +13,63 @@ import 'package:jospar/features/search/presentation/search_cubit.dart';
 import 'package:jospar/features/search/presentation/search_screen.dart';
 
 void main() {
+  testWidgets(
+    'dark search uses readable surfaces in initial and result states',
+    (tester) async {
+      GoogleFonts.config.allowRuntimeFetching = false;
+      final repository = _Repository();
+      final cubit = SearchCubit(repository, 'workspace');
+      addTearDown(cubit.close);
+      await tester.pumpWidget(
+        BlocProvider.value(
+          value: cubit,
+          child: MaterialApp(theme: AppTheme.dark, home: const SearchScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      const colors = AppPalette(true);
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        colors.canvas,
+      );
+      final field = tester.widget<TextField>(
+        find.byKey(const Key('global-search-input')),
+      );
+      expect(field.decoration!.fillColor, colors.subtleSurface);
+      expect(field.style!.color, colors.ink);
+      expect(
+        tester.widget<Text>(find.text('Найдите нужное')).style!.color,
+        colors.ink,
+      );
+      expect(
+        tester.widget<Text>(find.text('Поиск по номеру задачи')).style!.color,
+        colors.ink,
+      );
+      await tester.enterText(find.byType(TextField), 'тест');
+      await tester.pump(const Duration(milliseconds: 301));
+      repository.pending['тест']!.complete(
+        const SearchResults(
+          projects: [
+            ProjectModel(
+              id: 'p',
+              name: 'Результат',
+              code: 'CODE',
+              workspaceId: 'workspace',
+              start: null,
+              end: null,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.text('Результат')).style!.color,
+        colors.ink,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test('search uses documented parameters and scopes project tasks', () async {
     final adapter = _Adapter();
     final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/'))

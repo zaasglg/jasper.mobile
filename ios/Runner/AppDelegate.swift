@@ -1,4 +1,5 @@
 import Flutter
+import home_widget
 import UIKit
 import UserNotifications
 
@@ -14,6 +15,11 @@ import UserNotifications
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+    if #available(iOS 17, *) {
+      HomeWidgetBackgroundWorker.setPluginRegistrantCallback { registry in
+        GeneratedPluginRegistrant.register(with: registry)
+      }
+    }
     if let controller = window?.rootViewController as? FlutterViewController {
       pushNotifications = IOSPushNotifications(messenger: controller.binaryMessenger)
       UNUserNotificationCenter.current().delegate = self

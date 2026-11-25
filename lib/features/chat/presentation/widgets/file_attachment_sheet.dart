@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -84,9 +85,9 @@ class _FileAttachmentSheetState extends State<FileAttachmentSheet> {
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Отправить файлы',
+                    tr(context, 'Отправить файлы'),
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -96,9 +97,9 @@ class _FileAttachmentSheetState extends State<FileAttachmentSheet> {
                 ),
               ],
             ),
-            const Text(
-              'До 25 МБ на файл',
-              style: TextStyle(color: AppColors.muted),
+            Text(
+              tr(context, 'До 25 МБ на файл'),
+              style: TextStyle(color: AppColors.of(context).muted),
             ),
             const SizedBox(height: 12),
             ConstrainedBox(
@@ -122,7 +123,7 @@ class _FileAttachmentSheetState extends State<FileAttachmentSheet> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: IconButton(
-                          tooltip: 'Убрать файл',
+                          tooltip: tr(context, 'Убрать файл'),
                           onPressed: _sending
                               ? null
                               : () {
@@ -143,7 +144,7 @@ class _FileAttachmentSheetState extends State<FileAttachmentSheet> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
-                  _error!,
+                  tr(context, _error!),
                   style: const TextStyle(color: Colors.redAccent),
                 ),
               ),
@@ -160,7 +161,9 @@ class _FileAttachmentSheetState extends State<FileAttachmentSheet> {
                       size: AppIconSizes.standard,
                     ),
               label: Text(
-                _sending ? 'Отправка…' : 'Отправить (${_pending.length})',
+                _sending
+                    ? tr(context, 'Отправка…')
+                    : tr(context, "Отправить ({p0})", {'p0': _pending.length}),
               ),
             ),
           ],

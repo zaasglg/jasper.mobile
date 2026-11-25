@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../theme/app_icon_sizes.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -141,8 +142,8 @@ class AppActionSheet<T> extends StatelessWidget {
                 children: [
                   if (eyebrow != null)
                     Text(
-                      eyebrow!,
-                      style: GoogleFonts.manrope(
+                      tr(context, eyebrow!),
+                      style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: colors.onSurfaceVariant,
@@ -154,7 +155,7 @@ class AppActionSheet<T> extends StatelessWidget {
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.manrope(
+                    style: GoogleFonts.inter(
                       fontSize: 17,
                       height: 1.35,
                       fontWeight: FontWeight.w700,
@@ -174,7 +175,7 @@ class AppActionSheet<T> extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.all(24),
                         child: Text(
-                          'Нет доступных вариантов',
+                          tr(context, 'Нет доступных вариантов'),
                           style: TextStyle(color: colors.onSurfaceVariant),
                         ),
                       ),
@@ -214,12 +215,12 @@ class AppActionSheet<T> extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    textStyle: GoogleFonts.manrope(
+                    textStyle: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  child: const Text('Отмена'),
+                  child: Text(tr(context, 'Отмена')),
                 ),
               ),
             ),
@@ -282,8 +283,8 @@ class _AppActionRow<T> extends StatelessWidget {
                 const SizedBox(width: 14),
                 Expanded(
                   child: Text(
-                    action.label,
-                    style: GoogleFonts.manrope(
+                    tr(context, action.label),
+                    style: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                       color: foreground,

@@ -1,3 +1,9 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import 'dart:math' as math;
+import '../../../../core/widgets/app_action_menu.dart';
+import '../messenger_list_strings.dart';
+import '../widgets/channel_avatar.dart';
+import '../../domain/repositories/channel_image_repository.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../widgets/conversation_menu.dart';
 import '../widgets/messenger_refresh_lifecycle.dart';
@@ -13,8 +19,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../data/models/chat_conversation_model.dart';
+import '../../data/models/chat_message_model.dart';
 import '../cubit/chat_cubit.dart';
 import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
+
+enum _ChatFolder { all, channels, people }
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -40,7 +49,9 @@ class _ChatScreenState extends State<ChatScreen>
 
   final _searchController = TextEditingController();
   String _query = '';
+  _ChatFolder _folder = _ChatFolder.all;
   bool _channelsExpanded = true;
+  final Set<String> _expandedChannels = {};
   bool _peopleExpanded = true;
 
   @override
@@ -51,9 +62,21 @@ class _ChatScreenState extends State<ChatScreen>
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final strings = MessengerListStrings.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colors.surface,
       appBar: const DashboardAppBar(),
+      floatingActionButton: FloatingActionButton(
+        key: const Key('messenger-compose'),
+        tooltip: strings.newChat,
+        backgroundColor: AppColors.accent,
+        foregroundColor: Colors.white,
+        elevation: 2,
+        shape: const CircleBorder(),
+        onPressed: _compose,
+        child: const Icon(LucideIcons.pencil, size: 23),
+      ),
       body: SafeArea(
         top: false,
         child: Column(
@@ -61,6 +84,77 @@ class _ChatScreenState extends State<ChatScreen>
             _Search(
               controller: _searchController,
               onChanged: (value) => setState(() => _query = value.trim()),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: colors.outlineVariant.withValues(alpha: .4),
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final folder in _ChatFolder.values)
+                            Semantics(
+                              selected: _folder == folder,
+                              button: true,
+                              child: InkWell(
+                                key: ValueKey(
+                                  'messenger-folder-${folder.name}',
+                                ),
+                                onTap: () => setState(() => _folder = folder),
+                                child: Container(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    12,
+                                    16,
+                                    11,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        width: 3,
+                                        color: _folder == folder
+                                            ? AppColors.accent
+                                            : Colors.transparent,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    strings.folder(folder.name),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: _folder == folder
+                                          ? AppColors.accent
+                                          : colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    key: const Key('messenger-tools'),
+                    tooltip: strings.tools,
+                    onPressed: _showTools,
+                    icon: Icon(
+                      LucideIcons.ellipsis,
+                      size: 21,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
             Expanded(
               child: BlocBuilder<ChatCubit, ChatState>(
@@ -76,9 +170,19 @@ class _ChatScreenState extends State<ChatScreen>
                   }
                   final conversations = (state as ChatLoaded).conversations;
                   final filtered = _filtered(conversations);
-                  final channels = filtered
-                      .where((item) => item.isChannel)
-                      .toList();
+                  final channelChildren = <String, int>{};
+                  for (final channel in conversations.where(
+                    (item) => item.isChannel && item.parentId != null,
+                  )) {
+                    channelChildren.update(
+                      channel.parentId!,
+                      (count) => count + 1,
+                      ifAbsent: () => 1,
+                    );
+                  }
+                  final channels = _orderedChannels(
+                    filtered.where((item) => item.isChannel).toList(),
+                  );
                   final people = filtered
                       .where(
                         (item) =>
@@ -86,73 +190,153 @@ class _ChatScreenState extends State<ChatScreen>
                             (_query.isNotEmpty || item.hasThread),
                       )
                       .toList();
-                  if (channels.isEmpty && people.isEmpty && _query.isNotEmpty) {
-                    return const _NoResults(isSearch: true);
-                  }
-                  final mentions = conversations.fold<int>(
-                    0,
-                    (sum, item) => sum + item.unreadCount,
-                  );
+                  final visible = [
+                    if (_folder != _ChatFolder.people) ...channels,
+                    if (_folder != _ChatFolder.channels) ...people,
+                  ];
+                  final titles = {
+                    for (final item in conversations) item.id: item.title,
+                  };
                   return RefreshIndicator(
-                    onRefresh: context.read<ChatCubit>().load,
-                    child: ListView(
-                      key: const Key('messenger-list'),
-                      padding: const EdgeInsets.only(bottom: 96),
-                      children: [
-                        if (_query.isEmpty) ...[
-                          const SizedBox(height: 10),
-                          _Shortcut(
-                            icon: LucideIcons.atSign,
-                            label: 'Упоминания и реакции',
-                            count: mentions == 0 ? null : mentions,
-                            onTap: () => context.push('/activity/mentions'),
+                    onRefresh: () =>
+                        context.read<ChatCubit>().load(silent: true),
+                    child: visible.isEmpty
+                        ? CustomScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            slivers: [
+                              SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: _NoResults(isSearch: _query.isNotEmpty),
+                              ),
+                            ],
+                          )
+                        : CustomScrollView(
+                            key: const Key('messenger-list'),
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            slivers: [
+                              for (final isChannel in [true, false])
+                                if ((isChannel
+                                        ? _folder != _ChatFolder.people
+                                        : _folder != _ChatFolder.channels) &&
+                                    (isChannel
+                                        ? channels.isNotEmpty
+                                        : people.isNotEmpty)) ...[
+                                  SliverToBoxAdapter(
+                                    child: _ConversationGroupHeader(
+                                      key: ValueKey(
+                                        'messenger-section-${isChannel ? 'channels' : 'people'}',
+                                      ),
+                                      title: isChannel
+                                          ? strings.folder('channels')
+                                          : strings.personalMessages,
+                                      count: isChannel
+                                          ? filtered
+                                                .where((item) => item.isChannel)
+                                                .length
+                                          : people.length,
+                                      expanded:
+                                          _query.isNotEmpty ||
+                                          (isChannel
+                                              ? _channelsExpanded
+                                              : _peopleExpanded),
+                                      onToggle: () => setState(() {
+                                        if (isChannel) {
+                                          _channelsExpanded =
+                                              !_channelsExpanded;
+                                        } else {
+                                          _peopleExpanded = !_peopleExpanded;
+                                        }
+                                      }),
+                                      onAdd: () => isChannel
+                                          ? _showCreateChannel(
+                                              conversations
+                                                  .where((e) => e.isChannel)
+                                                  .toList(),
+                                            )
+                                          : _showPeople(
+                                              conversations
+                                                  .where((e) => !e.isChannel)
+                                                  .toList(),
+                                            ),
+                                      addLabel: isChannel
+                                          ? strings.addChannel
+                                          : strings.addPerson,
+                                    ),
+                                  ),
+                                  if (_query.isNotEmpty ||
+                                      (isChannel
+                                          ? _channelsExpanded
+                                          : _peopleExpanded))
+                                    SliverList.builder(
+                                      itemCount: isChannel
+                                          ? channels.length
+                                          : people.length,
+                                      itemBuilder: (context, index) {
+                                        final group = isChannel
+                                            ? channels
+                                            : people;
+                                        final item = group[index];
+                                        final depth = isChannel
+                                            ? _channelDepth(item, conversations)
+                                            : 0;
+                                        return Column(
+                                          children: [
+                                            _Conversation(
+                                              item: item,
+                                              isChannel: item.isChannel,
+                                              depth: depth,
+                                              hasChildren:
+                                                  isChannel &&
+                                                  channelChildren.containsKey(
+                                                    item.id,
+                                                  ),
+                                              childrenExpanded:
+                                                  _query.isNotEmpty ||
+                                                  _expandedChannels.contains(
+                                                    item.id,
+                                                  ),
+                                              onToggleChildren: () =>
+                                                  setState(() {
+                                                    if (!_expandedChannels.add(
+                                                      item.id,
+                                                    )) {
+                                                      _expandedChannels.remove(
+                                                        item.id,
+                                                      );
+                                                    }
+                                                  }),
+                                              continuesBranch:
+                                                  isChannel &&
+                                                  index + 1 < group.length &&
+                                                  group[index + 1].parentId ==
+                                                      item.parentId,
+                                              parentTitle: item.parentId == null
+                                                  ? null
+                                                  : titles[item.parentId],
+                                              onTap: () =>
+                                                  _openConversation(item),
+                                            ),
+                                            if (index < group.length - 1 &&
+                                                !(isChannel &&
+                                                    group[index + 1].parentId ==
+                                                        item.id))
+                                              Divider(
+                                                height: 1,
+                                                thickness: .5,
+                                                indent: 82 + depth * 36,
+                                                color: colors.outlineVariant
+                                                    .withValues(alpha: .4),
+                                              ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                ],
+                              const SliverToBoxAdapter(
+                                child: SizedBox(height: 88),
+                              ),
+                            ],
                           ),
-                          _Shortcut(
-                            icon: LucideIcons.bookmark,
-                            label: 'Сохранённое',
-                            onTap: () => context.push('/activity/saved'),
-                          ),
-                          _Shortcut(
-                            icon: LucideIcons.archive,
-                            label: 'Кладовка',
-                            onTap: () => context.push('/messenger-storage'),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.only(top: 9),
-                            child: Divider(height: 1, color: Color(0xFFE9E4E9)),
-                          ),
-                        ],
-                        if (_query.isEmpty || channels.isNotEmpty)
-                          _Section(
-                            title: 'Каналы',
-                            items: _orderedChannels(channels),
-                            isChannel: true,
-                            expanded: _channelsExpanded,
-                            onToggle: () => setState(
-                              () => _channelsExpanded = !_channelsExpanded,
-                            ),
-                            onAdd: () => _showCreateChannel(channels),
-                            onTap: _openConversation,
-                          ),
-                        if (_query.isEmpty || people.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          _Section(
-                            title: 'Личные сообщения',
-                            items: people,
-                            expanded: _peopleExpanded,
-                            onToggle: () => setState(
-                              () => _peopleExpanded = !_peopleExpanded,
-                            ),
-                            onAdd: () => _showPeople(
-                              conversations
-                                  .where((item) => !item.isChannel)
-                                  .toList(),
-                            ),
-                            onTap: _openConversation,
-                          ),
-                        ],
-                      ],
-                    ),
                   );
                 },
               ),
@@ -161,6 +345,86 @@ class _ChatScreenState extends State<ChatScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _compose() async {
+    final current = context.read<ChatCubit>().state;
+    if (current is! ChatLoaded) return;
+    final strings = MessengerListStrings.of(context);
+    final action = await showAppActionMenu<String>(
+      context,
+      title: strings.newChat,
+      groups: [
+        [
+          AppMenuAction(
+            value: 'person',
+            label: strings.addPerson,
+            icon: LucideIcons.messageCircle,
+          ),
+          AppMenuAction(
+            value: 'channel',
+            label: strings.addChannel,
+            icon: LucideIcons.hash,
+          ),
+        ],
+      ],
+    );
+    if (!mounted) return;
+    if (action == 'channel') {
+      await _showCreateChannel(
+        current.conversations.where((e) => e.isChannel).toList(),
+      );
+    } else if (action == 'person') {
+      await _showPeople(
+        current.conversations.where((e) => !e.isChannel).toList(),
+      );
+    }
+  }
+
+  Future<void> _showTools() async {
+    final strings = MessengerListStrings.of(context);
+    final route = await showAppActionMenu<String>(
+      context,
+      title: strings.tools,
+      groups: [
+        [
+          AppMenuAction(
+            value: '/activity/mentions',
+            label: strings.mentions,
+            icon: LucideIcons.atSign,
+          ),
+          AppMenuAction(
+            value: '/activity/saved',
+            label: strings.saved,
+            icon: LucideIcons.bookmark,
+          ),
+          AppMenuAction(
+            value: '/messenger-storage',
+            label: strings.storage,
+            icon: LucideIcons.archive,
+          ),
+        ],
+      ],
+    );
+    if (mounted && route != null) await context.push(route);
+  }
+
+  int _channelDepth(
+    ChatConversationModel item,
+    List<ChatConversationModel> items,
+  ) {
+    final parents = {
+      for (final channel in items.where((e) => e.isChannel))
+        channel.id: channel.parentId,
+    };
+    final visited = <String>{item.id};
+    var parent = item.parentId;
+    var depth = 0;
+    while (parent != null && depth < 2 && visited.add(parent)) {
+      depth++;
+      parent = parents[parent];
+    }
+    return depth;
   }
 
   List<ChatConversationModel> _filtered(List<ChatConversationModel> items) =>
@@ -185,17 +449,26 @@ class _ChatScreenState extends State<ChatScreen>
       byParent.putIfAbsent(channel.parentId, () => []).add(channel);
     }
     final result = <ChatConversationModel>[];
-    void append(String? parentId, Set<String> visited) {
-      for (final item in byParent[parentId] ?? const []) {
-        if (!visited.add(item.id)) continue;
-        result.add(item);
-        append(item.id, visited);
+    final visited = <String>{};
+    final ids = channels.map((item) => item.id).toSet();
+    void append(ChatConversationModel item, bool visible) {
+      if (!visited.add(item.id)) return;
+      if (visible) result.add(item);
+      final showChildren =
+          visible && (_query.isNotEmpty || _expandedChannels.contains(item.id));
+      for (final child in byParent[item.id] ?? <ChatConversationModel>[]) {
+        append(child, showChildren);
       }
     }
 
-    append(null, <String>{});
     for (final item in channels) {
-      if (!result.contains(item)) result.add(item);
+      if (item.parentId == null || !ids.contains(item.parentId)) {
+        append(item, true);
+      }
+    }
+    // Retain accessible entries even if the server sends a cyclic hierarchy.
+    for (final item in channels) {
+      if (!visited.contains(item.id)) append(item, true);
     }
     return result;
   }
@@ -205,18 +478,18 @@ class _ChatScreenState extends State<ChatScreen>
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (_) => _CreateChannelSheet(channels: channels, cubit: cubit),
     );
     if (created == true && mounted) {
-      setState(() => _channelsExpanded = true);
+      setState(() => _folder = _ChatFolder.channels);
     }
   }
 
   Future<void> _showPeople(List<ChatConversationModel> people) async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -225,18 +498,20 @@ class _ChatScreenState extends State<ChatScreen>
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
               child: Text(
-                'Начать диалог',
-                style: GoogleFonts.manrope(
+                tr(context, 'Начать диалог'),
+                style: GoogleFonts.inter(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
             if (people.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(20),
-                child: Text('В этом workspace пока нет доступных коллег.'),
+                child: Text(
+                  tr(context, 'В этом workspace пока нет доступных коллег.'),
+                ),
               )
             else
               Flexible(
@@ -271,12 +546,12 @@ class _Search extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.sm,
         AppSpacing.md,
-        AppSpacing.md,
+        AppSpacing.sm,
       ),
       child: TextField(
         key: const Key('messenger-search'),
@@ -287,19 +562,19 @@ class _Search extends StatelessWidget {
         onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
         style: AppTypography.body(context),
         decoration: InputDecoration(
-          hintText: 'Поиск чатов и каналов',
+          hintText: MessengerListStrings.of(context).search,
           hintStyle: AppTypography.body(
             context,
           )?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             LucideIcons.search,
             size: AppSpacing.md + AppSpacing.xs,
-            color: AppColors.muted,
+            color: AppColors.of(context).muted,
           ),
           suffixIcon: controller.text.isEmpty
               ? null
               : IconButton(
-                  tooltip: 'Очистить поиск',
+                  tooltip: tr(context, 'Очистить поиск'),
                   onPressed: () {
                     controller.clear();
                     onChanged('');
@@ -307,7 +582,9 @@ class _Search extends StatelessWidget {
                   icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
                 ),
           filled: true,
-          fillColor: AppColors.subtleSurface,
+          fillColor: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: .045),
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(
             vertical: AppSpacing.sm + AppSpacing.xs,
@@ -315,11 +592,11 @@ class _Search extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: AppSpacing.touchTarget),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderSide: BorderSide.none,
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
@@ -331,177 +608,82 @@ class _Search extends StatelessWidget {
   }
 }
 
-class _Shortcut extends StatelessWidget {
-  const _Shortcut({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.count,
-  });
-  final IconData icon;
-  final String label;
-  final int? count;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      dense: true,
-      minTileHeight: 43,
-      horizontalTitleGap: 12,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18),
-      leading: Icon(
-        icon,
-        size: AppIconSizes.standard,
-        color: const Color(0xFF4A364B),
-      ),
-      title: Text(
-        label,
-        style: GoogleFonts.manrope(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppColors.ink,
-        ),
-      ),
-      trailing: count == null ? null : _Badge(count!),
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  const _Section({
+class _ConversationGroupHeader extends StatelessWidget {
+  const _ConversationGroupHeader({
+    super.key,
     required this.title,
-    required this.items,
-    required this.onTap,
+    required this.count,
     required this.expanded,
     required this.onToggle,
     required this.onAdd,
-    this.isChannel = false,
+    required this.addLabel,
   });
-  final String title;
-  final List<ChatConversationModel> items;
-  final ValueChanged<ChatConversationModel> onTap;
+  final String title, addLabel;
+  final int count;
   final bool expanded;
-  final VoidCallback onToggle;
-  final VoidCallback onAdd;
-  final bool isChannel;
-
+  final VoidCallback onToggle, onAdd;
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        InkWell(
-          key: ValueKey(
-            'messenger-section-${isChannel ? 'channels' : 'people'}',
-          ),
-          onTap: onToggle,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 12, 8, 5),
-            child: Row(
-              children: [
-                Icon(
-                  expanded ? LucideIcons.chevronDown : LucideIcons.chevronRight,
-                  size: AppIconSizes.standard,
-                  color: Color(0xFF6F6570),
-                ),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: GoogleFonts.manrope(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF4A364B),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  key: ValueKey(
-                    'messenger-add-${isChannel ? 'channel' : 'person'}',
-                  ),
-                  tooltip: 'Добавить',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onAdd,
-                  icon: const Icon(
-                    LucideIcons.plus,
-                    size: AppIconSizes.standard,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (expanded)
-          for (final item in items)
-            _Conversation(
-              item: item,
-              isChannel: isChannel,
-              depth: isChannel ? _depthOf(item, items) : 0,
-              onTap: () => onTap(item),
-            ),
-        if (expanded)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 4, 18, 3),
-            child: InkWell(
-              key: ValueKey(
-                'messenger-add-row-${isChannel ? 'channel' : 'person'}',
-              ),
-              onTap: onAdd,
-              borderRadius: BorderRadius.circular(7),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 27,
-                      height: 27,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1EEF1),
-                        borderRadius: BorderRadius.circular(6),
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.onSurface.withValues(alpha: .025),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              button: true,
+              expanded: expanded,
+              child: InkWell(
+                onTap: onToggle,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 13, 8, 13),
+                  child: Row(
+                    children: [
+                      Icon(
+                        expanded
+                            ? LucideIcons.chevronDown
+                            : LucideIcons.chevronRight,
+                        size: 16,
+                        color: colors.onSurfaceVariant,
                       ),
-                      child: Icon(
-                        isChannel ? LucideIcons.plus : LucideIcons.userPlus,
-                        size: AppIconSizes.standard,
-                        color: const Color(0xFF5E4B60),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 11),
-                    Text(
-                      isChannel ? 'Добавить канал' : 'Добавить коллег',
-                      style: GoogleFonts.manrope(
-                        fontSize: 13,
-                        color: const Color(0xFF5E4B60),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$count',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant.withValues(alpha: .7),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-      ],
+          IconButton(
+            tooltip: addLabel,
+            onPressed: onAdd,
+            icon: Icon(
+              LucideIcons.plus,
+              size: 19,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
     );
-  }
-
-  int _depthOf(
-    ChatConversationModel item,
-    List<ChatConversationModel> channels,
-  ) {
-    var parentId = item.parentId;
-    var depth = 0;
-    final visited = <String>{item.id};
-    while (parentId != null && depth < 4 && visited.add(parentId)) {
-      depth++;
-      ChatConversationModel? parent;
-      for (final entry in channels) {
-        if (entry.id == parentId) {
-          parent = entry;
-          break;
-        }
-      }
-      parentId = parent?.parentId;
-    }
-    return depth;
   }
 }
 
@@ -510,59 +692,210 @@ class _Conversation extends StatelessWidget {
     required this.item,
     required this.isChannel,
     required this.onTap,
+    this.parentTitle,
     this.depth = 0,
+    this.hasChildren = false,
+    this.childrenExpanded = false,
+    this.onToggleChildren,
+    this.continuesBranch = false,
   });
   final ChatConversationModel item;
   final bool isChannel;
   final VoidCallback onTap;
+  final String? parentTitle;
   final int depth;
+  final bool hasChildren, continuesBranch, childrenExpanded;
+  final VoidCallback? onToggleChildren;
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
+    final colors = Theme.of(context).colorScheme;
+    final strings = MessengerListStrings.of(context);
+    final lastMessage = item.lastMessage;
+    final isForwarded =
+        lastMessage?.kind == ChatMessageKind.text &&
+        lastMessage!.text.startsWith('↪ ');
+    final previewMessage = isForwarded
+        ? lastMessage.copyWith(text: lastMessage.text.substring(2).trimLeft())
+        : lastMessage;
+    final subtitleText = previewMessage != null
+        ? strings.preview(previewMessage, isChannel: isChannel)
+        : isChannel
+        ? (parentTitle == null
+              ? strings.channel
+              : '${strings.subchannel} · $parentTitle')
+        : item.isOnline
+        ? strings.online
+        : strings.personal;
+    final row = ListTile(
       onTap: onTap,
-      dense: true,
-      minTileHeight: 42,
-      horizontalTitleGap: 11,
-      contentPadding: EdgeInsets.only(left: 18 + depth * 22, right: 18),
+      minTileHeight: depth > 0 ? 74 : 78,
+      minVerticalPadding: 12,
+      horizontalTitleGap: 12,
+      contentPadding: EdgeInsets.only(left: 16 + depth * 36, right: 8),
       leading: isChannel
-          ? const SizedBox(
-              width: 27,
-              child: Icon(
-                LucideIcons.hash,
-                size: AppIconSizes.standard,
-                color: Color(0xFF756A76),
-              ),
+          ? ChannelAvatar(
+              channelId: item.id,
+              size: 54,
+              imageUrl: item.imageUrl,
+              repository:
+                  context.read<ChatCubit>().repository is ChannelImageRepository
+                  ? context.read<ChatCubit>().repository
+                        as ChannelImageRepository
+                  : null,
             )
           : _Avatar(item),
       title: Text(
         item.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: GoogleFonts.manrope(
-          fontSize: 14,
-          fontWeight: item.unreadCount > 0 ? FontWeight.w800 : FontWeight.w500,
-          color: item.unreadCount > 0 ? AppColors.ink : const Color(0xFF554B56),
+        style: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 3),
+        child: Row(
+          children: [
+            if (isForwarded) ...[
+              ExcludeSemantics(
+                child: Icon(
+                  LucideIcons.forward,
+                  key: ValueKey('forwarded-preview-${item.id}'),
+                  size: 15,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 5),
+            ],
+            Expanded(
+              child: Text(
+                subtitleText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.3,
+                  color: item.lastMessage == null && !isChannel && item.isOnline
+                      ? AppColors.accent
+                      : colors.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (item.unreadCount > 0) _Badge(item.unreadCount),
+          if (hasChildren)
+            Semantics(
+              expanded: childrenExpanded,
+              child: IconButton(
+                key: ValueKey('channel-expand-${item.id}'),
+                tooltip: tr(
+                  context,
+                  childrenExpanded ? 'Скрыть подканалы' : 'Показать подканалы',
+                ),
+                onPressed: onToggleChildren,
+                icon: Icon(
+                  childrenExpanded
+                      ? LucideIcons.chevronDown
+                      : LucideIcons.chevronRight,
+                  size: 18,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ),
           ConversationMenuButton(
             key: ValueKey('conversation-menu-${item.id}'),
             conversation: item,
             repository: context.read<ChatCubit>().repository,
             chats: context.read<ChatCubit>().state is ChatLoaded
                 ? (context.read<ChatCubit>().state as ChatLoaded).conversations
-                : const [],
+                : [],
             onOpen: onTap,
             onChanged: () => context.read<ChatCubit>().load(silent: true),
           ),
         ],
       ),
     );
+    return Material(
+      key: ValueKey('messenger-channel-row-${item.id}'),
+      color: depth > 0
+          ? AppColors.accent.withValues(
+              alpha: Theme.of(context).brightness == Brightness.dark
+                  ? .055
+                  : .025,
+            )
+          : Colors.transparent,
+      child: CustomPaint(
+        painter: _ChannelBranchPainter(
+          depth: depth,
+          hasChildren: hasChildren && childrenExpanded,
+          continuesBranch: continuesBranch,
+          color: colors.outlineVariant.withValues(alpha: .85),
+        ),
+        child: row,
+      ),
+    );
   }
+}
+
+class _ChannelBranchPainter extends CustomPainter {
+  const _ChannelBranchPainter({
+    required this.depth,
+    required this.hasChildren,
+    required this.continuesBranch,
+    required this.color,
+  });
+  final int depth;
+  final bool hasChildren, continuesBranch;
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.25
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    if (depth > 0) {
+      final rail = 43.0 + (depth - 1) * 36;
+      final center = size.height / 2;
+      final avatarStart = 16.0 + depth * 36;
+      final path = Path()
+        ..moveTo(rail, 0)
+        ..lineTo(rail, center - 6)
+        ..quadraticBezierTo(rail, center, rail + 6, center)
+        ..lineTo(avatarStart - 3, center);
+      canvas.drawPath(path, paint);
+      if (continuesBranch) {
+        canvas.drawLine(
+          Offset(rail, math.max(0, center - 6)),
+          Offset(rail, size.height),
+          paint,
+        );
+      }
+    }
+    if (hasChildren) {
+      final center = 43.0 + depth * 36;
+      canvas.drawLine(
+        Offset(center, size.height / 2 + 28),
+        Offset(center, size.height),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ChannelBranchPainter old) =>
+      old.depth != depth ||
+      old.hasChildren != hasChildren ||
+      old.continuesBranch != continuesBranch ||
+      old.color != color;
 }
 
 class _Avatar extends StatelessWidget {
@@ -575,7 +908,7 @@ class _Avatar extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         UserAvatar(
-          size: 28,
+          size: 54,
           userId: item.id,
           name: item.title,
           avatarUrl: item.avatarUrl,
@@ -585,12 +918,15 @@ class _Avatar extends StatelessWidget {
             right: -2,
             bottom: -2,
             child: Container(
-              width: 9,
-              height: 9,
+              width: 12,
+              height: 12,
               decoration: BoxDecoration(
                 color: const Color(0xFF2BAC76),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.surface,
+                  width: 2,
+                ),
               ),
             ),
           ),
@@ -606,16 +942,17 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 22,
+      constraints: const BoxConstraints(minWidth: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       height: 22,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFFCD2553),
+        color: AppColors.accent,
         borderRadius: BorderRadius.circular(11),
       ),
       child: Text(
-        '$count',
-        style: GoogleFonts.manrope(
+        count > 999 ? '999+' : '$count',
+        style: GoogleFonts.inter(
           color: Colors.white,
           fontSize: 10,
           fontWeight: FontWeight.w800,
@@ -644,23 +981,28 @@ class _NoResults extends StatelessWidget {
             ),
             const SizedBox(height: 15),
             Text(
-              isSearch ? 'Ничего не найдено' : 'Чатов пока нет',
-              style: GoogleFonts.manrope(
+              isSearch
+                  ? tr(context, 'Ничего не найдено')
+                  : tr(context, 'Чатов пока нет'),
+              style: GoogleFonts.inter(
                 fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               isSearch
-                  ? 'Попробуйте другое имя или название канала.'
-                  : 'Каналы и коллеги вашего workspace появятся здесь.',
+                  ? tr(context, 'Попробуйте другое имя или название канала.')
+                  : tr(
+                      context,
+                      'Каналы и коллеги вашего workspace появятся здесь.',
+                    ),
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.inter(
                 fontSize: 13,
                 height: 1.45,
-                color: AppColors.muted,
+                color: AppColors.of(context).muted,
               ),
             ),
           ],
@@ -683,17 +1025,24 @@ class _LoadError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(LucideIcons.wifiOff, size: 34, color: AppColors.muted),
+            Icon(
+              LucideIcons.wifiOff,
+              size: 34,
+              color: AppColors.of(context).muted,
+            ),
             const SizedBox(height: 14),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(color: AppColors.ink, fontSize: 14),
+              style: GoogleFonts.inter(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 14),
             FilledButton.tonal(
               onPressed: onRetry,
-              child: const Text('Повторить'),
+              child: Text(tr(context, 'Повторить')),
             ),
           ],
         ),
@@ -736,7 +1085,7 @@ class _CreateChannelSheetState extends State<_CreateChannelSheet> {
         appSnackBar(
           context: context,
           tone: AppSnackBarTone.error,
-          content: Text('Введите название или повторите попытку.'),
+          content: Text(tr(context, 'Введите название или повторите попытку.')),
         ),
       );
     }
@@ -755,22 +1104,22 @@ class _CreateChannelSheetState extends State<_CreateChannelSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Новый канал',
-          style: GoogleFonts.manrope(
+          tr(context, 'Новый канал'),
+          style: GoogleFonts.inter(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 16),
         AppFormField(
-          label: 'Название канала',
+          label: tr(context, 'Название канала'),
           child: TextField(
             key: const Key('channel-name-field'),
             controller: _controller,
             autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Название канала',
+            decoration: InputDecoration(
+              hintText: tr(context, 'Название канала'),
               prefixText: '# ',
             ),
           ),
@@ -778,15 +1127,17 @@ class _CreateChannelSheetState extends State<_CreateChannelSheet> {
         if (widget.channels.isNotEmpty) ...[
           const SizedBox(height: 12),
           AppFormField(
-            label: 'Родительский канал',
+            label: tr(context, 'Родительский канал'),
             child: DropdownButtonFormField<String?>(
               isExpanded: true,
               initialValue: _parentId,
-              decoration: const InputDecoration(hintText: 'Родительский канал'),
+              decoration: InputDecoration(
+                hintText: tr(context, 'Родительский канал'),
+              ),
               items: [
-                const DropdownMenuItem<String?>(
+                DropdownMenuItem<String?>(
                   value: null,
-                  child: Text('Без вложенности'),
+                  child: Text(tr(context, 'Без вложенности')),
                 ),
                 ...widget.channels.map(
                   (channel) => DropdownMenuItem<String?>(
@@ -803,7 +1154,7 @@ class _CreateChannelSheetState extends State<_CreateChannelSheet> {
         FilledButton(
           key: const Key('create-channel-button'),
           onPressed: _saving ? null : _submit,
-          child: const Text('Создать канал'),
+          child: Text(tr(context, 'Создать канал')),
         ),
       ],
     ),

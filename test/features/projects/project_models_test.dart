@@ -238,23 +238,26 @@ void main() {
     expect(ProjectDto.fromEntity(project).toJson()['children'], isNotEmpty);
   });
 
-  test('ProjectTaskModel recognizes both completion rules', () {
-    const byStatus = ProjectTaskModel(
-      id: '1',
-      projectId: 'project',
-      status: 'done',
-    );
-    final byProgress = ProjectTaskDto.fromJson(<String, dynamic>{
-      'id': '2',
-      'project_id': 'project',
-      'status': 'IN_PROGRESS',
-      'progress': '100',
-    }).toEntity();
+  test(
+    'ProjectTaskModel matches web progress completion independently of status',
+    () {
+      const byStatus = ProjectTaskModel(
+        id: '1',
+        projectId: 'project',
+        status: 'done',
+      );
+      final byProgress = ProjectTaskDto.fromJson(<String, dynamic>{
+        'id': '2',
+        'project_id': 'project',
+        'status': 'IN_PROGRESS',
+        'progress': '100',
+      }).toEntity();
 
-    expect(byStatus.isDone, isTrue);
-    expect(byProgress.isDone, isTrue);
-    expect(byProgress.projectId, 'project');
-  });
+      expect(byStatus.isDone, isFalse);
+      expect(byProgress.isDone, isTrue);
+      expect(byProgress.projectId, 'project');
+    },
+  );
 
   test('ProjectTaskModel treats Unix epoch deadline as absent', () {
     final fromIso = ProjectTaskDto.fromJson(<String, dynamic>{

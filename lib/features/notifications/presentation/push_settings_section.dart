@@ -1,3 +1,9 @@
+import '../../../core/widgets/app_settings_group.dart';
+import '../../../core/di/service_locator.dart';
+import 'notification_preferences_cubit.dart';
+import 'notification_preferences_section.dart';
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -44,18 +50,22 @@ class _PushSettingsSectionState extends State<PushSettingsSection>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Уведомления',
+            Text(
+              tr(context, 'Уведомления'),
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF777C89),
+                fontWeight: FontWeight.w400,
+                color: AppColors.of(context).muted,
               ),
             ),
             const SizedBox(height: 10),
+            if (sl.isRegistered<NotificationPreferencesCubit>())
+              NotificationPreferencesSection(
+                cubit: sl<NotificationPreferencesCubit>(),
+              ),
             Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              color: AppSettingsGroup.surfaceColor(context),
+              borderRadius: BorderRadius.circular(10),
               child: Column(
                 children: [
                   ListTile(
@@ -63,16 +73,16 @@ class _PushSettingsSectionState extends State<PushSettingsSection>
                       LucideIcons.bell,
                       size: AppIconSizes.standard,
                     ),
-                    title: const Text(
-                      'Push-уведомления',
+                    title: Text(
+                      tr(context, 'Push-уведомления'),
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                     subtitle: Text(
                       state.loading
-                          ? 'Проверка…'
+                          ? tr(context, 'Проверка…')
                           : state.registrationError ??
                                 state.error ??
                                 (!state.authorized
@@ -95,11 +105,14 @@ class _PushSettingsSectionState extends State<PushSettingsSection>
                   if (!state.authorized)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      child: FilledButton(
-                        onPressed: state.loading
-                            ? null
-                            : widget.cubit.requestPermission,
-                        child: const Text('Разрешить уведомления'),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: state.loading
+                              ? null
+                              : widget.cubit.requestPermission,
+                          child: Text(tr(context, 'Разрешить уведомления')),
+                        ),
                       ),
                     ),
                   if (state.error != null ||
@@ -107,7 +120,7 @@ class _PushSettingsSectionState extends State<PushSettingsSection>
                       (state.authorized && state.token == null))
                     TextButton(
                       onPressed: state.loading ? null : widget.cubit.refresh,
-                      child: const Text('Повторить проверку'),
+                      child: Text(tr(context, 'Повторить проверку')),
                     ),
                   if (kDebugMode && state.token != null)
                     TextButton(
@@ -121,14 +134,17 @@ class _PushSettingsSectionState extends State<PushSettingsSection>
                               context: context,
                               tone: AppSnackBarTone.success,
                               content: Text(
-                                'Токен устройства скопирован для теста Firebase.',
+                                tr(
+                                  context,
+                                  'Токен устройства скопирован для теста Firebase.',
+                                ),
                               ),
                             ),
                           );
                         }
                       },
-                      child: const Text(
-                        'Скопировать токен для теста Firebase',
+                      child: Text(
+                        tr(context, 'Скопировать токен для теста Firebase'),
                         style: TextStyle(fontSize: 12),
                       ),
                     ),

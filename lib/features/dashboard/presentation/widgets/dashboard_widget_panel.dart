@@ -1,8 +1,7 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_model.dart';
-import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_widget_skeleton.dart';
-import '../../../../core/theme/dashboard_surface.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
 import '../../data/mentions_read_storage.dart';
 import 'dashboard_mentions_widget.dart';
@@ -11,8 +10,8 @@ import 'dashboard_activity_widget.dart';
 import 'dashboard_scrum_widget.dart';
 import 'dashboard_kpi_widget.dart';
 import 'dashboard_team_widget.dart';
+import 'dashboard_task_list_sheet.dart';
 import '../../../../core/widgets/user_avatar.dart';
-import 'dashboard_task_map.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -22,23 +21,21 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../planner/domain/repositories/planner_repository.dart';
 import '../../../planner/data/models/planner_item_model.dart';
-import '../../../storage/presentation/storage_file_screen.dart';
 import '../../domain/entities/dashboard_widget_slot.dart';
 import '../../data/dashboard_repository_impl.dart';
 import '../cubit/dashboard_layout_cubit.dart';
 
 IconData dashboardWidgetIcon(String id) => switch (id) {
-  'daily-motivation' => LucideIcons.sparkles,
-  'kpi-group' => LucideIcons.chartColumn,
-  'tasks-summary' => LucideIcons.listChecks,
-  'activity' => LucideIcons.history,
-  'my-tasks' => LucideIcons.userCheck,
-  'team' => LucideIcons.users,
-  'mentions' => LucideIcons.atSign,
-  'calendar' => LucideIcons.calendarDays,
-  'resource' => LucideIcons.chartNoAxesCombined,
-  'task-map' => LucideIcons.mapPin,
-  _ => LucideIcons.layoutDashboard,
+  'daily-motivation' => LucideIcons.sparkles500,
+  'kpi-group' => LucideIcons.layoutDashboard500,
+  'tasks-summary' => LucideIcons.listChecks500,
+  'activity' => LucideIcons.clock500,
+  'my-tasks' => LucideIcons.userCheck500,
+  'team' => LucideIcons.users500,
+  'mentions' => LucideIcons.atSign500,
+  'calendar' => LucideIcons.calendarDays500,
+  'resource' => LucideIcons.chartNoAxesCombined500,
+  _ => LucideIcons.layoutDashboard500,
 };
 List<ProjectModel> flattenDashboardProjects(List<ProjectModel> projects) => [
   for (final project in projects) ...[
@@ -58,7 +55,6 @@ Map<String, dynamic> dashboardObject(dynamic value) {
 }
 
 bool dashboardDone(Map<String, dynamic> task) =>
-    task['status']?.toString().toUpperCase() == 'DONE' ||
     ((task['progress'] as num?) ?? 0) >= 100;
 
 class DashboardWidgetPanel extends StatefulWidget {
@@ -181,85 +177,11 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
     }
   }
 
-  List<Map<String, dynamic>> _tasks(dynamic raw) {
-    final tasks = DashboardRepositoryImpl.items(raw);
-    final options = widget.slot.options;
-    if (widget.slot.id == 'resource' &&
-        ['labels', 'epics'].contains(options.resourceFilterType)) {
-      final labels = (options.resourceLabelKeys as List? ?? [])
-          .map((e) => e.toString())
-          .toSet();
-      final epics = (options.resourceEpicIds as List? ?? [])
-          .map((e) => e.toString())
-          .toSet();
-      Set<String> taskLabels(Map<String, dynamic> task) =>
-          (dashboardObject(task['detail'])['labels'] as List? ?? [])
-              .whereType<Map>()
-              .map(
-                (e) => jsonEncode([
-                  e['text']?.toString().toLowerCase() ?? '',
-                  e['color']?.toString() ?? '',
-                ]),
-              )
-              .toSet();
-      Set<String> taskEpics(Map<String, dynamic> task) =>
-          (task['epics'] as List? ?? [])
-              .whereType<Map>()
-              .map(
-                (e) =>
-                    (e['epicId'] ?? dashboardObject(e['epic'])['id'])
-                        ?.toString() ??
-                    '',
-              )
-              .toSet();
-      if (options.resourceFilterType == 'labels') {
-        final valid = labels.intersection(tasks.expand(taskLabels).toSet());
-        return tasks
-            .where(
-              (e) =>
-                  valid.isEmpty || taskLabels(e).intersection(valid).isNotEmpty,
-            )
-            .toList();
-      }
-      final valid = epics.intersection(tasks.expand(taskEpics).toSet());
-      return tasks
-          .where(
-            (e) => valid.isEmpty || taskEpics(e).intersection(valid).isNotEmpty,
-          )
-          .toList();
-    }
-    final selected = widget.slot.id == 'team'
-        ? options.teamProjectIds ??
-              (options.teamProjectId != null && options.teamProjectId != 'all'
-                  ? [options.teamProjectId!]
-                  : [])
-        : widget.slot.id == 'resource'
-        ? (options.resourceProjectId != null &&
-                  options.resourceProjectId != 'all'
-              ? [options.resourceProjectId!]
-              : [])
-        : options.projectIds ??
-              (options.projectId != null ? [options.projectId!] : []);
-    final ids = selected.map((e) => e.toString()).toSet();
-    if (ids.isNotEmpty) {
-      for (final project in flattenDashboardProjects(widget.projects)) {
-        if (ids.contains(project.id)) {
-          ids.addAll(
-            flattenDashboardProjects(project.children).map((e) => e.id),
-          );
-        }
-      }
-    }
-    return tasks
-        .where((e) => ids.isEmpty || ids.contains(e['projectId']))
-        .toList();
-  }
-
   Widget _empty(String text) => Padding(
     padding: const EdgeInsets.all(20),
     child: Text(
       text,
-      style: const TextStyle(fontSize: 12, color: AppColors.muted),
+      style: TextStyle(fontSize: 12, color: AppColors.of(context).muted),
     ),
   );
   Future<void> _openTask(String id) async {
@@ -294,13 +216,16 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
               title: Text(item.title, style: const TextStyle(fontSize: 12)),
               subtitle: Text(
                 item.scheduledAt!.toLocal().toString().substring(0, 16),
-                style: const TextStyle(fontSize: 10, color: AppColors.muted),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppColors.of(context).muted,
+                ),
               ),
               onTap: () => context.go('/planner'),
             ),
           TextButton(
             onPressed: () => context.go('/planner'),
-            child: const Text('Открыть ежедневник'),
+            child: Text(tr(context, 'Открыть ежедневник')),
           ),
         ],
       );
@@ -334,6 +259,7 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
         }).toList();
         return (
           user: user,
+          tasks: assigned,
           active: assigned.length,
           overdue: assigned.where((task) {
             final end = DateTime.tryParse(task['end']?.toString() ?? '');
@@ -352,12 +278,19 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
                     (p.active >= 6 && p.active >= average * 1.5),
               )
               .toList()
-            ..sort(
-              (a, b) =>
-                  (b.overdue >= 2 ? 1 : 0).compareTo(a.overdue >= 2 ? 1 : 0),
-            );
+            ..sort((a, b) => b.overdue.compareTo(a.overdue));
       if (recommendations.isEmpty) return _empty('Нет рекомендаций');
       return _AiRecommendations(
+        overdueCount: {
+          for (final rec in recommendations)
+            for (final task in rec.tasks)
+              if (DateTime.tryParse(
+                    task['end']?.toString() ?? '',
+                  )?.isBefore(now) ??
+                  false)
+                task['id']?.toString() ?? task,
+        }.length,
+        peopleCount: recommendations.length,
         items: [
           for (final rec in recommendations.take(3))
             (
@@ -371,6 +304,29 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
               count: rec.overdue >= 2 ? rec.overdue : rec.active,
               isOverdue: rec.overdue >= 2,
               average: average.round(),
+              onTap: () async {
+                final id = await showModalBottomSheet<String>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => DashboardTaskListSheet(
+                    title: tr(context, "Задачи · {p0}", {
+                      'p0': rec.user['name'] ?? '',
+                    }),
+                    tasks: rec.tasks
+                        .where(
+                          (task) =>
+                              rec.overdue < 2 ||
+                              (DateTime.tryParse(
+                                    task['end']?.toString() ?? '',
+                                  )?.isBefore(now) ??
+                                  false),
+                        )
+                        .toList(),
+                    projects: widget.projects,
+                  ),
+                );
+                if (id != null && mounted) await _openTask(id);
+              },
             ),
         ],
       );
@@ -470,7 +426,6 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
             cubit.saveWidgetOptions(widget.slot.instanceId, changes),
       );
     }
-    final tasks = _tasks(data);
     if (kind == 'kpi-group') {
       return DashboardKpiWidget(
         key: ValueKey('${widget.workspaceId}:${widget.slot.instanceId}'),
@@ -481,106 +436,6 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
             .toList(),
         trailing: widget.trailing,
         onOpenTask: _openTask,
-      );
-    }
-    if (kind == 'task-map') {
-      final located = tasks
-          .where(
-            (e) =>
-                dashboardObject(
-                  dashboardObject(e['detail'])['location'],
-                )['address'] !=
-                null,
-          )
-          .toList();
-      final points = <(String, String, double, double)>[];
-      for (final task in located) {
-        final location = dashboardObject(
-          dashboardObject(task['detail'])['location'],
-        );
-        final lat = location['latitude'], lng = location['longitude'];
-        if (lat is num &&
-            lng is num &&
-            lat.isFinite &&
-            lng.isFinite &&
-            lat.abs() <= 90 &&
-            lng.abs() <= 180) {
-          points.add((
-            task['id'].toString(),
-            task['title']?.toString() ?? '',
-            lat.toDouble(),
-            lng.toDouble(),
-          ));
-        }
-      }
-      return Column(
-        children: [
-          DashboardTaskMap(tasks: points, onOpenTask: _openTask),
-          if (located.isEmpty) _empty('У задач пока нет местоположений'),
-          for (final task in located)
-            Builder(
-              builder: (context) {
-                final location = dashboardObject(
-                  dashboardObject(task['detail'])['location'],
-                );
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
-                    LucideIcons.mapPin,
-                    size: 16,
-                    color: AppColors.accent,
-                  ),
-                  title: Text(
-                    task['title']?.toString() ?? '',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  subtitle: Text(
-                    location['address'].toString(),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                  onTap: () => _openTask(task['id'].toString()),
-                  trailing: IconButton(
-                    tooltip: 'Открыть на карте',
-                    icon: const Icon(LucideIcons.externalLink, size: 16),
-                    onPressed: () async {
-                      try {
-                        final latitude = location['latitude'],
-                            longitude = location['longitude'];
-                        final uri = Uri.https(
-                          'yandex.ru',
-                          '/maps/',
-                          latitude is num && longitude is num
-                              ? {
-                                  'll': '$longitude,$latitude',
-                                  'pt': '$longitude,$latitude,pm2rdm',
-                                  'z': '16',
-                                }
-                              : {
-                                  'text': location['address'].toString(),
-                                  'mode': 'search',
-                                },
-                        );
-                        await openStorageLink(uri.toString());
-                      } catch (_) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            appSnackBar(
-                              context: context,
-                              tone: AppSnackBarTone.error,
-                              content: Text('Не удалось открыть карту'),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                  ),
-                );
-              },
-            ),
-        ],
       );
     }
     return _empty('Нет данных');
@@ -597,48 +452,55 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
                 900,
               )
               .toDouble(),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: DashboardSurface.border),
-      borderRadius: BorderRadius.circular(16),
-    ),
+    decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface),
     clipBehavior: Clip.antiAlias,
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.slot.id != 'team' &&
-            widget.slot.id != 'kpi-group' &&
-            widget.slot.id != 'tasks-summary' &&
-            widget.slot.id != 'activity' &&
-            widget.slot.id != 'resource' &&
-            widget.slot.id != 'mentions')
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 12, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: AppWidgetHeading(
-                    icon: dashboardWidgetIcon(widget.slot.id),
-                    title: widget.slot.id == 'daily-motivation'
-                        ? 'AI рекомендации'
-                        : widget.slot.definition?.title ?? widget.slot.id,
-                    iconColor: widget.slot.id == 'daily-motivation'
-                        ? AppColors.accent
-                        : AppColors.muted,
-                  ),
-                ),
-                ?widget.trailing,
-              ],
-            ),
-          ),
-        if (widget.slot.id != 'daily-motivation' &&
+        if (!WidgetCollapseScope.hidesHeading(context) &&
             widget.slot.id != 'team' &&
             widget.slot.id != 'kpi-group' &&
             widget.slot.id != 'tasks-summary' &&
             widget.slot.id != 'activity' &&
             widget.slot.id != 'resource' &&
             widget.slot.id != 'mentions')
-          const Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: widget.slot.id == 'daily-motivation'
+                ? EdgeInsets.zero
+                : const EdgeInsets.fromLTRB(18, 16, 12, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: AppWidgetHeading(
+                    fullWidthToggle: widget.slot.id == 'daily-motivation',
+                    icon: dashboardWidgetIcon(widget.slot.id),
+                    iconAsset: widget.slot.id == 'daily-motivation'
+                        ? 'assets/images/JBee.svg'
+                        : null,
+                    title: widget.slot.id == 'daily-motivation'
+                        ? tr(context, 'AI рекомендации')
+                        : widget.slot.definition?.title ?? widget.slot.id,
+                    titleFontWeight: widget.slot.id == 'daily-motivation'
+                        ? FontWeight.w600
+                        : null,
+                    iconColor: widget.slot.id == 'daily-motivation'
+                        ? AppColors.accent
+                        : AppColors.of(context).muted,
+                  ),
+                ),
+                ?widget.trailing,
+              ],
+            ),
+          ),
+        if (!WidgetCollapseScope.hidesHeading(context) &&
+            widget.slot.id != 'daily-motivation' &&
+            widget.slot.id != 'team' &&
+            widget.slot.id != 'kpi-group' &&
+            widget.slot.id != 'tasks-summary' &&
+            widget.slot.id != 'activity' &&
+            widget.slot.id != 'resource' &&
+            widget.slot.id != 'mentions')
+          Divider(height: 1, color: AppColors.of(context).border),
         Flexible(
           fit: widget.expandContent ? FlexFit.loose : FlexFit.tight,
           child: FutureBuilder<dynamic>(
@@ -649,9 +511,12 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Не удалось загрузить виджет',
-                        style: TextStyle(fontSize: 12, color: AppColors.muted),
+                      Text(
+                        tr(context, 'Не удалось загрузить виджет'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.of(context).muted,
+                        ),
                       ),
                       TextButton(
                         onPressed: () {
@@ -672,7 +537,7 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
                           cubit.retryData('tasks:${ids.join(',')}');
                           setState(_load);
                         },
-                        child: const Text('Повторить'),
+                        child: Text(tr(context, 'Повторить')),
                       ),
                     ],
                   ),
@@ -681,14 +546,16 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
               if (!snapshot.hasData) {
                 return DashboardWidgetSkeleton(
                   kind: widget.slot.id,
-                  showHeading: const [
-                    'team',
-                    'kpi-group',
-                    'tasks-summary',
-                    'activity',
-                    'resource',
-                    'mentions',
-                  ].contains(widget.slot.id),
+                  showHeading:
+                      !WidgetCollapseScope.hidesHeading(context) &&
+                      [
+                        'team',
+                        'kpi-group',
+                        'tasks-summary',
+                        'activity',
+                        'resource',
+                        'mentions',
+                      ].contains(widget.slot.id),
                 );
               }
               return SingleChildScrollView(
@@ -696,15 +563,16 @@ class _DashboardWidgetPanelState extends State<DashboardWidgetPanel> {
                 physics: widget.expandContent
                     ? const NeverScrollableScrollPhysics()
                     : null,
-                padding:
-                    [
-                      'team',
-                      'kpi-group',
-                      'tasks-summary',
-                      'activity',
-                      'resource',
-                      'mentions',
-                    ].contains(widget.slot.id)
+                padding: WidgetCollapseScope.hidesHeading(context)
+                    ? const EdgeInsets.fromLTRB(18, 0, 18, 18)
+                    : [
+                        'team',
+                        'kpi-group',
+                        'tasks-summary',
+                        'activity',
+                        'resource',
+                        'mentions',
+                      ].contains(widget.slot.id)
                     ? const EdgeInsets.fromLTRB(18, 16, 18, 18)
                     : const EdgeInsets.fromLTRB(18, 8, 18, 18),
                 child: _content(snapshot.data),
@@ -724,21 +592,40 @@ typedef _AiRecommendationData = ({
   int count,
   bool isOverdue,
   int average,
+  VoidCallback onTap,
 });
 
 class _AiRecommendations extends StatelessWidget {
-  const _AiRecommendations({required this.items});
+  const _AiRecommendations({
+    required this.items,
+    required this.overdueCount,
+    required this.peopleCount,
+  });
 
   final List<_AiRecommendationData> items;
+  final int overdueCount;
+  final int peopleCount;
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(
+          tr(context, 'С чего начать сегодня'),
+          style: AppTypography.title(context),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          tr(context, 'Приоритетные действия по текущим задачам'),
+          style: AppTypography.caption(
+            context,
+          )?.copyWith(color: AppColors.of(context).muted),
+        ),
+        const SizedBox(height: AppSpacing.md),
         for (var index = 0; index < items.length; index++) ...[
           _AiRecommendationCard(item: items[index]),
-          if (index != items.length - 1)
-            const Divider(height: AppSpacing.md, color: AppColors.border),
+          if (index != items.length - 1) const SizedBox(height: AppSpacing.md),
         ],
       ],
     );
@@ -755,59 +642,85 @@ class _AiRecommendationCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final tone = item.isOverdue ? colors.error : colors.primary;
     final status = item.isOverdue
-        ? '${item.count} ${_taskWord(item.count, short: true)}'
-        : '${item.count} активных';
-    final detail = item.isOverdue
-        ? 'Пересмотрите сроки и приоритеты задач.'
-        : 'Перераспределите задачи: средняя нагрузка — ${item.average}.';
+        ? '${item.count} ${_taskWord(item.count, short: false)} с истёкшим сроком. Проверьте сроки и приоритеты.'
+        : '${item.count} активных задач при средней нагрузке ${item.average}. Проверьте, нужна ли помощь.';
 
     return Semantics(
       container: true,
-      label: '${item.name}. $status. $detail',
-      child: SizedBox(
-        width: double.infinity,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            UserAvatar(
-              size: AppSpacing.lg + AppSpacing.sm,
-              userId: item.userId,
-              name: item.name,
-              avatarUrl: item.avatarUrl,
-              backgroundColor: colors.surfaceContainerHighest,
-              foregroundColor: colors.onSurfaceVariant,
+      label: tr(context, "{p0}. {p1}. Открыть задачи", {
+        'p0': item.name,
+        'p1': status,
+      }),
+      button: true,
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.smMd),
+          child: SizedBox(
+            width: double.infinity,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                UserAvatar(
+                  size: AppSpacing.lg + AppSpacing.sm,
+                  userId: item.userId,
+                  name: item.name,
+                  avatarUrl: item.avatarUrl,
+                  backgroundColor: colors.surfaceContainerHighest,
+                  foregroundColor: colors.onSurfaceVariant,
+                ),
+                const SizedBox(width: AppSpacing.sm + AppSpacing.xs),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.isOverdue
+                            ? tr(context, 'Проверьте просроченные задачи')
+                            : tr(context, 'Оцените распределение задач'),
+                        style: AppTypography.body(context)?.copyWith(
+                          color: colors.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(item.name, style: AppTypography.body(context)),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        status,
+                        style: AppTypography.caption(
+                          context,
+                        )?.copyWith(color: colors.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        tr(context, 'Посмотреть задачи →'),
+                        style: AppTypography.caption(context)?.copyWith(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Icon(
+                  item.isOverdue
+                      ? LucideIcons.triangleAlert
+                      : LucideIcons.gauge,
+                  size: 18,
+                  color: tone,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  LucideIcons.chevronRight,
+                  size: 16,
+                  color: colors.onSurfaceVariant,
+                ),
+              ],
             ),
-            const SizedBox(width: AppSpacing.sm + AppSpacing.xs),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    style: AppTypography.body(context)?.copyWith(
-                      color: colors.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  _StatusBadge(
-                    label: status,
-                    color: tone,
-                    icon: item.isOverdue
-                        ? LucideIcons.triangleAlert
-                        : LucideIcons.gauge,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    detail,
-                    style: AppTypography.caption(
-                      context,
-                    )?.copyWith(color: colors.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -821,38 +734,5 @@ class _AiRecommendationCard extends StatelessWidget {
     if (mod10 == 1) return 'задача';
     if (mod10 >= 2 && mod10 <= 4) return 'задачи';
     return 'задач';
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({
-    required this.label,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: AppSpacing.md, color: color),
-          const SizedBox(width: AppSpacing.xs),
-          Flexible(
-            child: Text(
-              label,
-              style: AppTypography.caption(
-                context,
-              )?.copyWith(color: color, fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

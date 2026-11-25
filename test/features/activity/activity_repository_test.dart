@@ -7,6 +7,59 @@ import 'package:jospar/core/storage/workspace_selection_storage.dart';
 import 'package:jospar/features/activity/data/activity_repository.dart';
 
 void main() {
+  test('call events show a heading rather than their transport JSON', () {
+    for (final mode in ['audio', 'video']) {
+      final payload = jsonEncode({
+        'callId': 'call',
+        'mode': mode,
+        'status': 'ended',
+        'createdById': 'user',
+        'title': 'Private <b>&quot;call metadata&quot;</b>',
+      });
+      for (final nested in [false, true]) {
+        final message = {'threadId': 'dm:a:b', 'kind': 'CALL', 'text': payload};
+        final entry = ActivityEntry.fromJson({
+          'id': 'event',
+          if (nested) 'message': message else ...message,
+        });
+        expect(
+          entry.text,
+          mode == 'video' ? 'Видеозвонок завершён' : 'Звонок завершён',
+        );
+        expect(entry.threadId, 'dm:a:b');
+        expect(entry.text, isNot(contains('callId')));
+        expect(entry.text, isNot(contains('createdById')));
+      }
+    }
+  });
+
+  test('legacy calls and malformed typed calls do not leak raw payloads', () {
+    expect(
+      ActivityEntry.fromJson({
+        'text': jsonEncode({
+          'callId': 'legacy',
+          'mode': 'video',
+          'status': 'ended',
+        }),
+      }).text,
+      'Видеозвонок завершён',
+    );
+    expect(
+      ActivityEntry.fromJson({'kind': 'CALL', 'text': '{broken payload'}).text,
+      'Звонок',
+    );
+  });
+
+  test('ordinary JSON and quoted user text remain readable user content', () {
+    for (final text in [
+      '{"answer":42}',
+      '↩ @Автор: «Видеозвонок завершён»\n\nПривет',
+      '<p>Привет</p>',
+    ]) {
+      final entry = ActivityEntry.fromJson({'text': text});
+      expect(entry.text, text == '<p>Привет</p>' ? 'Привет' : text);
+    }
+  });
   setUp(
     () => FlutterSecureStorage.setMockInitialValues({
       'selected_workspace_id': 'w',

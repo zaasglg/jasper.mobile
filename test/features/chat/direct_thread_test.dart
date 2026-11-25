@@ -26,6 +26,41 @@ void main() {
     }
   });
 
+  test('delete hides a DM server-side while clear keeps it visible', () async {
+    final dio = Dio();
+    final repository = ChatRepositoryImpl(dio, const _Workspace());
+    addTearDown(repository.dispose);
+    addTearDown(dio.close);
+    final writes = <RequestOptions>[];
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (r, h) {
+          writes.add(r);
+          h.resolve(Response(requestOptions: r, data: {'success': true}));
+        },
+      ),
+    );
+    await repository.clearConversation('dm:a:b');
+    await repository.deleteConversation('dm:a:b');
+    expect(writes.map((r) => r.path), everyElement('messages/threads/clear'));
+    expect(writes.last.method, 'POST');
+    expect(writes.first.data, {
+      'threadId': 'dm:a:b',
+      'workspaceId': 'workspace',
+      'keepVisible': true,
+    });
+    expect(writes.last.data, {
+      'threadId': 'dm:a:b',
+      'workspaceId': 'workspace',
+      'keepVisible': false,
+    });
+    await expectLater(
+      repository.deleteConversation('channel'),
+      throwsA(isA<Exception>()),
+    );
+    expect(writes.length, 2);
+  });
+
   for (final existing in [false, true]) {
     test(
       'loads ${existing ? "existing" : "new"} direct chat with a valid thread',

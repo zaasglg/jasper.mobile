@@ -65,3 +65,18 @@ List<ProjectTaskModel> moveKanbanTask({
   ]);
   return result;
 }
+
+String nextColumnCopyName(
+  String source,
+  Iterable<String> existing, {
+  String copyLabel = 'Копия',
+}) {
+  final names = existing.map((name) => name.trim().toLowerCase()).toSet();
+  final base = source.trim();
+  var number = 1;
+  while (true) {
+    final candidate = '$base ($copyLabel${number == 1 ? '' : ' $number'})';
+    if (!names.contains(candidate.toLowerCase())) return candidate;
+    number++;
+  }
+}

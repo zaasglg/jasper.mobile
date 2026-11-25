@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/task_assignee_model.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
@@ -22,7 +23,7 @@ Future<bool> _confirm(BuildContext context, String title) =>
     showAppConfirmation(
       context,
       title,
-      'Это действие нельзя отменить.',
+      tr(context, 'Это действие нельзя отменить.'),
       confirmLabel: 'Удалить',
       destructive: true,
     );
@@ -46,8 +47,8 @@ class TaskChecklistsEditor extends StatelessWidget {
       if (showCreation)
         ChecklistQuickAdd(
           key: const ValueKey('new-checklist-inline'),
-          label: 'Добавить чек-лист',
-          hint: 'Название чек-листа',
+          label: tr(context, 'Добавить чек-лист'),
+          hint: tr(context, 'Название чек-листа'),
           initiallyOpen: true,
           enabled: enabled,
           onClose: onCloseCreation,
@@ -61,11 +62,11 @@ class TaskChecklistsEditor extends StatelessWidget {
           },
         ),
       if (checklists.isEmpty && !showCreation)
-        const Padding(
-          padding: EdgeInsets.all(12),
+        Padding(
+          padding: const EdgeInsets.all(12),
           child: Text(
-            'Нет чек-листов. Добавьте первый кнопкой «+».',
-            style: TextStyle(color: AppColors.muted),
+            tr(context, 'Нет чек-листов. Добавьте первый кнопкой «+».'),
+            style: TextStyle(color: AppColors.of(context).muted),
           ),
         ),
       for (final list in checklists)
@@ -91,7 +92,9 @@ class _ListCard extends StatelessWidget {
     final cubit = context.read<TaskDetailsCubit>();
     final name = await _askName(
       context,
-      section == null ? 'Название чек-листа' : 'Название раздела',
+      section == null
+          ? tr(context, 'Название чек-листа')
+          : tr(context, 'Название раздела'),
       section?.name ?? list.name,
     );
     if (name == null || cubit.isClosed) return;
@@ -165,7 +168,10 @@ class _ListCard extends StatelessWidget {
 
   Future<void> _deleteItem(BuildContext context, String itemId) async {
     final cubit = context.read<TaskDetailsCubit>();
-    if (!await _confirm(context, 'Удалить пункт?') || cubit.isClosed) return;
+    if (!await _confirm(context, tr(context, 'Удалить пункт?')) ||
+        cubit.isClosed) {
+      return;
+    }
     await cubit.modifyChecklist(
       list.id,
       (current) => current.copyWith(
@@ -224,6 +230,8 @@ class _ListCard extends StatelessWidget {
     children: [
       Checkbox.adaptive(
         value: item.done,
+        activeColor: AppColors.of(context).accent,
+        checkColor: AppColors.of(context).onAccent,
         onChanged: enabled
             ? (_) => context.read<TaskDetailsCubit>().toggleChecklistItem(
                 list.id,
@@ -246,15 +254,17 @@ class _ListCard extends StatelessWidget {
                   item.text,
                   style: TextStyle(
                     decoration: item.done ? TextDecoration.lineThrough : null,
-                    color: item.done ? AppColors.muted : null,
+                    color: item.done
+                        ? AppColors.of(context).muted
+                        : AppColors.of(context).ink,
                   ),
                 ),
                 if (item.dueDate != null)
                   Text(
                     '${item.dueDate!.day}.${item.dueDate!.month}.${item.dueDate!.year}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.muted,
+                      color: AppColors.of(context).muted,
                     ),
                   ),
                 if (item.assigneeIds.isNotEmpty)
@@ -273,9 +283,9 @@ class _ListCard extends StatelessWidget {
                               'Исполнитель',
                         )
                         .join(', '),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.muted,
+                      color: AppColors.of(context).muted,
                     ),
                   ),
               ],
@@ -285,8 +295,8 @@ class _ListCard extends StatelessWidget {
       ),
       AppActionMenuButton<String>(
         title: item.text,
-        eyebrow: 'Пункт чек-листа',
-        tooltip: 'Действия пункта',
+        eyebrow: tr(context, 'Пункт чек-листа'),
+        tooltip: tr(context, 'Действия пункта'),
         enabled: enabled,
         onSelected: (action) {
           if (action == 'edit') {
@@ -299,29 +309,29 @@ class _ListCard extends StatelessWidget {
         },
         groups: [
           [
-            const AppMenuAction(
+            AppMenuAction(
               value: 'edit',
-              label: 'Редактировать',
+              label: tr(context, 'Редактировать'),
               icon: LucideIcons.pencil,
               opensSubmenu: true,
             ),
             AppMenuAction(
               value: 'up',
-              label: 'Выше',
+              label: tr(context, 'Выше'),
               icon: LucideIcons.arrowUp,
               enabled: index > 0,
             ),
             AppMenuAction(
               value: 'down',
-              label: 'Ниже',
+              label: tr(context, 'Ниже'),
               icon: LucideIcons.arrowDown,
               enabled: index < length - 1,
             ),
           ],
-          const [
+          [
             AppMenuAction(
               value: 'delete',
-              label: 'Удалить',
+              label: tr(context, 'Удалить'),
               icon: LucideIcons.trash2,
               destructive: true,
             ),
@@ -336,7 +346,7 @@ class _ListCard extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: const Color(0xFFF7F7F6),
+      color: AppColors.of(context).subtleSurface,
       borderRadius: BorderRadius.circular(12),
     ),
     child: Column(
@@ -352,12 +362,15 @@ class _ListCard extends StatelessWidget {
             ),
             Text(
               '${list.completed}/${list.total}',
-              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.of(context).muted,
+              ),
             ),
             AppActionMenuButton<String>(
               title: list.name,
-              eyebrow: 'Чек-лист',
-              tooltip: 'Действия чек-листа',
+              eyebrow: tr(context, 'Чек-лист'),
+              tooltip: tr(context, 'Действия чек-листа'),
               enabled: enabled,
               onSelected: (action) async {
                 final cubit = context.read<TaskDetailsCubit>();
@@ -372,7 +385,7 @@ class _ListCard extends StatelessWidget {
                 if (action == 'delete' &&
                     await _confirm(
                       context,
-                      'Удалить чек-лист со всеми пунктами?',
+                      tr(context, 'Удалить чек-лист со всеми пунктами?'),
                     ) &&
                     !cubit.isClosed) {
                   await cubit.deleteChecklist(list.id);
@@ -380,29 +393,29 @@ class _ListCard extends StatelessWidget {
               },
               groups: [
                 [
-                  const AppMenuAction(
+                  AppMenuAction(
                     value: 'rename',
-                    label: 'Переименовать',
+                    label: tr(context, 'Переименовать'),
                     icon: LucideIcons.pencil,
                     opensSubmenu: true,
                   ),
                   AppMenuAction(
                     value: 'up',
-                    label: 'Выше',
+                    label: tr(context, 'Выше'),
                     icon: LucideIcons.arrowUp,
                     enabled: true,
                   ),
                   AppMenuAction(
                     value: 'down',
-                    label: 'Ниже',
+                    label: tr(context, 'Ниже'),
                     icon: LucideIcons.arrowDown,
                     enabled: true,
                   ),
                 ],
-                const [
+                [
                   AppMenuAction(
                     value: 'delete',
-                    label: 'Удалить чек-лист',
+                    label: tr(context, 'Удалить чек-лист'),
                     icon: LucideIcons.trash2,
                     destructive: true,
                   ),
@@ -414,15 +427,17 @@ class _ListCard extends StatelessWidget {
         LinearProgressIndicator(
           value: list.progress,
           minHeight: 4,
-          backgroundColor: AppColors.skeletonTrack,
+          color: AppColors.of(context).accent,
+          borderRadius: BorderRadius.circular(2),
+          backgroundColor: AppColors.of(context).skeletonTrack,
         ),
         const SizedBox(height: 6),
         for (var i = 0; i < list.items.length; i++)
           _item(context, list.items[i], i, list.items.length),
         ChecklistQuickAdd(
           key: ValueKey('add-item-${list.id}'),
-          label: 'Добавить пункт',
-          hint: 'Текст пункта',
+          label: tr(context, 'Добавить пункт'),
+          hint: tr(context, 'Текст пункта'),
           enabled: enabled,
           onSubmit: (text) => _addItem(context, text),
         ),
@@ -437,8 +452,8 @@ class _ListCard extends StatelessWidget {
               ),
               AppActionMenuButton<String>(
                 title: section.name,
-                eyebrow: 'Раздел чек-листа',
-                tooltip: 'Действия раздела',
+                eyebrow: tr(context, 'Раздел чек-листа'),
+                tooltip: tr(context, 'Действия раздела'),
                 enabled: enabled,
                 onSelected: (action) async {
                   if (action == 'rename') {
@@ -464,7 +479,7 @@ class _ListCard extends StatelessWidget {
                     final cubit = context.read<TaskDetailsCubit>();
                     if (await _confirm(
                           context,
-                          'Удалить раздел со всеми пунктами?',
+                          tr(context, 'Удалить раздел со всеми пунктами?'),
                         ) &&
                         !cubit.isClosed) {
                       await cubit.modifyChecklist(
@@ -480,29 +495,29 @@ class _ListCard extends StatelessWidget {
                 },
                 groups: [
                   [
-                    const AppMenuAction(
+                    AppMenuAction(
                       value: 'rename',
-                      label: 'Переименовать',
+                      label: tr(context, 'Переименовать'),
                       icon: LucideIcons.pencil,
                       opensSubmenu: true,
                     ),
                     AppMenuAction(
                       value: 'up',
-                      label: 'Выше',
+                      label: tr(context, 'Выше'),
                       icon: LucideIcons.arrowUp,
                       enabled: true,
                     ),
                     AppMenuAction(
                       value: 'down',
-                      label: 'Ниже',
+                      label: tr(context, 'Ниже'),
                       icon: LucideIcons.arrowDown,
                       enabled: true,
                     ),
                   ],
-                  const [
+                  [
                     AppMenuAction(
                       value: 'delete',
-                      label: 'Удалить раздел',
+                      label: tr(context, 'Удалить раздел'),
                       icon: LucideIcons.trash2,
                       destructive: true,
                     ),
@@ -521,8 +536,8 @@ class _ListCard extends StatelessWidget {
             ),
           ChecklistQuickAdd(
             key: ValueKey('add-section-item-${section.id}'),
-            label: 'Добавить пункт в раздел',
-            hint: 'Текст пункта',
+            label: tr(context, 'Добавить пункт в раздел'),
+            hint: tr(context, 'Текст пункта'),
             enabled: enabled,
             onSubmit: (text) => _addItem(context, text, sectionId: section.id),
           ),
@@ -540,10 +555,11 @@ class ChecklistQuickAdd extends StatefulWidget {
     required this.enabled,
     required this.onSubmit,
     this.initiallyOpen = false,
+    this.compact = false,
     this.onClose,
   });
   final String label, hint;
-  final bool enabled, initiallyOpen;
+  final bool enabled, initiallyOpen, compact;
   final Future<bool> Function(String text) onSubmit;
   final VoidCallback? onClose;
   @override
@@ -608,13 +624,31 @@ class _ChecklistQuickAddState extends State<ChecklistQuickAdd> {
         alignment: Alignment.centerLeft,
         child: TextButton.icon(
           onPressed: widget.enabled ? () => setState(() => _open = true) : null,
-          icon: const Icon(Icons.add, size: AppIconSizes.standard),
-          label: Text(widget.label),
+          style: widget.compact
+              ? TextButton.styleFrom(
+                  foregroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 10,
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                  ),
+                )
+              : null,
+          icon: Icon(
+            Icons.add,
+            size: widget.compact ? 16 : AppIconSizes.standard,
+          ),
+          label: Text(tr(context, widget.label)),
         ),
       );
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: widget.compact ? 2 : 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -629,10 +663,40 @@ class _ChecklistQuickAddState extends State<ChecklistQuickAdd> {
                   autofocus: true,
                   enabled: widget.enabled && !_saving,
                   textInputAction: TextInputAction.done,
+                  style: widget.compact
+                      ? const TextStyle(fontSize: 14, height: 1.4)
+                      : null,
                   decoration: InputDecoration(
-                    hintText: widget.hint,
+                    hintText: tr(context, widget.hint),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: widget.compact
+                        ? Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: .035)
+                        : AppColors.of(context).badgeSurface,
+                    isDense: widget.compact,
+                    border: widget.compact
+                        ? OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide.none,
+                          )
+                        : null,
+                    enabledBorder: widget.compact
+                        ? OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide.none,
+                          )
+                        : null,
+                    focusedBorder: widget.compact
+                        ? OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: AppColors.of(
+                                context,
+                              ).accent.withValues(alpha: .4),
+                            ),
+                          )
+                        : null,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 10,
@@ -642,21 +706,21 @@ class _ChecklistQuickAddState extends State<ChecklistQuickAdd> {
                 ),
               ),
               IconButton(
-                tooltip: 'Сохранить',
+                tooltip: tr(context, 'Сохранить'),
                 onPressed: _saving || !widget.enabled ? null : _save,
                 icon: _saving
                     ? const SizedBox.square(
                         dimension: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(
+                    : Icon(
                         Icons.check,
-                        color: AppColors.accent,
+                        color: AppColors.of(context).accent,
                         size: AppIconSizes.standard,
                       ),
               ),
               IconButton(
-                tooltip: 'Отмена',
+                tooltip: tr(context, 'Отмена'),
                 onPressed: _saving ? null : _cancel,
                 icon: const Icon(Icons.close, size: AppIconSizes.standard),
               ),
@@ -666,8 +730,11 @@ class _ChecklistQuickAddState extends State<ChecklistQuickAdd> {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                _error!,
-                style: const TextStyle(color: AppColors.error, fontSize: 12),
+                tr(context, _error!),
+                style: TextStyle(
+                  color: AppColors.of(context).error,
+                  fontSize: 12,
+                ),
               ),
             ),
         ],
@@ -704,22 +771,25 @@ class _NameDialogState extends State<_NameDialog> {
 
   @override
   Widget build(BuildContext context) => AppDialog(
-    title: Text(widget.title),
+    title: Text(tr(context, widget.title)),
     content: AppFormField(
-      label: 'Название',
+      label: tr(context, 'Название'),
       child: TextField(
         controller: _text,
         autofocus: true,
-        decoration: InputDecoration(hintText: 'Название', errorText: _error),
+        decoration: InputDecoration(
+          hintText: tr(context, 'Название'),
+          errorText: trn(context, _error),
+        ),
         onSubmitted: (_) => _save(),
       ),
     ),
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Отмена'),
+        child: Text(tr(context, 'Отмена')),
       ),
-      FilledButton(onPressed: _save, child: const Text('Сохранить')),
+      FilledButton(onPressed: _save, child: Text(tr(context, 'Сохранить'))),
     ],
   );
 }
@@ -804,12 +874,14 @@ class _ItemEditorState extends State<_ItemEditor> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            widget.item == null ? 'Новый пункт' : 'Редактировать пункт',
+            widget.item == null
+                ? tr(context, 'Новый пункт')
+                : tr(context, 'Редактировать пункт'),
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 12),
           AppFormField(
-            label: 'Текст пункта',
+            label: tr(context, 'Текст пункта'),
             child: TextField(
               key: const Key('checklist-item-text'),
               controller: _text,
@@ -817,8 +889,8 @@ class _ItemEditorState extends State<_ItemEditor> {
               minLines: 1,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'Текст пункта',
-                errorText: _error,
+                hintText: tr(context, 'Текст пункта'),
+                errorText: trn(context, _error),
               ),
             ),
           ),
@@ -828,10 +900,10 @@ class _ItemEditorState extends State<_ItemEditor> {
               Icons.calendar_today_outlined,
               size: AppIconSizes.standard,
             ),
-            title: const Text('Срок'),
+            title: Text(tr(context, 'Срок')),
             subtitle: Text(
               _due == null
-                  ? 'Не задан'
+                  ? tr(context, 'Не задан')
                   : '${_due!.day}.${_due!.month}.${_due!.year}',
             ),
             onTap: () async {
@@ -846,22 +918,27 @@ class _ItemEditorState extends State<_ItemEditor> {
             trailing: _due == null
                 ? null
                 : IconButton(
-                    tooltip: 'Убрать срок',
+                    tooltip: tr(context, 'Убрать срок'),
                     onPressed: () => setState(() => _due = null),
                     icon: const Icon(Icons.close, size: AppIconSizes.standard),
                   ),
           ),
-          const Text(
-            'Исполнители',
+          Text(
+            tr(context, 'Исполнители'),
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           if (_loading) const LinearProgressIndicator(),
           if (_loadError != null)
-            Text(_loadError!, style: const TextStyle(color: AppColors.muted)),
+            Text(
+              _loadError!,
+              style: TextStyle(color: AppColors.of(context).muted),
+            ),
           for (final user in _users)
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(user.name.isEmpty ? 'Пользователь' : user.name),
+              title: Text(
+                user.name.isEmpty ? tr(context, 'Пользователь') : user.name,
+              ),
               value: _selected.contains(user.userId),
               onChanged: (checked) => setState(() {
                 if (checked == true) {
@@ -872,7 +949,7 @@ class _ItemEditorState extends State<_ItemEditor> {
               }),
             ),
           const SizedBox(height: 12),
-          FilledButton(onPressed: _save, child: const Text('Сохранить')),
+          FilledButton(onPressed: _save, child: Text(tr(context, 'Сохранить'))),
         ],
       ),
     ),

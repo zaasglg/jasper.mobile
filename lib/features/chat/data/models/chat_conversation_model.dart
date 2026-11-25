@@ -1,3 +1,4 @@
+import 'chat_message_preview_model.dart';
 import 'package:equatable/equatable.dart';
 
 class ChatConversationModel extends Equatable {
@@ -7,11 +8,32 @@ class ChatConversationModel extends Equatable {
     required this.title,
     required this.isChannel,
     this.avatarUrl,
+    this.imageUrl,
     this.parentId,
     this.isOnline = false,
     this.unreadCount = 0,
     this.hasThread = false,
+    this.lastMessage,
   });
+
+  factory ChatConversationModel.fromJson(Map<String, dynamic> json) =>
+      ChatConversationModel(
+        id: json['id'] as String? ?? '',
+        threadId: json['threadId'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        isChannel: json['isChannel'] == true,
+        avatarUrl: json['avatarUrl'] as String?,
+        imageUrl: json['imageUrl'] as String?,
+        parentId: json['parentId'] as String?,
+        isOnline: json['isOnline'] == true,
+        unreadCount: _integer(json, const ['unreadCount']),
+        hasThread: json['hasThread'] == true,
+        lastMessage: json['lastMessage'] is Map
+            ? ChatMessagePreviewModel.fromJson(
+                Map<String, dynamic>.from(json['lastMessage'] as Map),
+              )
+            : null,
+      );
 
   factory ChatConversationModel.fromChannelJson(Map<String, dynamic> json) {
     final id = json['id']?.toString() ?? '';
@@ -20,6 +42,7 @@ class ChatConversationModel extends Equatable {
       threadId: _string(json, const ['threadId', 'thread_id']) ?? id,
       title: _string(json, const ['name', 'title']) ?? 'Канал',
       isChannel: true,
+      imageUrl: _string(json, const ['imageUrl']),
       parentId: _string(json, const ['parentId', 'parent_id']),
       unreadCount: _integer(json, const ['unreadCount', 'unread_count']),
     );
@@ -41,6 +64,7 @@ class ChatConversationModel extends Equatable {
           'Пользователь',
       isChannel: false,
       hasThread: thread != null,
+      lastMessage: previewFromThread(thread, currentUserId: currentUserId),
       avatarUrl: _string(json, const ['avatarUrl', 'avatar_url', 'avatar']),
       isOnline: json['online'] == true || json['isOnline'] == true,
       unreadCount: _integer(thread ?? json, const [
@@ -49,6 +73,18 @@ class ChatConversationModel extends Equatable {
       ]),
     );
   }
+
+  static ChatMessagePreviewModel? previewFromThread(
+    Map<String, dynamic>? thread, {
+    String? currentUserId,
+  }) =>
+      thread != null &&
+          (thread.containsKey('text') || thread['lastMessage'] is Map)
+      ? ChatMessagePreviewModel.fromThreadJson(
+          thread,
+          currentUserId: currentUserId,
+        )
+      : null;
 
   static String directThreadId(String currentUserId, String recipientId) {
     final participants = [currentUserId, recipientId]..sort();
@@ -60,10 +96,12 @@ class ChatConversationModel extends Equatable {
   final String title;
   final bool isChannel;
   final String? avatarUrl;
+  final String? imageUrl;
   final String? parentId;
   final bool isOnline;
   final int unreadCount;
   final bool hasThread;
+  final ChatMessagePreviewModel? lastMessage;
 
   String get initials {
     final words = title.trim().split(RegExp(r'\s+'));
@@ -81,23 +119,37 @@ class ChatConversationModel extends Equatable {
     'title': title,
     'isChannel': isChannel,
     'avatarUrl': avatarUrl,
+    'imageUrl': imageUrl,
     'parentId': parentId,
     'isOnline': isOnline,
     'unreadCount': unreadCount,
     'hasThread': hasThread,
+    'lastMessage': lastMessage?.toJson(),
   };
 
-  ChatConversationModel copyWith({String? threadId, int? unreadCount}) {
+  static const _unchanged = Object();
+  ChatConversationModel copyWith({
+    String? threadId,
+    int? unreadCount,
+    Object? imageUrl = _unchanged,
+    Object? lastMessage = _unchanged,
+  }) {
     return ChatConversationModel(
       id: id,
       threadId: threadId ?? this.threadId,
       title: title,
       isChannel: isChannel,
       avatarUrl: avatarUrl,
+      imageUrl: identical(imageUrl, _unchanged)
+          ? this.imageUrl
+          : imageUrl as String?,
       parentId: parentId,
       isOnline: isOnline,
       unreadCount: unreadCount ?? this.unreadCount,
       hasThread: hasThread,
+      lastMessage: identical(lastMessage, _unchanged)
+          ? this.lastMessage
+          : lastMessage as ChatMessagePreviewModel?,
     );
   }
 
@@ -128,9 +180,11 @@ class ChatConversationModel extends Equatable {
     title,
     isChannel,
     avatarUrl,
+    imageUrl,
     parentId,
     isOnline,
     unreadCount,
     hasThread,
+    lastMessage,
   ];
 }

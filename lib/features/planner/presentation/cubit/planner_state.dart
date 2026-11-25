@@ -12,6 +12,8 @@ class PlannerState extends Equatable {
     this.actionError,
     this.actionRevision = 0,
     this.isSaving = false,
+    this.taskIcons = const {},
+    this.iconsLoading = false,
   });
   final PlannerStatus status;
   final List<PlannerItemModel> items;
@@ -19,6 +21,8 @@ class PlannerState extends Equatable {
   final String? error, actionError;
   final int actionRevision;
   final bool isSaving;
+  final Map<String, String> taskIcons;
+  final bool iconsLoading;
   PlannerState copyWith({
     PlannerStatus? status,
     List<PlannerItemModel>? items,
@@ -27,8 +31,12 @@ class PlannerState extends Equatable {
     String? actionError,
     int? actionRevision,
     bool? isSaving,
+    Map<String, String>? taskIcons,
+    bool? iconsLoading,
     bool clearError = false,
   }) => PlannerState(
+    taskIcons: taskIcons ?? this.taskIcons,
+    iconsLoading: iconsLoading ?? this.iconsLoading,
     status: status ?? this.status,
     items: items ?? this.items,
     busyIds: busyIds ?? this.busyIds,
@@ -46,5 +54,7 @@ class PlannerState extends Equatable {
     actionError,
     actionRevision,
     isSaving,
+    taskIcons,
+    iconsLoading,
   ];
 }

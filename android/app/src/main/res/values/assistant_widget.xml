@@ -1,0 +1,9 @@
+<resources>
+    <string name="assistant_widget_label">Jospar AI</string>
+    <string name="assistant_widget_description">Быстрый запрос ИИ-помощнику с клавиатуры</string>
+    <color name="assistant_widget_surface">#FFFFFF</color>
+    <color name="assistant_widget_ink">#252531</color>
+    <color name="assistant_widget_muted">#666879</color>
+    <color name="assistant_widget_accent">#6D5FE0</color>
+    <color name="assistant_widget_border">#E6E6E3</color>
+</resources>

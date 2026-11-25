@@ -13,6 +13,6 @@ The endpoint must validate the Apple identity token, its audience, issuer,
 expiry, and nonce before returning the normal Jospar session in `accessToken`,
 `access_token`, or `token`.
 
-Before release, enable **Sign in with Apple** for the `com.jospar.app` App ID
+Before release, enable **Sign in with Apple** for the `com.josparbee.app` App ID
 in the Apple Developer portal and regenerate the provisioning profile. The
 Runner entitlement and Xcode capability are already included in the project.

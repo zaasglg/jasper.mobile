@@ -145,7 +145,7 @@ void main() {
       final error = find.byKey(const Key('planner-remove-error'));
       expect(error, findsOneWidget);
       expect(tester.widget<Text>(error).data, contains('HTTP 403'));
-      expect(find.text('Задача ежедневника'), findsOneWidget);
+      expect(find.byKey(const Key('planner-editor-title')), findsOneWidget);
       expect(cubit.state.items.single.id, 'planner-slot');
       expect(tester.widget<TextButton>(remove).onPressed, isNotNull);
       await tester.ensureVisible(error);
@@ -157,7 +157,7 @@ void main() {
       await tester.ensureVisible(remove);
       await tester.tap(remove);
       await tester.pumpAndSettle();
-      expect(find.text('Задача ежедневника'), findsNothing);
+      expect(find.byKey(const Key('planner-editor-title')), findsNothing);
       expect(find.textContaining(_title), findsNothing);
       expect(cubit.state.items, isEmpty);
       final refreshed = cubit.refresh();

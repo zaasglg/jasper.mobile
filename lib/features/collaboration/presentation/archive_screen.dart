@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import '../../../core/widgets/app_dialog.dart';
 import 'package:equatable/equatable.dart';
@@ -88,7 +89,7 @@ class ArchiveScreen extends StatelessWidget {
             appSnackBar(
               context: context,
               tone: AppSnackBarTone.error,
-              content: Text(state.error!),
+              content: Text(tr(context, state.error!)),
             ),
           );
         }
@@ -96,7 +97,9 @@ class ArchiveScreen extends StatelessWidget {
       builder: (context, state) => Scaffold(
         appBar: AppBar(
           title: Text(
-            kind == SpaceKind.project ? 'Архив проектов' : 'Архив workspace',
+            kind == SpaceKind.project
+                ? tr(context, 'Архив проектов')
+                : tr(context, 'Архив workspace'),
           ),
         ),
         body: state.loading && state.items.isEmpty
@@ -114,15 +117,15 @@ class ArchiveScreen extends StatelessWidget {
                         child: Center(
                           child: Text(
                             state.error == null
-                                ? 'Архив пуст'
-                                : 'Не удалось загрузить архив',
+                                ? tr(context, 'Архив пуст')
+                                : tr(context, 'Не удалось загрузить архив'),
                           ),
                         ),
                       ),
                     if (state.error != null)
                       TextButton(
                         onPressed: context.read<ArchiveCubit>().load,
-                        child: const Text('Повторить'),
+                        child: Text(tr(context, 'Повторить')),
                       ),
                     for (final item in state.items)
                       ListTile(
@@ -140,18 +143,18 @@ class ArchiveScreen extends StatelessWidget {
                               )
                             : AppActionMenuButton<String>(
                                 title: item.name,
-                                groups: const [
+                                groups: [
                                   [
                                     AppMenuAction(
                                       value: 'restore',
-                                      label: 'Восстановить',
+                                      label: tr(context, 'Восстановить'),
                                       icon: LucideIcons.archiveRestore,
                                     ),
                                   ],
                                   [
                                     AppMenuAction(
                                       value: 'delete',
-                                      label: 'Удалить навсегда',
+                                      label: tr(context, 'Удалить навсегда'),
                                       icon: LucideIcons.trash2,
                                       destructive: true,
                                     ),
@@ -161,8 +164,11 @@ class ArchiveScreen extends StatelessWidget {
                                   if (value == 'delete' &&
                                       !await showAppConfirmation(
                                         context,
-                                        'Удалить навсегда?',
-                                        'Это действие нельзя отменить.',
+                                        tr(context, 'Удалить навсегда?'),
+                                        tr(
+                                          context,
+                                          'Это действие нельзя отменить.',
+                                        ),
                                         confirmLabel: 'Удалить',
                                         destructive: true,
                                       )) {

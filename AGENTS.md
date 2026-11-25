@@ -166,3 +166,25 @@ When generating or modifying code in **Jospar Me**:
 3. Use `Dio` for API calls and wrap responses in explicit model parsers.
 4. Use `GoRouter` for all screen transitions.
 5. Use `GoogleFonts` and `FlutterSvg` for UI assets.
+
+---
+
+## 🤖 Project Agent Routing
+
+Project-specific agents are implemented as Codex skills under `.agents/skills/`:
+
+- Use `jospar-feature` for end-to-end product functionality, repositories, DTOs, Cubits/BLoCs, DI, and routing.
+- Use `jospar-ui` for screens, widgets, responsive layout, accessibility, and visual polish.
+- Use `jospar-testing` when the requested outcome is test coverage, regression reproduction, or test repair.
+- Use `jospar-review` for code-review and audit requests. Review is read-only unless the user also requests fixes.
+- Use `jospar-idea-council` when the user wants multiple independent opinions, structured debate, voting, or a shared decision about an idea.
+
+When a task clearly matches one of these skills, read its complete `SKILL.md` before acting. If multiple skills apply, use the smallest set that covers the request and state their order. Explicit invocations such as `$jospar-feature` or `$jospar-review` take precedence.
+
+Full agent documentation is maintained in `docs/AI_AGENTS.md`.
+
+### Continuous Agent Improvement
+
+Before project work, selected agents must read `.agents/knowledge/lessons.md` and apply relevant verified lessons. At the end of a completed task, evaluate whether the work produced a reusable project-specific lesson. Record it only when it satisfies the acceptance rules in `docs/AI_AGENTS.md`; do not add generic advice, speculation, secrets, personal data, or duplicate entries.
+
+If a verified lesson changes an agent workflow, update the relevant `SKILL.md` and run the skill validator. Continuous improvement changes repository guidance only; it does not retrain the underlying model.

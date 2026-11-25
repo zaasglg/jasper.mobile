@@ -68,22 +68,22 @@ class DashboardRepositoryImpl implements DashboardRepository {
     for (var skip = 0; ; skip += 100) {
       final page = items(
         (await dio.get<dynamic>(
-          'project-tasks',
-          queryParameters: {
-            'projectIds': projectIds.join(','),
-            'archived': 'false',
-            'take': 100,
-            'skip': skip,
-          },
+          // Match the web dashboard: timing excludes archived projects and
+          // tasks in archived/deleted columns on the server.
+          'project-tasks/timing',
+          queryParameters: {'take': 100, 'skip': skip},
           options: options(workspaceId),
         )).data,
       );
       var added = 0;
       for (final row in page) {
-        if (projectIds.contains(row['projectId']) &&
-            seen.add(row['id'].toString())) {
-          rows.add(row);
+        final id = row['id']?.toString() ?? '';
+        if (id.isNotEmpty && seen.add(id)) {
           added++;
+          if (projectIds.contains(row['projectId']) &&
+              row['archived'] != true) {
+            rows.add(row);
+          }
         }
       }
       if (page.length < 100) break;

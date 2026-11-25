@@ -1,3 +1,4 @@
+import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'planner_test_app.dart';
 import 'package:flutter/material.dart';
@@ -88,7 +89,7 @@ void main() {
       await tester.tap(find.byKey(const Key('planner-add')));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Личная запись');
-      await tester.tap(find.text('Сохранить'));
+      await tester.tap(find.byKey(const Key('planner-editor-save')));
       await tester.pumpAndSettle();
       expect(repository.createdTitle, 'Личная запись');
       expect(tester.takeException(), isNull);
@@ -161,34 +162,30 @@ void main() {
       expect(find.byKey(const Key('planner-hour-11')), findsNothing);
       await tester.tap(find.byKey(const ValueKey('planner-open-first')));
       await tester.pumpAndSettle();
-      expect(find.text('Задача ежедневника'), findsOneWidget);
+      expect(find.byKey(const Key('planner-editor-title')), findsOneWidget);
       expect(find.text('Длительность'), findsOneWidget);
-      await tester.tap(find.text('Сохранить'));
+      await tester.tap(find.byKey(const Key('planner-editor-save')));
       await tester.pumpAndSettle();
-      // The weekly view retains its time grid and drag-to-reschedule behavior.
-      await tester.tap(find.text('Неделя'));
+      // The current weekly view groups entries into day columns.
+      await tester.tap(find.byKey(const Key('planner-view-selector')));
       await tester.pumpAndSettle();
-      final gesture = await tester.startGesture(
-        tester.getCenter(find.text('Подготовить презентацию')),
-      );
-      await tester.pump(const Duration(milliseconds: 600));
-      await gesture.moveTo(
-        tester.getCenter(find.byKey(const ValueKey('planner-hour-11'))),
-      );
-      await tester.pump();
-      await gesture.up();
-      await tester.pumpAndSettle();
-      expect(plannerLocal(repository.lastScheduledAt!).hour, 11);
+      expect(find.byKey(const Key('planner-week-view')), findsOneWidget);
+      expect(find.text('Подготовить презентацию'), findsOneWidget);
       await tester.tap(find.byKey(const Key('planner-add')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Новая задача');
-      await tester.tap(find.text('Сохранить'));
+      await tester.enterText(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is TextField &&
+              widget.decoration?.hintText == 'Введите название',
+        ),
+        'Новая задача',
+      );
+      await tester.tap(find.byKey(const Key('planner-editor-save')));
       await tester.pumpAndSettle();
       expect(repository.createdTitle, 'Новая задача');
-      await tester.tap(find.text('Неделя'));
-      await tester.pumpAndSettle();
-      expect(find.text('Пн'), findsOneWidget);
-      await tester.tap(find.text('Месяц'));
+      expect(find.byKey(const Key('planner-week-view')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('planner-view-selector')));
       await tester.pumpAndSettle();
       expect(find.byType(GridView), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -215,6 +212,14 @@ void main() {
 }
 
 class _Repository implements PlannerRepository {
+  @override
+  Future<void> updateExtras(
+    String itemId, {
+    bool updateIcon = false,
+    String? icon,
+    List<TaskChecklistModel>? checklists,
+  }) async {}
+
   _Repository({this.late = false});
   final bool late;
   int loadCount = 0;
@@ -251,6 +256,7 @@ class _Repository implements PlannerRepository {
     DateTime? plannedDate,
     int? durationMinutes,
     bool? completed,
+    int? reminderMinutes,
   }) async {
     lastScheduledAt = scheduledAt ?? lastScheduledAt;
   }

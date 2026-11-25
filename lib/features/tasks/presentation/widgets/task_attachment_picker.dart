@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/widgets/app_action_menu.dart';
@@ -14,16 +15,16 @@ Future<List<TaskFileModel>> pickTaskAttachments(
     context,
     title: 'Добавить вложение',
     eyebrow: 'Фото, видео и документы · до 10 МБ на файл',
-    groups: const [
+    groups: [
       [
         AppMenuAction(
           value: TaskAttachmentSource.gallery,
-          label: 'Галерея',
+          label: tr(context, 'Галерея'),
           icon: LucideIcons.images,
         ),
         AppMenuAction(
           value: TaskAttachmentSource.files,
-          label: 'Файлы',
+          label: tr(context, 'Файлы'),
           icon: LucideIcons.file,
         ),
       ],

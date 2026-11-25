@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -16,9 +17,9 @@ class TaskResourcePairs extends StatelessWidget {
     final cubit = context.read<TaskDetailsCubit>();
     final sorted = [...resources]..sort((a, b) => a.order.compareTo(b.order));
     if (sorted.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-        child: Text('Нет ресурсов. Нажмите «+», чтобы добавить.'),
+        child: Text(tr(context, 'Нет ресурсов. Нажмите «+», чтобы добавить.')),
       );
     }
     return Column(
@@ -79,8 +80,8 @@ class _Pair extends StatelessWidget {
                 ),
                 child: Text(
                   plan > 0 && resources.length == 2
-                      ? 'Расход ${percentage.round()}%'
-                      : 'Расход —',
+                      ? tr(context, "Расход {p0}%", {'p0': percentage.round()})
+                      : tr(context, 'Расход —'),
                   style: AppTypography.caption(context)?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: percentage > 100
@@ -91,7 +92,7 @@ class _Pair extends StatelessWidget {
               ),
               const Spacer(),
               IconButton(
-                tooltip: 'История группы ресурсов',
+                tooltip: tr(context, 'История группы ресурсов'),
                 style: IconButton.styleFrom(
                   minimumSize: const Size.square(AppSpacing.touchTarget),
                   foregroundColor: Theme.of(
@@ -103,7 +104,7 @@ class _Pair extends StatelessWidget {
                     showResourcePairHistory(context, cubit, resources),
               ),
               IconButton(
-                tooltip: 'Удалить строку ресурсов',
+                tooltip: tr(context, 'Удалить строку ресурсов'),
                 style: IconButton.styleFrom(
                   minimumSize: const Size.square(AppSpacing.touchTarget),
                   foregroundColor: Theme.of(
@@ -116,8 +117,11 @@ class _Pair extends StatelessWidget {
                     : () async {
                         if (await showAppConfirmation(
                           context,
-                          'Удалить строку ресурсов?',
-                          'Ресурсы и история их изменений будут удалены.',
+                          tr(context, 'Удалить строку ресурсов?'),
+                          tr(
+                            context,
+                            'Ресурсы и история их изменений будут удалены.',
+                          ),
                           confirmLabel: 'Удалить',
                           destructive: true,
                         )) {
@@ -181,7 +185,7 @@ class _Value extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: 'Калькулятор: ${resource.name}',
+              tooltip: tr(context, "Калькулятор: {p0}", {'p0': resource.name}),
               onPressed: cubit.state.isSaving
                   ? null
                   : () => showServerResourceCalculator(
@@ -364,7 +368,7 @@ class _ResourceInlineFieldState extends State<ResourceInlineField> {
         errorBorder: UnderlineInputBorder(
           borderSide: BorderSide(color: Theme.of(context).colorScheme.error),
         ),
-        errorText: _error,
+        errorText: trn(context, _error),
         errorMaxLines: 4,
         suffixIcon: _busy
             ? const Padding(

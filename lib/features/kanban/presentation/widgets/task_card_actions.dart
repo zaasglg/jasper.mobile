@@ -1,19 +1,22 @@
+import 'package:forui/forui.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../tasks/presentation/cubit/task_details_cubit.dart';
+import '../../../tasks/presentation/cubit/task_details_state.dart';
+import '../../../tasks/presentation/widgets/task_extras_sheet.dart';
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_task_cover.dart';
 import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
-import '../../../../core/widgets/app_form_surface.dart';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../data/models/task_translation.dart';
 import '../cubit/kanban_cubit.dart';
 import 'task_card.dart';
 
@@ -31,7 +34,7 @@ Future<void> handleTaskCardAction(
           appSnackBar(
             context: context,
             tone: AppSnackBarTone.success,
-            content: Text('Копия задачи создана'),
+            content: Text(tr(context, 'Копия задачи создана')),
           ),
         );
       }
@@ -40,12 +43,33 @@ Future<void> handleTaskCardAction(
     case TaskCardAction.delete:
       final confirmed = await showAppConfirmation(
         context,
-        'Удалить задачу?',
-        '«${task.title}» будет удалена. Это действие нельзя отменить.',
+        tr(context, 'Удалить задачу?'),
+        tr(context, "«{p0}» будет удалена. Это действие нельзя отменить.", {
+          'p0': task.title,
+        }),
         confirmLabel: 'Удалить',
         destructive: true,
       );
       if (confirmed == true && context.mounted) await cubit.deleteTask(task);
+    case TaskCardAction.epics:
+    case TaskCardAction.labels:
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        useSafeArea: true,
+        builder: (_) => BlocProvider(
+          create: (_) =>
+              sl<TaskDetailsCubit>()..load(task.id, initialTask: task),
+          child: _TaskExtrasActionSheet(
+            task: task,
+            tab: action == TaskCardAction.epics
+                ? TaskExtraTab.epics
+                : TaskExtraTab.labels,
+          ),
+        ),
+      );
+      if (!cubit.isClosed) await cubit.load(task.projectId, refresh: true);
     case TaskCardAction.cover:
       await showModalBottomSheet<void>(
         context: context,
@@ -67,6 +91,45 @@ Future<void> handleTaskCardAction(
     default:
       break;
   }
+}
+
+class _TaskExtrasActionSheet extends StatelessWidget {
+  const _TaskExtrasActionSheet({required this.task, required this.tab});
+
+  final ProjectTaskModel task;
+  final TaskExtraTab tab;
+
+  @override
+  Widget build(BuildContext context) =>
+      BlocBuilder<TaskDetailsCubit, TaskDetailsState>(
+        builder: (context, state) {
+          if (state.status == TaskDetailsStatus.success) {
+            return TaskExtrasSheet(tab: tab);
+          }
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: state.status == TaskDetailsStatus.failure
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(tr(context, 'Не удалось загрузить задачу')),
+                        TextButton(
+                          onPressed: () => context
+                              .read<TaskDetailsCubit>()
+                              .load(task.id, initialTask: task),
+                          child: Text(tr(context, 'Повторить')),
+                        ),
+                      ],
+                    )
+                  : const SizedBox(
+                      height: 80,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+            ),
+          );
+        },
+      );
 }
 
 class _CoverSheet extends StatefulWidget {
@@ -194,7 +257,7 @@ class _CoverSheetState extends State<_CoverSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Обложка задачи',
+              tr(context, 'Обложка задачи'),
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -208,7 +271,7 @@ class _CoverSheetState extends State<_CoverSheet> {
               children: [
                 for (final color in _colors)
                   Semantics(
-                    label: 'Цвет $color',
+                    label: tr(context, "Цвет {p0}", {'p0': color}),
                     selected: _cover?.color == color,
                     button: true,
                     child: InkWell(
@@ -249,16 +312,19 @@ class _CoverSheetState extends State<_CoverSheet> {
                 Icons.image_outlined,
                 size: AppIconSizes.standard,
               ),
-              label: const Text('Выбрать изображение'),
+              label: Text(tr(context, 'Выбрать изображение')),
             ),
             TextButton(
               onPressed: _busy || _cover == null
                   ? null
                   : () => setState(() => _cover = null),
-              child: const Text('Убрать обложку'),
+              child: Text(tr(context, 'Убрать обложку')),
             ),
             if (_error != null)
-              Text(_error!, style: const TextStyle(color: AppColors.error)),
+              Text(
+                tr(context, _error!),
+                style: TextStyle(color: AppColors.of(context).error),
+              ),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: _busy ? null : _save,
@@ -267,7 +333,7 @@ class _CoverSheetState extends State<_CoverSheet> {
                       dimension: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Сохранить'),
+                  : Text(tr(context, 'Сохранить')),
             ),
           ],
         ),
@@ -276,7 +342,7 @@ class _CoverSheetState extends State<_CoverSheet> {
   );
 }
 
-class _TranslationSheet extends StatefulWidget {
+class _TranslationSheet extends StatelessWidget {
   const _TranslationSheet({
     required this.task,
     required this.cubit,
@@ -285,155 +351,40 @@ class _TranslationSheet extends StatefulWidget {
   final ProjectTaskModel task;
   final KanbanCubit cubit;
   final String workspaceId;
-  @override
-  State<_TranslationSheet> createState() => _TranslationSheetState();
-}
-
-class _TranslationSheetState extends State<_TranslationSheet> {
-  String _language = 'Казахский';
-  TaskTranslation? _translation;
-  bool _busy = false;
-  String? _error;
-
-  Future<void> _translate() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-      _translation = null;
-    });
-    final translation = await widget.cubit.translateTask(
-      widget.task,
-      widget.workspaceId,
-      _language,
-    );
-    if (mounted) {
-      setState(() {
-        _busy = false;
-        _translation = translation;
-        if (translation == null) {
-          _error =
-              widget.cubit.state.actionErrorMessage ??
-              'Не удалось перевести задачу.';
-        }
-      });
-    }
-  }
-
-  Future<void> _apply() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    final saved = await widget.cubit.applyTranslation(
-      widget.task,
-      _translation!,
-    );
-    if (!mounted) return;
-    if (saved) {
-      Navigator.pop(context);
-    } else {
-      setState(() {
-        _busy = false;
-        _error =
-            widget.cubit.state.actionErrorMessage ??
-            'Не удалось сохранить перевод.';
-      });
-    }
-  }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: !_busy,
+  Widget build(BuildContext context) => FTheme(
+    data: Theme.of(context).brightness == Brightness.dark
+        ? FTheme.neutral.dark.touch
+        : FTheme.neutral.light.touch,
     child: SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Перевести задачу',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            AppFormField(
-              label: 'Язык перевода',
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                initialValue: _language,
-                decoration: const InputDecoration(hintText: 'Язык перевода'),
-                items: [
-                  for (final language in ['Казахский', 'Русский', 'Английский'])
-                    DropdownMenuItem(value: language, child: Text(language)),
-                ],
-                onChanged: _busy
-                    ? null
-                    : (value) => setState(() {
-                        _language = value!;
-                        _translation = null;
-                      }),
-              ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: _busy ? null : _translate,
-              child: const Text('Получить перевод'),
-            ),
-            if (_busy)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            if (_error != null)
-              Text(_error!, style: const TextStyle(color: AppColors.error)),
-            if (_translation != null) ...[
-              const SizedBox(height: 12),
-              SelectableText(
-                _translation!.title,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+              child: Text(
+                tr(context, 'Язык перевода'),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 8),
-              SelectableText(_translation!.description),
-              const SizedBox(height: 16),
-              Text(
-                'Применение перевода заменит название и описание задачи.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              TextButton(
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        try {
-                          await Clipboard.setData(
-                            ClipboardData(
-                              text:
-                                  '${_translation!.title}\n\n${_translation!.description}',
-                            ),
-                          );
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              appSnackBar(
-                                context: context,
-                                tone: AppSnackBarTone.success,
-                                content: Text('Перевод скопирован'),
-                              ),
-                            );
-                          }
-                        } catch (_) {
-                          if (mounted) {
-                            setState(
-                              () => _error = 'Не удалось скопировать перевод.',
-                            );
-                          }
-                        }
-                      },
-                child: const Text('Скопировать перевод'),
-              ),
-              FilledButton(
-                onPressed: _busy ? null : _apply,
-                child: const Text('Применить перевод'),
-              ),
-            ],
+            ),
+            FItemGroup(
+              children: [
+                for (final language in ['Казахский', 'Русский', 'Английский'])
+                  FItem(
+                    title: Text(tr(context, language)),
+                    suffix: const Icon(Icons.chevron_right, size: 18),
+                    onPress: () {
+                      Navigator.pop(context);
+                      cubit.translateTask(task, workspaceId, language);
+                    },
+                  ),
+              ],
+            ),
           ],
         ),
       ),

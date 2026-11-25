@@ -1,6 +1,7 @@
+import 'package:jospar/features/shell/presentation/widgets/app_bottom_navigation.dart';
 import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:jospar/features/projects/domain/entities/create_project_request.dart';
-import 'package:jospar/features/settings/presentation/screens/settings_screen.dart';
+import 'package:jospar/features/profile/presentation/widgets/profile_settings_sections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -12,7 +13,7 @@ import 'package:jospar/core/storage/workspace_selection_storage.dart';
 import 'package:jospar/features/projects/domain/repositories/project_repository.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart';
 import 'package:jospar/features/projects/presentation/cubit/projects_state.dart';
-import 'package:jospar/features/shell/presentation/widgets/app_drawer.dart';
+import 'package:jospar/features/workspaces/presentation/widgets/workspace_switcher.dart';
 import 'package:jospar/features/shell/presentation/screens/main_shell.dart';
 import 'package:jospar/features/workspaces/domain/entities/create_workspace_request.dart';
 import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart';
@@ -36,21 +37,111 @@ class _Workspaces implements WorkspaceRepository {
     const WorkspaceModel(id: 'archive', name: 'Архив с сайта'),
   ];
   @override
-  Future<WorkspaceModel> createWorkspace(CreateWorkspaceRequest request) =>
-      throw UnimplementedError();
+  Future<WorkspaceModel> createWorkspace(
+    CreateWorkspaceRequest request,
+  ) async => WorkspaceModel(id: 'created', name: request.name);
 }
 
 class _Projects implements ProjectRepository {
+  @override
+  Future<void> setPinned(String id, bool pinned) async {}
+  @override
+  Future<void> archiveProject(String id) async {}
+
+  @override
+  Future<void> moveProject(
+    String id, {
+    required String workspaceId,
+    String? parentId,
+    String? anchorId,
+    required String placement,
+  }) async {}
+
+  int loads = 0;
   List<ProjectModel> projects = [];
 
   @override
-  Future<List<ProjectModel>> getProjects() async => projects;
+  Future<List<ProjectModel>> getProjects() async {
+    loads++;
+    return projects;
+  }
+
   @override
   Future<ProjectModel> createProject(CreateProjectRequest request) =>
       throw UnimplementedError();
 }
 
 void main() {
+  testWidgets(
+    'new account never builds workspace tabs before creating a workspace',
+    (tester) async {
+      GoogleFonts.config.allowRuntimeFetching = false;
+      FlutterSecureStorage.setMockInitialValues({
+        'selected_workspace_id': 'stale',
+      });
+      final repository = _Workspaces()..workspaces = [];
+      final projects = _Projects();
+      sl.registerFactory<WorkspaceCubit>(
+        () => WorkspaceCubit(
+          repository: repository,
+          selectionStorage: const WorkspaceSelectionStorage(
+            FlutterSecureStorage(),
+          ),
+        ),
+      );
+      sl.registerFactory<ProjectsCubit>(() => ProjectsCubit(projects));
+      addTearDown(() async {
+        await sl.unregister<WorkspaceCubit>();
+        await sl.unregister<ProjectsCubit>();
+      });
+      var tabBuilds = 0;
+      final router = GoRouter(
+        routes: [
+          ShellRoute(
+            builder: (_, _, child) =>
+                MainShell(currentIndex: 0, onTap: (_) {}, child: child),
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (_, _) => Builder(
+                  builder: (_) {
+                    tabBuilds++;
+                    return const Text('Workspace data');
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+      expect(find.text('Создайте первое пространство'), findsOneWidget);
+      expect(find.byType(AppBottomNavigation), findsNothing);
+      expect(tabBuilds, 0);
+      expect(projects.loads, 0);
+      expect(
+        await const FlutterSecureStorage().read(key: 'selected_workspace_id'),
+        isNull,
+      );
+      await tester.enterText(
+        find.byKey(const Key('first-workspace-name')),
+        'Личное',
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('first-workspace-create')),
+      );
+      await tester.tap(find.byKey(const Key('first-workspace-create')));
+      await tester.pumpAndSettle();
+      expect(find.text('Workspace data'), findsOneWidget);
+      expect(find.byType(AppBottomNavigation), findsOneWidget);
+      expect(projects.loads, 1);
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('left-edge swipe navigates back instead of opening the drawer', (
     tester,
   ) async {
@@ -83,10 +174,7 @@ void main() {
               builder: (context, _) => Scaffold(
                 body: Column(
                   children: [
-                    TextButton(
-                      onPressed: MainShell.openDrawer,
-                      child: const Text('Меню'),
-                    ),
+                    const WorkspaceSwitcher(),
                     TextButton(
                       onPressed: () => context.push('/projects/one'),
                       child: const Text('Открыть проект'),
@@ -142,15 +230,13 @@ void main() {
     expect(find.text('Детали проекта'), findsNothing);
     expect(find.text('Открыть проект'), findsOneWidget);
     expect(MainShell.scaffoldKey.currentState!.isDrawerOpen, isFalse);
-    await tester.tap(find.text('Меню'));
-    await tester.pumpAndSettle();
-    expect(MainShell.scaffoldKey.currentState!.isDrawerOpen, isTrue);
+    expect(find.byType(Drawer), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
     expect(tester.takeException(), isNull);
   });
 
   testWidgets(
-    'selecting workspace from drawer reloads projects and leaves old details',
+    'selecting workspace from Forui switcher reloads projects and leaves old details',
     (tester) async {
       GoogleFonts.config.allowRuntimeFetching = false;
       FlutterSecureStorage.setMockInitialValues({});
@@ -203,6 +289,7 @@ void main() {
                 builder: (_, _) => BlocBuilder<ProjectsCubit, ProjectsState>(
                   builder: (_, state) => Column(
                     children: [
+                      const WorkspaceSwitcher(),
                       for (final project in state.projects) Text(project.name),
                     ],
                   ),
@@ -210,7 +297,12 @@ void main() {
                 routes: [
                   GoRoute(
                     path: ':id',
-                    builder: (_, _) => const Text('Детали прежнего проекта'),
+                    builder: (_, _) => const Column(
+                      children: [
+                        WorkspaceSwitcher(),
+                        Text('Детали прежнего проекта'),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -223,32 +315,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(projects.state.workspaceId, 'one');
 
-      MainShell.openDrawer();
+      await tester.tap(find.byKey(const Key('workspace-switcher')));
       await tester.pumpAndSettle();
-      expect(find.text('Цифровизация'), findsOneWidget);
       expect(find.text('Продажи'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byType(AppDrawer),
-          matching: find.text('Прежний проект'),
-        ),
-        findsNothing,
-      );
-      final selectedWorkspace = find.byKey(const Key('drawer-workspace-one'));
-      expect(
-        tester
-            .widget<Semantics>(
-              find
-                  .descendant(
-                    of: selectedWorkspace,
-                    matching: find.byType(Semantics),
-                  )
-                  .first,
-            )
-            .properties
-            .selected,
-        isTrue,
-      );
+      expect(find.byType(Drawer), findsNothing);
       await tester.tap(find.text('Продажи'));
       await tester.pumpAndSettle();
 
@@ -261,140 +331,136 @@ void main() {
       expect(find.text('Проект продаж'), findsOneWidget);
       expect(find.text('Детали прежнего проекта'), findsNothing);
 
-      MainShell.openDrawer();
-      await tester.pumpAndSettle();
-      final salesWorkspace = find.byKey(const Key('drawer-workspace-two'));
-      expect(
-        tester
-            .widget<Semantics>(
-              find
-                  .descendant(
-                    of: salesWorkspace,
-                    matching: find.byType(Semantics),
-                  )
-                  .first,
-            )
-            .properties
-            .selected,
-        isTrue,
-      );
-      expect(find.text('Настройки'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets(
-    'drawer refreshes server data, polls only in foreground, and loads archive',
-    (tester) async {
-      GoogleFonts.config.allowRuntimeFetching = false;
-      FlutterSecureStorage.setMockInitialValues({});
-      final repository = _Workspaces();
-      sl.registerFactory<WorkspaceCubit>(
-        () => WorkspaceCubit(
-          repository: repository,
-          selectionStorage: WorkspaceSelectionStorage(
-            const FlutterSecureStorage(),
+  testWidgets('Forui switcher creates and selects a workspace', (tester) async {
+    GoogleFonts.config.allowRuntimeFetching = false;
+    FlutterSecureStorage.setMockInitialValues({});
+    final storage = WorkspaceSelectionStorage(const FlutterSecureStorage());
+    final cubit = WorkspaceCubit(
+      repository: _Workspaces(),
+      selectionStorage: storage,
+    );
+    addTearDown(cubit.close);
+    await cubit.load();
+    await tester.pumpWidget(
+      BlocProvider.value(
+        value: cubit,
+        child: const MaterialApp(
+          home: Scaffold(body: SafeArea(child: WorkspaceSwitcher())),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workspace-switcher')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Создать workspace'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Команда');
+    await tester.tap(find.widgetWithText(FilledButton, 'Создать'));
+    await tester.pumpAndSettle();
+    expect((cubit.state as WorkspaceLoaded).selected?.name, 'Команда');
+    expect(await storage.read(), 'created');
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(Drawer), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('workspace switcher refreshes server data and opens archive', (
+    tester,
+  ) async {
+    GoogleFonts.config.allowRuntimeFetching = false;
+    FlutterSecureStorage.setMockInitialValues({});
+    final repository = _Workspaces();
+    sl.registerFactory<WorkspaceCubit>(
+      () => WorkspaceCubit(
+        repository: repository,
+        selectionStorage: WorkspaceSelectionStorage(
+          const FlutterSecureStorage(),
+        ),
+      ),
+    );
+    sl.registerFactory<ProjectsCubit>(() => ProjectsCubit(_Projects()));
+    addTearDown(() async {
+      await sl.unregister<WorkspaceCubit>();
+      await sl.unregister<ProjectsCubit>();
+    });
+    final router = GoRouter(
+      initialLocation: '/dashboard',
+      routes: [
+        GoRoute(
+          path: '/profile',
+          builder: (_, state) {
+            final args = state.extra! as ProfileNavigationData;
+            return Scaffold(
+              body: SingleChildScrollView(
+                child: ProfileSettingsSections(
+                  voiceController: args.voice,
+                  workspaceCubit: args.workspace,
+                ),
+              ),
+            );
+          },
+        ),
+        GoRoute(
+          path: '/manage/workspaces/:id',
+          builder: (context, state) => Scaffold(
+            body: TextButton(
+              child: Text('Изменить workspace ${state.pathParameters['id']}'),
+              onPressed: () {
+                repository.workspaces = [
+                  const WorkspaceModel(
+                    id: 'one',
+                    name: 'Новое имя из настроек',
+                  ),
+                ];
+                context.pop();
+              },
+            ),
           ),
         ),
-      );
-      sl.registerFactory<ProjectsCubit>(() => ProjectsCubit(_Projects()));
-      addTearDown(() async {
-        await sl.unregister<WorkspaceCubit>();
-        await sl.unregister<ProjectsCubit>();
-      });
-      final router = GoRouter(
-        initialLocation: '/dashboard',
-        routes: [
-          GoRoute(
-            path: '/settings',
-            builder: (_, state) {
-              final args = state.extra! as SettingsNavigationData;
-              return SettingsScreen(
-                voiceController: args.voice,
-                workspaceCubit: args.workspace,
-              );
-            },
+        GoRoute(
+          path: '/dashboard',
+          builder: (_, _) => MainShell(
+            currentIndex: 0,
+            onTap: (_) {},
+            child: const WorkspaceSwitcher(),
           ),
-          GoRoute(
-            path: '/manage/workspaces/:id',
-            builder: (context, state) => Scaffold(
-              body: TextButton(
-                child: Text('Изменить workspace ${state.pathParameters['id']}'),
-                onPressed: () {
-                  repository.workspaces = [
-                    const WorkspaceModel(
-                      id: 'one',
-                      name: 'Новое имя из настроек',
-                    ),
-                  ];
-                  context.pop();
-                },
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/dashboard',
-            builder: (_, _) => MainShell(
-              currentIndex: 0,
-              onTap: (_) {},
-              child: const Text('Экран'),
-            ),
-          ),
-        ],
-      );
-      addTearDown(router.dispose);
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-      await tester.pumpAndSettle();
-      expect(repository.loads, 1);
-      repository.workspaces = [
-        const WorkspaceModel(id: 'one', name: 'Новое имя с сайта'),
-      ];
-      MainShell.openDrawer();
-      await tester.pumpAndSettle();
-      expect(repository.loads, 2);
-      expect(find.text('Новое имя с сайта'), findsOneWidget);
-      await tester.tap(find.text('Архивированные'));
-      await tester.pumpAndSettle();
-      expect(find.text('Архив с сайта'), findsOneWidget);
-      repository.workspaces = [
-        const WorkspaceModel(id: 'one', name: 'Обновлено снова'),
-      ];
-      await tester.pump(const Duration(seconds: 30));
-      await tester.pumpAndSettle();
-      expect(repository.loads, 3);
-      expect(find.text('Обновлено снова'), findsWidgets);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      await tester.pump(const Duration(seconds: 60));
-      expect(repository.loads, 3);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pumpAndSettle();
-      expect(repository.loads, 4);
-      MainShell.scaffoldKey.currentState!.closeDrawer();
-      await tester.pumpAndSettle();
-      await tester.pump(const Duration(seconds: 60));
-      expect(repository.loads, 4);
-      MainShell.openDrawer();
-      await tester.pumpAndSettle();
-      expect(find.text('Workspace'), findsNothing);
-      expect(find.byTooltip('Архив workspace'), findsNothing);
-      expect(find.text('Архивированные'), findsOneWidget);
-      await tester.tap(find.text('Настройки'));
-      await tester.pumpAndSettle();
-      final workspaceSettings = find.byKey(const Key('settings-workspace'));
-      await tester.ensureVisible(workspaceSettings);
-      expect(find.text('Настройки workspace'), findsOneWidget);
-      await tester.tap(workspaceSettings);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Изменить workspace one'));
-      await tester.pumpAndSettle();
-      expect(find.text('Новое имя из настроек'), findsOneWidget);
-      router.pop();
-      await tester.pumpAndSettle();
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    },
-  );
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+    expect(repository.loads, 1);
+    repository.workspaces = [
+      const WorkspaceModel(id: 'one', name: 'Новое имя с сайта'),
+    ];
+    await tester.tap(find.byKey(const Key('workspace-switcher')));
+    await tester.pumpAndSettle();
+    expect(repository.loads, 2);
+    expect(find.text('Новое имя с сайта'), findsWidgets);
+    await tester.tap(find.text('Архивированные'));
+    await tester.pumpAndSettle();
+    expect(find.text('Архив с сайта'), findsOneWidget);
+    repository.workspaces = [
+      const WorkspaceModel(id: 'one', name: 'Обновлено снова'),
+    ];
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump(const Duration(seconds: 60));
+    expect(repository.loads, 2);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(repository.loads, 3);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Обновлено снова'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 }

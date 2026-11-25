@@ -12,6 +12,9 @@ class PushNotificationData extends Equatable {
   final Map<String, String> data;
   String get id => data['messageId'] ?? '';
   String get route {
+    if (data['type'] == 'reminder' && data['plannerItemId']?.isNotEmpty == true) {
+      return '/planner';
+    }
     final task = data['taskId'];
     if (task != null && task.trim().isNotEmpty) {
       return '/tasks/${Uri.encodeComponent(task)}';

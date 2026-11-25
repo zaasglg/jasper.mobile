@@ -1,3 +1,10 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../../core/widgets/app_action_menu.dart';
+import '../../domain/repositories/channel_image_repository.dart';
+import '../channel_photo_strings.dart';
+import '../widgets/channel_avatar.dart';
+import '../widgets/channel_info_sheet.dart';
+import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../widgets/messenger_refresh_lifecycle.dart';
 import '../widgets/message_interactions.dart';
@@ -17,6 +24,7 @@ import '../widgets/video_note_capture.dart';
 import '../widgets/video_note_message.dart';
 import '../widgets/voice_composer.dart';
 import '../widgets/voice_message.dart';
+import '../widgets/chat_wallpaper.dart';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -40,6 +48,65 @@ import '../../../../core/di/service_locator.dart';
 import '../../data/models/chat_conversation_model.dart';
 import '../../data/models/chat_message_model.dart';
 import '../cubit/conversation_cubit.dart';
+
+class _DeliveryIndicator extends StatelessWidget {
+  const _DeliveryIndicator({required this.message});
+  final ChatMessageModel message;
+  @override
+  Widget build(BuildContext context) {
+    final kk = Localizations.localeOf(context).languageCode == 'kk';
+    final status = message.deliveryStatus;
+    final label = switch (status) {
+      'sending' => kk ? 'Жіберілуде' : 'Отправляется',
+      'failed' => kk ? 'Жіберілмеді' : 'Не отправлено',
+      'read' => kk ? 'Оқылды' : 'Прочитано',
+      'delivered' => kk ? 'Жеткізілді' : 'Доставлено',
+      _ => kk ? 'Жіберілді' : 'Отправлено',
+    };
+    final color = status == 'failed'
+        ? Theme.of(context).colorScheme.error
+        : status == 'read'
+        ? AppColors.accent
+        : AppColors.of(context).muted;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (status == 'sending')
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 1.5),
+            )
+          else
+            Tooltip(
+              message: label,
+              child: Icon(
+                status == 'failed'
+                    ? LucideIcons.circleAlert
+                    : status == 'read' || status == 'delivered'
+                    ? LucideIcons.checkCheck
+                    : LucideIcons.check,
+                size: 14,
+                color: color,
+              ),
+            ),
+          if (message.isPending) ...[
+            const SizedBox(width: 4),
+            Text(label, style: TextStyle(fontSize: 10, color: color)),
+          ],
+          if (status == 'failed')
+            TextButton(
+              onPressed: () =>
+                  context.read<ConversationCubit>().retryMessage(message),
+              child: Text(tr(context, 'Повторить')),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
 class ConversationScreen extends StatefulWidget {
   const ConversationScreen({
@@ -74,7 +141,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   String _searchQuery = '';
   String? _storageMessageId;
   String? _currentUserId;
-  List<ChatConversationModel> _people = const [];
+  List<ChatConversationModel> _people = [];
   final _sentMessageIds = <String>{};
 
   @override
@@ -128,7 +195,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         appSnackBar(
           context: context,
           tone: AppSnackBarTone.info,
-          content: Text('Сначала ответьте на входящий звонок.'),
+          content: Text(tr(context, 'Сначала ответьте на входящий звонок.')),
         ),
       );
       return;
@@ -167,10 +234,10 @@ class _ConversationScreenState extends State<ConversationScreen>
                 height: MediaQuery.sizeOf(context).height * .65,
                 child: Column(
                   children: [
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.all(16),
                       child: Text(
-                        'Участники звонка',
+                        tr(context, 'Участники звонка'),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -201,7 +268,7 @@ class _ConversationScreenState extends State<ConversationScreen>
                         onPressed: selected.isEmpty
                             ? null
                             : () => context.pop(selected.toList()),
-                        child: const Text('Позвонить'),
+                        child: Text(tr(context, 'Позвонить')),
                       ),
                     ),
                   ],
@@ -230,7 +297,9 @@ class _ConversationScreenState extends State<ConversationScreen>
             context: context,
             tone: AppSnackBarTone.error,
             content: Text(
-              e is ChatException ? e.message : 'Не удалось начать звонок.',
+              e is ChatException
+                  ? e.message
+                  : tr(context, 'Не удалось начать звонок.'),
             ),
           ),
         );
@@ -261,6 +330,24 @@ class _ConversationScreenState extends State<ConversationScreen>
     }
   }
 
+  Future<void> _headerAction(String action) async {
+    if (action == 'storage') {
+      _openStorage();
+    } else if (action == 'search') {
+      setState(() {
+        _searching = true;
+        _searchQuery = '';
+      });
+    } else if (action == 'info' &&
+        _refreshCubit.repository is ChannelImageRepository) {
+      await showChannelInfo(
+        context,
+        widget.conversation,
+        _refreshCubit.repository as ChannelImageRepository,
+      );
+    }
+  }
+
   @override
   void dispose() {
     _composerFocus.removeListener(_onComposerFocus);
@@ -274,25 +361,26 @@ class _ConversationScreenState extends State<ConversationScreen>
   Widget build(BuildContext context) {
     final chat = widget.conversation;
     return Scaffold(
-      backgroundColor: AppColors.chatCanvas,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: AppColors.canvas,
-        foregroundColor: AppColors.ink,
+        toolbarHeight: 56,
+        leadingWidth: 44,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        leading: IconButton(
+        leading: AppBackButton(
           key: const Key('conversation-back'),
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(LucideIcons.arrowLeft, size: AppIconSizes.standard),
         ),
         titleSpacing: AppSpacing.xs,
         title: _searching
             ? TextField(
                 key: const Key('conversation-search'),
                 autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Поиск в переписке',
+                decoration: InputDecoration(
+                  hintText: tr(context, 'Поиск в переписке'),
                   border: InputBorder.none,
                 ),
                 onChanged: (value) =>
@@ -300,32 +388,58 @@ class _ConversationScreenState extends State<ConversationScreen>
               )
             : Row(
                 children: [
-                  _Avatar(conversation: chat, size: AppSpacing.xl),
-                  const SizedBox(width: AppSpacing.smMd),
+                  InkWell(
+                    key: const Key('channel-header-info'),
+                    onTap:
+                        chat.isChannel &&
+                            _refreshCubit.repository is ChannelImageRepository
+                        ? () => showChannelInfo(
+                            context,
+                            chat,
+                            _refreshCubit.repository as ChannelImageRepository,
+                          )
+                        : null,
+                    child: _Avatar(
+                      conversation: chat,
+                      size: 36,
+                      repository:
+                          _refreshCubit.repository is ChannelImageRepository
+                          ? _refreshCubit.repository as ChannelImageRepository
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           chat.isChannel
-                              ? '# ${chat.title.replaceFirst(RegExp(r'^#\s*'), '')}'
+                              ? chat.title.replaceFirst(RegExp(r'^#\s*'), '')
                               : chat.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.title(
-                            context,
-                          )?.copyWith(color: AppColors.ink),
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            height: 1.2,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
                         Text(
                           chat.isChannel
-                              ? 'Канал'
+                              ? tr(context, 'Канал')
                               : chat.isOnline
-                              ? 'в сети'
-                              : 'Личная переписка',
+                              ? tr(context, 'в сети')
+                              : tr(context, 'Личная переписка'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: AppTypography.caption(context)?.copyWith(
+                            fontSize: 11,
+                            height: 1.4,
                             color: !chat.isChannel && chat.isOnline
                                 ? AppColors.accent
-                                : AppColors.muted,
+                                : AppColors.of(context).muted,
                           ),
                         ),
                       ],
@@ -334,29 +448,56 @@ class _ConversationScreenState extends State<ConversationScreen>
                 ],
               ),
         actions: [
-          if (!_searching && sl.isRegistered<CallCubit>()) ...[
+          if (!_searching && sl.isRegistered<CallCubit>())
             IconButton(
-              tooltip: 'Аудиозвонок',
+              tooltip: tr(context, 'Аудиозвонок'),
               onPressed: () => _startCall(false),
-              icon: const Icon(LucideIcons.phone, size: 18),
+              icon: const Icon(LucideIcons.phone, size: 21),
             ),
+          if (_searching)
             IconButton(
-              tooltip: 'Видеозвонок',
+              tooltip: tr(context, 'Закрыть поиск'),
+              onPressed: () => setState(() {
+                _searching = false;
+                _searchQuery = '';
+              }),
+              icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
+            )
+          else if (sl.isRegistered<CallCubit>())
+            IconButton(
+              key: const Key('conversation-video-call'),
+              tooltip: tr(context, 'Видеозвонок'),
               onPressed: () => _startCall(true),
-              icon: const Icon(LucideIcons.video, size: 18),
+              icon: const Icon(LucideIcons.video, size: 21),
             ),
-          ],
-          IconButton(
-            tooltip: _searching ? 'Закрыть поиск' : 'Поиск в переписке',
-            onPressed: () => setState(() {
-              _searching = !_searching;
-              _searchQuery = '';
-            }),
-            icon: Icon(
-              _searching ? LucideIcons.x : LucideIcons.search,
-              size: AppIconSizes.standard,
+          if (!_searching)
+            AppActionMenuButton<String>(
+              key: const Key('conversation-more'),
+              title: chat.title,
+              tooltip: tr(context, 'Действия переписки'),
+              groups: [
+                [
+                  if (chat.isChannel &&
+                      _refreshCubit.repository is ChannelImageRepository)
+                    AppMenuAction(
+                      value: 'info',
+                      label: ChannelPhotoStrings.of(context).info,
+                      icon: LucideIcons.info,
+                    ),
+                  AppMenuAction(
+                    value: 'search',
+                    label: tr(context, 'Поиск в переписке'),
+                    icon: LucideIcons.search,
+                  ),
+                  AppMenuAction(
+                    value: 'storage',
+                    label: tr(context, 'Кладовка'),
+                    icon: LucideIcons.archive,
+                  ),
+                ],
+              ],
+              onSelected: _headerAction,
             ),
-          ),
         ],
       ),
       body: SafeArea(
@@ -379,7 +520,7 @@ class _ConversationScreenState extends State<ConversationScreen>
                 appSnackBar(
                   context: context,
                   tone: AppSnackBarTone.error,
-                  content: Text(state.error!),
+                  content: Text(tr(context, state.error!)),
                 ),
               );
             }
@@ -402,31 +543,32 @@ class _ConversationScreenState extends State<ConversationScreen>
           },
           builder: (context, state) => Column(
             children: [
-              ConversationSections(onStoragePressed: _openStorage),
               PinnedMessagesBar(
                 messages: state.messages,
                 onSelect: (id) => setState(() => _storageMessageId = id),
               ),
               if (_storageMessageId != null)
                 MaterialBanner(
-                  content: const Text('Выбранное сообщение'),
+                  content: Text(tr(context, 'Выбранное сообщение')),
                   actions: [
                     TextButton(
                       onPressed: () => setState(() => _storageMessageId = null),
-                      child: const Text('Показать все'),
+                      child: Text(tr(context, 'Показать все')),
                     ),
                   ],
                 ),
               Expanded(
-                child: _MessageList(
-                  scrollController: _messageScroll,
-                  state: state,
-                  conversation: chat,
-                  currentUserId: _currentUserId,
-                  sentMessageIds: _sentMessageIds,
-                  people: _people,
-                  searchQuery: _searchQuery,
-                  focusedMessageId: _storageMessageId,
+                child: ChatWallpaper(
+                  child: _MessageList(
+                    scrollController: _messageScroll,
+                    state: state,
+                    conversation: chat,
+                    currentUserId: _currentUserId,
+                    sentMessageIds: _sentMessageIds,
+                    people: _people,
+                    searchQuery: _searchQuery,
+                    focusedMessageId: _storageMessageId,
+                  ),
                 ),
               ),
               if (state.typingUsers.isNotEmpty)
@@ -439,9 +581,9 @@ class _ConversationScreenState extends State<ConversationScreen>
                     alignment: Alignment.centerLeft,
                     child: Text(
                       '${state.typingUsers.take(3).map((e) => e.name).join(', ')} ${state.typingUsers.length == 1 ? 'печатает…' : 'печатают…'}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.muted,
+                        color: AppColors.of(context).muted,
                       ),
                     ),
                   ),
@@ -455,7 +597,9 @@ class _ConversationScreenState extends State<ConversationScreen>
                     color: AppColors.accent,
                   ),
                   title: Text(
-                    'Ответ: ${state.replyTo!.authorName}',
+                    tr(context, "Ответ: {p0}", {
+                      'p0': state.replyTo!.authorName,
+                    }),
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.accent,
@@ -467,7 +611,7 @@ class _ConversationScreenState extends State<ConversationScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                   trailing: IconButton(
-                    tooltip: 'Отменить ответ',
+                    tooltip: tr(context, 'Отменить ответ'),
                     icon: const Icon(Icons.close, size: 18),
                     onPressed: () => _refreshCubit.selectReply(null),
                   ),
@@ -526,7 +670,9 @@ class _ConversationScreenState extends State<ConversationScreen>
           appSnackBar(
             context: context,
             tone: AppSnackBarTone.error,
-            content: Text('Не удалось выбрать файлы. Попробуйте ещё раз.'),
+            content: Text(
+              tr(context, 'Не удалось выбрать файлы. Попробуйте ещё раз.'),
+            ),
           ),
         );
       }
@@ -599,17 +745,17 @@ class ConversationSections extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: AppColors.canvas,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: AppColors.of(context).canvas,
+        border: Border(bottom: BorderSide(color: AppColors.of(context).border)),
       ),
       child: SizedBox(
         height: AppSpacing.touchTarget,
         child: Row(
           children: <Widget>[
-            const Expanded(
+            Expanded(
               child: ConversationSectionButton(
-                label: 'Переписка',
+                label: tr(context, 'Переписка'),
                 icon: LucideIcons.messageCircle,
                 selected: true,
               ),
@@ -617,7 +763,7 @@ class ConversationSections extends StatelessWidget {
             Expanded(
               child: ConversationSectionButton(
                 key: const Key('conversation-storage'),
-                label: 'Кладовка',
+                label: tr(context, 'Кладовка'),
                 icon: LucideIcons.archive,
                 onPressed: onStoragePressed,
               ),
@@ -645,7 +791,7 @@ class ConversationSectionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.accent : AppColors.muted;
+    final color = selected ? AppColors.accent : AppColors.of(context).muted;
     return Semantics(
       selected: selected,
       button: true,
@@ -716,7 +862,7 @@ class _MessageList extends StatelessWidget {
         title: state.error!,
         action: TextButton(
           onPressed: context.read<ConversationCubit>().load,
-          child: const Text('Повторить'),
+          child: Text(tr(context, 'Повторить')),
         ),
       );
     }
@@ -746,9 +892,9 @@ class _MessageList extends StatelessWidget {
         (message) => message.id == focusedMessageId,
       );
       if (index < 0) {
-        return const _CenteredState(
+        return _CenteredState(
           icon: LucideIcons.messageCircle,
-          title: 'Исходное сообщение больше недоступно',
+          title: tr(context, 'Исходное сообщение больше недоступно'),
         );
       }
       if (index > 0) {
@@ -756,9 +902,9 @@ class _MessageList extends StatelessWidget {
       }
     }
     if (messages.isEmpty) {
-      return const _CenteredState(
+      return _CenteredState(
         icon: LucideIcons.search,
-        title: 'Сообщения не найдены',
+        title: tr(context, 'Сообщения не найдены'),
       );
     }
     bool sameDay(DateTime a, DateTime b) =>
@@ -834,6 +980,7 @@ class _MessageList extends StatelessWidget {
                 groupStart: groupStart,
                 groupEnd: groupEnd,
                 isMine:
+                    messages[index].isPending ||
                     (currentUserId != null &&
                         currentUserId!.isNotEmpty &&
                         messages[index].authorId == currentUserId) ||
@@ -849,30 +996,35 @@ class _MessageList extends StatelessWidget {
 
 class ConversationDateDivider extends StatelessWidget {
   const ConversationDateDivider({super.key, required this.label});
-
   final String label;
-
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.mdLg),
-      child: Row(
-        children: <Widget>[
-          const Expanded(child: Divider(color: AppColors.border)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.smMd),
-            child: Text(
-              label,
-              style: AppTypography.caption(
-                context,
-              )?.copyWith(color: AppColors.muted, fontWeight: FontWeight.w600),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Center(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF34404C)
+              : const Color(0xFFD0D9DF),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white70
+                  : const Color(0xFF536674),
             ),
           ),
-          const Expanded(child: Divider(color: AppColors.border)),
-        ],
+        ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _MessageRow extends StatelessWidget {
@@ -893,12 +1045,13 @@ class _MessageRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final time = TimeOfDay.fromDateTime(message.createdAt).format(context);
     return Padding(
       key: Key('message-row-${message.id}'),
       padding: EdgeInsets.only(
-        top: groupStart ? AppSpacing.sm : AppSpacing.xxs,
-        bottom: groupEnd ? AppSpacing.xs : AppSpacing.xxs,
+        top: groupStart ? 6 : 2,
+        bottom: groupEnd ? 3 : 1,
       ),
       child: GestureDetector(
         onLongPress: () => showMessageActions(context, message, isMine),
@@ -910,7 +1063,12 @@ class _MessageRow extends StatelessWidget {
           children: [
             if (!isMine && reserveAvatar) ...[
               if (showAvatar)
-                _MessageAvatar(message: message)
+                Padding(
+                  padding: EdgeInsets.only(
+                    bottom: message.reactions.isEmpty ? 0 : 32,
+                  ),
+                  child: _MessageAvatar(message: message),
+                )
               else
                 const SizedBox(width: AppSpacing.xl),
               const SizedBox(width: AppSpacing.sm),
@@ -918,105 +1076,122 @@ class _MessageRow extends StatelessWidget {
             Flexible(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width * 0.76,
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.82,
                 ),
-                child: Container(
-                  key: Key('message-bubble-${message.id}'),
-                  constraints: const BoxConstraints(minWidth: 60),
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.smMd,
-                    AppSpacing.sm,
-                    AppSpacing.smMd,
-                    AppSpacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: message.kind == ChatMessageKind.videoMessage
-                        ? Colors.transparent
-                        : isMine
-                        ? AppColors.outgoingMessage
-                        : AppColors.canvas,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(
-                        !isMine && !groupStart ? AppRadius.xs : AppRadius.lg,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: isMine
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      key: Key('message-bubble-${message.id}'),
+                      constraints: const BoxConstraints(minWidth: 60),
+                      padding: EdgeInsets.fromLTRB(
+                        10,
+                        7,
+                        10,
+                        message.reactions.isEmpty ? 5 : 9,
                       ),
-                      topRight: Radius.circular(
-                        isMine && !groupStart ? AppRadius.xs : AppRadius.lg,
+                      decoration: BoxDecoration(
+                        color: message.kind == ChatMessageKind.videoMessage
+                            ? Colors.transparent
+                            : isMine
+                            ? (dark
+                                  ? const Color(0xFF352D55)
+                                  : const Color(0xFFEEE9FF))
+                            : (dark ? const Color(0xFF202B36) : Colors.white),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(
+                            !isMine && !groupStart
+                                ? AppRadius.xs
+                                : AppRadius.lg,
+                          ),
+                          topRight: Radius.circular(
+                            isMine && !groupStart ? AppRadius.xs : AppRadius.lg,
+                          ),
+                          bottomLeft: Radius.circular(
+                            !isMine && groupEnd ? AppRadius.xs : AppRadius.lg,
+                          ),
+                          bottomRight: Radius.circular(
+                            isMine && groupEnd ? AppRadius.xs : AppRadius.lg,
+                          ),
+                        ),
                       ),
-                      bottomLeft: Radius.circular(
-                        !isMine && groupEnd ? AppRadius.xs : AppRadius.lg,
-                      ),
-                      bottomRight: Radius.circular(
-                        isMine && groupEnd ? AppRadius.xs : AppRadius.lg,
+                      child: Stack(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 15),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (!isMine && showAuthor) ...[
+                                  Text(
+                                    message.authorName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.accent,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                ],
+                                _MessageBody(
+                                  message: message,
+                                  people: people,
+                                  isMine: isMine,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (message.pinned) ...[
+                                  Icon(
+                                    Icons.push_pin_outlined,
+                                    size: 12,
+                                    color: AppColors.of(context).muted,
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                if (message.favorited) ...[
+                                  const Icon(
+                                    LucideIcons.bookmark,
+                                    size: AppIconSizes.standard,
+                                    color: AppColors.accent,
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                Text(
+                                  time,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    color: AppColors.of(context).muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  child: Stack(
-                    children: [
+                    if (isMine) _DeliveryIndicator(message: message),
+                    if (message.reactions.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.mdLg),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (!isMine && showAuthor) ...[
-                              Text(
-                                message.authorName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.manrope(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.accent,
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                            ],
-                            _MessageBody(
-                              message: message,
-                              people: people,
-                              isMine: isMine,
-                            ),
-                            if (message.reactions.isNotEmpty) ...[
-                              const SizedBox(height: AppSpacing.sm),
-                              MessageReactionBar(message: message),
-                            ],
-                          ],
+                        padding: const EdgeInsets.fromLTRB(6, 0, 6, 0),
+                        child: Transform.translate(
+                          offset: const Offset(0, -7),
+                          child: MessageReactionBar(message: message),
                         ),
                       ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (message.pinned) ...[
-                              const Icon(
-                                Icons.push_pin_outlined,
-                                size: 12,
-                                color: AppColors.muted,
-                              ),
-                              const SizedBox(width: 4),
-                            ],
-                            if (message.favorited) ...[
-                              const Icon(
-                                LucideIcons.bookmark,
-                                size: AppIconSizes.standard,
-                                color: AppColors.accent,
-                              ),
-                              const SizedBox(width: 4),
-                            ],
-                            Text(
-                              time,
-                              style: GoogleFonts.manrope(
-                                fontSize: 10,
-                                color: AppColors.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -1047,11 +1222,14 @@ class _MessageBody extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(bottom: 5),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 5),
             child: Text(
-              'Переслано',
-              style: TextStyle(fontSize: 11, color: AppColors.muted),
+              tr(context, 'Переслано'),
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.of(context).muted,
+              ),
             ),
           ),
           _MessageBody(
@@ -1074,7 +1252,9 @@ class _MessageBody extends StatelessWidget {
               vertical: AppSpacing.sm,
             ),
             decoration: BoxDecoration(
-              color: AppColors.quoteSurface,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.surfaceContainerHighest
+                  : AppColors.of(context).quoteSurface,
               borderRadius: BorderRadius.circular(AppRadius.sm),
               border: const Border(
                 left: BorderSide(color: AppColors.accent, width: AppSpacing.xs),
@@ -1151,9 +1331,11 @@ class _MessageBody extends StatelessWidget {
         );
       }
     }
-    final style = AppTypography.body(
-      context,
-    )!.copyWith(height: 1.4, color: AppColors.ink);
+    final style = AppTypography.body(context)!.copyWith(
+      fontSize: 15,
+      height: 1.35,
+      color: Theme.of(context).colorScheme.onSurface,
+    );
     final matches = RegExp(r'@\[([^\]]+)\]').allMatches(message.text);
     final spans = <InlineSpan>[];
     var position = 0;
@@ -1262,7 +1444,7 @@ void _showMention(
             const SizedBox(height: 12),
             Text(
               name,
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -1281,7 +1463,7 @@ void _showMention(
                   LucideIcons.messageCircle,
                   size: AppIconSizes.standard,
                 ),
-                label: const Text('Написать сообщение'),
+                label: Text(tr(context, 'Написать сообщение')),
               ),
             ],
           ],
@@ -1345,7 +1527,7 @@ class _AttachmentMessageState extends State<_AttachmentMessage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _FileCard(message: message, failedPreview: true),
-                const Text('Повторить загрузку'),
+                Text(tr(context, 'Повторить загрузку')),
               ],
             ),
           );
@@ -1403,7 +1585,9 @@ class _AttachmentMessageState extends State<_AttachmentMessage> {
           appSnackBar(
             context: context,
             tone: AppSnackBarTone.error,
-            content: Text('Не удалось открыть файл. Попробуйте ещё раз.'),
+            content: Text(
+              tr(context, 'Не удалось открыть файл. Попробуйте ещё раз.'),
+            ),
           ),
         );
       }
@@ -1433,7 +1617,7 @@ class _AttachmentMessageState extends State<_AttachmentMessage> {
                 top: 8,
                 right: 8,
                 child: IconButton.filledTonal(
-                  tooltip: 'Закрыть',
+                  tooltip: tr(context, 'Закрыть'),
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
                 ),
@@ -1459,9 +1643,11 @@ class _FileCard extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 320),
       padding: const EdgeInsets.all(AppSpacing.smMd),
       decoration: BoxDecoration(
-        color: AppColors.quoteSurface,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).colorScheme.surfaceContainerHighest
+            : AppColors.of(context).quoteSurface,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.of(context).border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1490,7 +1676,7 @@ class _FileCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.body(context)?.copyWith(
-                    color: AppColors.ink,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1500,7 +1686,7 @@ class _FileCard extends StatelessWidget {
                     message.text.split(' · ').skip(1).join(' · '),
                     style: AppTypography.caption(
                       context,
-                    )?.copyWith(color: AppColors.muted),
+                    )?.copyWith(color: AppColors.of(context).muted),
                   ),
                 ],
               ],
@@ -1527,7 +1713,7 @@ class _CallMessage extends StatelessWidget {
     final failed =
         status == 'failed' || status == 'cancelled' || status == 'canceled';
     final color = missed || declined || failed
-        ? AppColors.error
+        ? AppColors.of(context).error
         : AppColors.accent;
     final title = video ? 'Видеозвонок' : 'Аудиозвонок';
     final detail = missed
@@ -1580,7 +1766,7 @@ class _CallMessage extends StatelessWidget {
                     appSnackBar(
                       context: context,
                       tone: AppSnackBarTone.info,
-                      content: Text('Звонок недоступен.'),
+                      content: Text(tr(context, 'Звонок недоступен.')),
                     ),
                   );
                 }
@@ -1613,8 +1799,8 @@ class _CallMessage extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: GoogleFonts.manrope(
-                      color: AppColors.ink,
+                    style: GoogleFonts.inter(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1634,8 +1820,8 @@ class _CallMessage extends StatelessWidget {
                       Flexible(
                         child: Text(
                           detail,
-                          style: GoogleFonts.manrope(
-                            color: AppColors.muted,
+                          style: GoogleFonts.inter(
+                            color: AppColors.of(context).muted,
                             fontSize: 12,
                           ),
                         ),
@@ -1666,26 +1852,23 @@ class _MessageAvatar extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.conversation, required this.size});
+  const _Avatar({
+    required this.conversation,
+    required this.size,
+    this.repository,
+  });
+  final ChannelImageRepository? repository;
   final ChatConversationModel conversation;
   final double size;
 
   @override
   Widget build(BuildContext context) {
     if (conversation.isChannel) {
-      return Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(9),
-        ),
-        child: const Icon(
-          LucideIcons.hash,
-          size: AppIconSizes.standard,
-          color: AppColors.accent,
-        ),
+      return ChannelAvatar(
+        channelId: conversation.id,
+        size: size,
+        imageUrl: conversation.imageUrl,
+        repository: repository,
       );
     }
     return UserAvatar(
@@ -1709,13 +1892,13 @@ class _CenteredState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: AppColors.muted, size: 34),
+          Icon(icon, color: AppColors.of(context).muted, size: 34),
           const SizedBox(height: 12),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: GoogleFonts.manrope(
-              color: AppColors.ink,
+            style: GoogleFonts.inter(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1759,9 +1942,15 @@ class _Composer extends StatelessWidget {
       AppSpacing.smMd,
       AppSpacing.smMd,
     ),
-    decoration: const BoxDecoration(
-      color: AppColors.canvas,
-      border: Border(top: BorderSide(color: AppColors.border)),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      border: Border(
+        top: BorderSide(
+          color: Theme.of(
+            context,
+          ).colorScheme.outlineVariant.withValues(alpha: .35),
+        ),
+      ),
     ),
     child: VoiceComposer(
       hasText: hasText,
@@ -1779,25 +1968,27 @@ class _Composer extends StatelessWidget {
         onChanged: onChanged,
         onSubmitted: (_) => onSend(),
         decoration: InputDecoration(
-          hintText: 'Сообщение',
+          hintText: tr(context, 'Сообщение'),
           filled: true,
-          fillColor: AppColors.subtleSurface,
+          fillColor: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: .045),
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
             vertical: AppSpacing.smMd,
           ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            borderSide: const BorderSide(color: AppColors.accent),
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide.none,
           ),
         ),
       ),

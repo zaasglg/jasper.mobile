@@ -1,3 +1,4 @@
+import 'package:jospar/features/projects/presentation/cubit/projects_state.dart';
 import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:jospar/features/projects/domain/entities/create_project_request.dart';
 import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
@@ -159,6 +160,28 @@ void main() {
     await cubit.close();
   });
 
+  test(
+    'selects a nested subproject and preserves selection after refresh',
+    () async {
+      final repository = _FakeProjectRepository(
+        projects: [
+          _project(
+            id: 'parent',
+            workspaceId: workspaceOne,
+            children: [_project(id: 'child', workspaceId: workspaceOne)],
+          ),
+        ],
+      );
+      final cubit = ProjectsCubit(repository);
+      addTearDown(cubit.close);
+      await cubit.loadForWorkspace(workspaceOne);
+      cubit.selectProject('child');
+      expect(cubit.state.selectedProjectId, 'child');
+      await cubit.loadForWorkspace(workspaceOne, refresh: true);
+      expect(cubit.state.selectedProjectId, 'child');
+    },
+  );
+
   test('rejects invalid dates without calling repository', () async {
     final repository = _FakeProjectRepository();
     final cubit = ProjectsCubit(repository);
@@ -248,12 +271,165 @@ void main() {
     await cubit.loadForWorkspace(workspaceOne);
 
     expect(taskRepository.requestedIds, containsAll(<String>['root', 'child']));
-    expect(cubit.state.projectTaskProgress['root'], 67);
-    expect(cubit.state.projectTaskSummaries['root']?.completed, 2);
+    expect(cubit.state.projectTaskProgress['root'], 33);
+    expect(cubit.state.projectTaskSummaries['root']?.completed, 1);
     expect(cubit.state.projectTaskSummaries['root']?.total, 3);
     expect(cubit.state.isProgressLoading, isFalse);
     await cubit.close();
   });
+  test('publishes initial projects only together with task progress', () async {
+    final tasks = _FakeProjectTaskRepository([])
+      ..pending = Completer<List<ProjectTaskModel>>();
+    final cubit = ProjectsCubit(
+      _FakeProjectRepository(
+        projects: [
+          _project(
+            id: 'root',
+            workspaceId: workspaceOne,
+          ).copyWith(progress: 91),
+        ],
+      ),
+      taskRepository: tasks,
+    );
+    addTearDown(cubit.close);
+    final states = <ProjectsState>[];
+    final subscription = cubit.stream.listen(states.add);
+    addTearDown(subscription.cancel);
+    final load = cubit.loadForWorkspace(workspaceOne);
+    await Future<void>.delayed(Duration.zero);
+    expect(cubit.state.isLoading, isTrue);
+    expect(cubit.state.projects, isEmpty);
+    tasks.pending!.complete([
+      const ProjectTaskModel(
+        id: 'one',
+        projectId: 'root',
+        status: 'DONE',
+        progress: 100,
+      ),
+      const ProjectTaskModel(
+        id: 'two',
+        projectId: 'root',
+        status: 'IN_PROGRESS',
+      ),
+    ]);
+    await load;
+    await Future<void>.delayed(Duration.zero);
+    expect(cubit.state.projectTaskProgress['root'], 50);
+    expect(
+      states
+          .where((s) => s.projects.isNotEmpty)
+          .every((s) => s.projectTaskProgress['root'] == 50),
+      isTrue,
+    );
+  });
+
+  test(
+    'refresh retains complete old snapshot until new progress is ready',
+    () async {
+      final repository = _FakeProjectRepository(
+        projects: [
+          _project(
+            id: 'root',
+            workspaceId: workspaceOne,
+          ).copyWith(progress: 91),
+        ],
+      );
+      final tasks = _FakeProjectTaskRepository([
+        const ProjectTaskModel(
+          id: 'one',
+          projectId: 'root',
+          status: 'DONE',
+          progress: 100,
+        ),
+      ]);
+      final cubit = ProjectsCubit(repository, taskRepository: tasks);
+      addTearDown(cubit.close);
+      await cubit.loadForWorkspace(workspaceOne);
+      final previous = cubit.state.projects;
+      repository.projects = [
+        previous.single.copyWith(name: 'Updated', progress: 5),
+      ];
+      tasks.pending = Completer<List<ProjectTaskModel>>();
+      final refresh = cubit.loadForWorkspace(workspaceOne, refresh: true);
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.state.projects, previous);
+      expect(cubit.state.projectTaskProgress['root'], 100);
+      tasks.pending!.complete([]);
+      await refresh;
+      expect(cubit.state.projects.single.name, 'Updated');
+      expect(cubit.state.projectTaskProgress['root'], 0);
+    },
+  );
+
+  test(
+    'failed progress refresh preserves verified percentages and allows retry',
+    () async {
+      final tasks = _FakeProjectTaskRepository([
+        const ProjectTaskModel(
+          id: 'one',
+          projectId: 'root',
+          status: 'DONE',
+          progress: 100,
+        ),
+      ]);
+      final cubit = ProjectsCubit(
+        _FakeProjectRepository(
+          projects: [
+            _project(
+              id: 'root',
+              workspaceId: workspaceOne,
+            ).copyWith(progress: 5),
+          ],
+        ),
+        taskRepository: tasks,
+      );
+      addTearDown(cubit.close);
+      await cubit.loadForWorkspace(workspaceOne);
+      tasks.pending = Completer<List<ProjectTaskModel>>();
+      final refresh = cubit.loadForWorkspace(workspaceOne, refresh: true);
+      await Future<void>.delayed(Duration.zero);
+      tasks.pending!.completeError(Exception('offline'));
+      await refresh;
+      expect(cubit.state.projectTaskProgress['root'], 100);
+      expect(cubit.state.isLoading, isFalse);
+      expect(cubit.state.progressErrorMessage, isNotNull);
+      tasks.pending = null;
+      await cubit.loadForWorkspace(workspaceOne, refresh: true);
+      expect(cubit.state.errorMessage, isNull);
+      expect(cubit.state.progressErrorMessage, isNull);
+    },
+  );
+  test(
+    'initial progress failure shows retry instead of an unverified percentage',
+    () async {
+      final tasks = _FakeProjectTaskRepository([])
+        ..pending = Completer<List<ProjectTaskModel>>();
+      final cubit = ProjectsCubit(
+        _FakeProjectRepository(
+          projects: [
+            _project(
+              id: 'root',
+              workspaceId: workspaceOne,
+            ).copyWith(progress: 91),
+          ],
+        ),
+        taskRepository: tasks,
+      );
+      addTearDown(cubit.close);
+      final load = cubit.loadForWorkspace(workspaceOne);
+      await Future<void>.delayed(Duration.zero);
+      tasks.pending!.completeError(Exception('offline'));
+      await load;
+      expect(cubit.state.projects, isEmpty);
+      expect(cubit.state.errorMessage, isNotNull);
+      expect(cubit.state.isLoading, isFalse);
+      tasks.pending = null;
+      await cubit.loadForWorkspace(workspaceOne);
+      expect(cubit.state.projects.single.id, 'root');
+      expect(cubit.state.projectTaskProgress['root'], 0);
+      expect(cubit.state.errorMessage, isNull);
+    },
+  );
 }
 
 ProjectModel _project({
@@ -285,6 +461,20 @@ CreateProjectRequest _request({DateTime? start, DateTime? end}) {
 }
 
 class _FakeProjectRepository implements ProjectRepository {
+  @override
+  Future<void> setPinned(String id, bool pinned) async {}
+  @override
+  Future<void> archiveProject(String id) async {}
+
+  @override
+  Future<void> moveProject(
+    String id, {
+    required String workspaceId,
+    String? parentId,
+    String? anchorId,
+    required String placement,
+  }) async {}
+
   _FakeProjectRepository({
     this.projects = const <ProjectModel>[],
     this.createCompleter,
@@ -321,7 +511,8 @@ class _FakeProjectRepository implements ProjectRepository {
 class _FakeProjectTaskRepository implements ProjectTaskRepository {
   _FakeProjectTaskRepository(this.tasks);
 
-  final List<ProjectTaskModel> tasks;
+  List<ProjectTaskModel> tasks;
+  Completer<List<ProjectTaskModel>>? pending;
   List<String> requestedIds = const <String>[];
 
   @override
@@ -329,6 +520,6 @@ class _FakeProjectTaskRepository implements ProjectTaskRepository {
     List<String> projectIds,
   ) async {
     requestedIds = projectIds;
-    return tasks;
+    return pending?.future ?? tasks;
   }
 }

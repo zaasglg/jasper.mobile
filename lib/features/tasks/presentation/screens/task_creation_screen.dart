@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -63,7 +64,9 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
               ),
               Expanded(
                 child: values.isEmpty
-                    ? const Center(child: Text('Нет доступных вариантов'))
+                    ? Center(
+                        child: Text(tr(context, 'Нет доступных вариантов')),
+                      )
                     : ListView(
                         children: [
                           for (final value in values)
@@ -86,7 +89,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                 padding: const EdgeInsets.all(20),
                 child: AppFormButton(
                   onPressed: () => Navigator.pop(context, selected),
-                  child: const Text('Готово'),
+                  child: Text(tr(context, 'Готово')),
                 ),
               ),
             ],
@@ -191,7 +194,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     Widget? trailing,
     Key? key,
   }) => Material(
-    color: AppColors.subtleSurface,
+    color: AppColors.of(context).subtleSurface,
     borderRadius: BorderRadius.circular(12),
     child: InkWell(
       key: key,
@@ -201,7 +204,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           children: [
-            Icon(icon, size: 16, color: AppColors.muted),
+            Icon(icon, size: 16, color: AppColors.of(context).muted),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -240,18 +243,18 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
         canPop: !busy,
         child: AppFormSurface(
           child: Scaffold(
-            backgroundColor: Colors.white,
+            backgroundColor: AppColors.of(context).canvas,
             appBar: AppBar(
-              title: const Text(
-                'Добавить задачу',
+              title: Text(
+                tr(context, 'Добавить задачу'),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
               leading: IconButton(
-                tooltip: 'Отмена',
+                tooltip: tr(context, 'Отмена'),
                 onPressed: busy ? null : context.pop,
                 icon: const Icon(LucideIcons.x, size: 18),
               ),
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.of(context).canvas,
               surfaceTintColor: Colors.transparent,
             ),
             body: SafeArea(
@@ -278,8 +281,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                             textCapitalization: TextCapitalization.sentences,
                             minLines: 1,
                             maxLines: 3,
-                            decoration: const InputDecoration(
-                              hintText: 'Название задачи',
+                            decoration: InputDecoration(
+                              hintText: tr(context, 'Название задачи'),
                             ),
                             onChanged: (value) => cubit.change(
                               cubit.state.draft.copyWith(title: value),
@@ -288,11 +291,13 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                         ),
                         if (state.catalog != null &&
                             state.catalog!.workspaces.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 16),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
                             child: Text(
-                              'Нет доступных workspace',
-                              style: TextStyle(color: AppColors.muted),
+                              tr(context, 'Нет доступных workspace'),
+                              style: TextStyle(
+                                color: AppColors.of(context).muted,
+                              ),
                             ),
                           ),
                         _field(
@@ -305,8 +310,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                                 ? null
                                 : draft.workspaceId,
                             isExpanded: true,
-                            decoration: const InputDecoration(
-                              hintText: 'Выберите workspace',
+                            decoration: InputDecoration(
+                              hintText: tr(context, 'Выберите workspace'),
                             ),
                             items: [
                               for (final workspace
@@ -342,8 +347,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                               hintText:
                                   state.projects.isEmpty &&
                                       !state.loadingProjects
-                                  ? 'Нет доступных проектов'
-                                  : 'Выберите проект',
+                                  ? tr(context, 'Нет доступных проектов')
+                                  : tr(context, 'Выберите проект'),
                             ),
                             items: [
                               for (final project in state.projects)
@@ -377,10 +382,10 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                             isExpanded: true,
                             decoration: InputDecoration(
                               hintText: draft.projectId.isEmpty
-                                  ? 'Сначала выберите проект'
+                                  ? tr(context, 'Сначала выберите проект')
                                   : state.loadingOptions
-                                  ? 'Загрузка колонок…'
-                                  : 'Выберите колонку',
+                                  ? tr(context, 'Загрузка колонок…')
+                                  : tr(context, 'Выберите колонку'),
                             ),
                             items: [
                               for (final column in state.options.columns)
@@ -402,13 +407,16 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                           ),
                         ),
                         if (ready && state.options.columns.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 16),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
                             child: Text(
-                              'В проекте нет активных колонок. Создайте колонку в проекте.',
+                              tr(
+                                context,
+                                'В проекте нет активных колонок. Создайте колонку в проекте.',
+                              ),
                               style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.muted,
+                                color: AppColors.of(context).muted,
                               ),
                             ),
                           ),
@@ -433,7 +441,9 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                                   value: i,
                                   child: Text(
                                     i == state.siblings.length + 1
-                                        ? '$i (в конец)'
+                                        ? tr(context, "{p0} (в конец)", {
+                                            'p0': i,
+                                          })
                                         : '$i',
                                   ),
                                 ),
@@ -460,10 +470,10 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                                 : epicNames,
                             icon: LucideIcons.layers,
                             onTap: busy || !ready ? null : _epics,
-                            trailing: const Icon(
+                            trailing: Icon(
                               LucideIcons.chevronDown,
                               size: 16,
-                              color: AppColors.muted,
+                              color: AppColors.of(context).muted,
                             ),
                           ),
                         ),
@@ -477,13 +487,13 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                             icon: LucideIcons.calendarClock,
                             onTap: busy ? null : _deadline,
                             trailing: draft.end == null
-                                ? const Icon(
+                                ? Icon(
                                     LucideIcons.pencil,
                                     size: 16,
-                                    color: AppColors.muted,
+                                    color: AppColors.of(context).muted,
                                   )
                                 : IconButton(
-                                    tooltip: 'Убрать срок',
+                                    tooltip: tr(context, 'Убрать срок'),
                                     onPressed: busy
                                         ? null
                                         : () => cubit.change(
@@ -558,11 +568,11 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                                 ],
                               ),
                               const SizedBox(height: 6),
-                              const Text(
-                                'Рабочий день — 8 часов',
+                              Text(
+                                tr(context, 'Рабочий день — 8 часов'),
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: AppColors.muted,
+                                  color: AppColors.of(context).muted,
                                 ),
                               ),
                             ],
@@ -582,10 +592,10 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                                     draft.workspaceId.isEmpty
                                 ? null
                                 : _members,
-                            trailing: const Icon(
+                            trailing: Icon(
                               LucideIcons.plus,
                               size: 16,
-                              color: AppColors.muted,
+                              color: AppColors.of(context).muted,
                             ),
                           ),
                         ),
@@ -608,7 +618,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   trailing: IconButton(
-                                    tooltip: 'Убрать файл',
+                                    tooltip: tr(context, 'Убрать файл'),
                                     onPressed: busy
                                         ? null
                                         : () => cubit.change(
@@ -630,23 +640,23 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                                 ),
                                 label: Text(
                                   _picking
-                                      ? 'Подготовка файлов…'
-                                      : 'Прикрепить файлы',
+                                      ? tr(context, 'Подготовка файлов…')
+                                      : tr(context, 'Прикрепить файлы'),
                                 ),
                               ),
-                              const Text(
-                                'До 10 МБ на файл, до 35 МБ всего',
+                              Text(
+                                tr(context, 'До 10 МБ на файл, до 35 МБ всего'),
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: AppColors.muted,
+                                  color: AppColors.of(context).muted,
                                 ),
                               ),
                               if (_fileError != null)
                                 Text(
                                   _fileError!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
-                                    color: AppColors.error,
+                                    color: AppColors.of(context).error,
                                   ),
                                 ),
                             ],
@@ -657,7 +667,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                             state.catalog == null)
                           TextButton(
                             onPressed: () => cubit.initialize(),
-                            child: const Text('Повторить загрузку'),
+                            child: Text(tr(context, 'Повторить загрузку')),
                           ),
                         if (!busy &&
                             state.error != null &&
@@ -666,7 +676,9 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                           TextButton(
                             onPressed: () =>
                                 cubit.selectWorkspace(state.draft.workspaceId),
-                            child: const Text('Повторить загрузку проектов'),
+                            child: Text(
+                              tr(context, 'Повторить загрузку проектов'),
+                            ),
                           ),
                         if (!busy &&
                             state.error != null &&
@@ -675,7 +687,9 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                           TextButton(
                             onPressed: () =>
                                 cubit.selectProject(state.draft.projectId),
-                            child: const Text('Повторить загрузку параметров'),
+                            child: Text(
+                              tr(context, 'Повторить загрузку параметров'),
+                            ),
                           ),
                       ],
                     ),
@@ -684,11 +698,11 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                       child: Text(
-                        state.error!,
+                        tr(context, state.error!),
                         key: const Key('create-task-error'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.error,
+                          color: AppColors.of(context).error,
                         ),
                       ),
                     ),
@@ -701,7 +715,11 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                         onPressed: state.canSubmit && !_picking
                             ? _submit
                             : null,
-                        child: Text(busy ? 'Создание…' : 'Добавить задачу'),
+                        child: Text(
+                          busy
+                              ? tr(context, 'Создание…')
+                              : tr(context, 'Добавить задачу'),
+                        ),
                       ),
                     ),
                   ),

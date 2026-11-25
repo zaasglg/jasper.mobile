@@ -1,3 +1,6 @@
+import 'package:forui/forui.dart';
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../domain/entities/assistant_attachment.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -9,117 +12,201 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../storage/presentation/storage_file_screen.dart';
 import '../../domain/entities/assistant_message_model.dart';
 
-abstract final class _AiColors {
-  static const ink = Color(0xFF1C1C2B);
-  static const muted = Color(0xFF82829E);
-  static const surface = Color(0xFFF7F7F5);
-}
-
 class AssistantWebHeader extends StatelessWidget {
   const AssistantWebHeader({
     super.key,
     required this.workspaceName,
     required this.onStopVoice,
     required this.onVoiceHelp,
+    this.onHistory,
+    this.onNewConversation,
   });
   final String workspaceName;
   final VoidCallback onStopVoice, onVoiceHelp;
+  final VoidCallback? onHistory, onNewConversation;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
-    decoration: const BoxDecoration(
-      border: Border(bottom: BorderSide(color: AppColors.border)),
-    ),
-    child: Column(
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: .1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SvgPicture.asset('assets/images/JBee.svg'),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ai',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: _AiColors.ink,
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.canvas,
+        border: Border(bottom: BorderSide(color: colors.border)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: colors.accent.withValues(alpha: .1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: SvgPicture.asset(
+                        'assets/images/JBee.svg',
+                        colorFilter: ColorFilter.mode(
+                          colors.accent,
+                          BlendMode.srcIn,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  const Text(
-                    'AI-агент · задачи и проекты',
-                    style: TextStyle(fontSize: 12, color: _AiColors.muted),
-                  ),
-                ],
-              ),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'Действия помощника',
-              onSelected: (v) => v == 'voice' ? onStopVoice() : onVoiceHelp(),
-              itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'voice',
-                  child: Text('Остановить озвучивание'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ai',
+                            style: GoogleFonts.inter(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: colors.ink,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            tr(context, 'AI-агент · задачи и проекты'),
+                            style: TextStyle(fontSize: 12, color: colors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    FTheme(
+                      data: Theme.of(context).brightness == Brightness.dark
+                          ? FTheme.neutral.dark.touch
+                          : FTheme.neutral.light.touch,
+                      child: FPopoverMenu(
+                        menuAnchor: Alignment.topRight,
+                        childAnchor: Alignment.bottomRight,
+                        menuBuilder: (context, controller, _) => [
+                          FItemGroup(
+                            children: [
+                              FItem(
+                                prefix: const Icon(
+                                  LucideIcons.volumeX,
+                                  size: 16,
+                                ),
+                                title: Text(
+                                  tr(context, 'Остановить озвучивание'),
+                                ),
+                                onPress: () {
+                                  controller.hide();
+                                  onStopVoice();
+                                },
+                              ),
+                              FItem(
+                                prefix: const Icon(LucideIcons.mic, size: 16),
+                                title: Text(tr(context, 'Голосовой вызов')),
+                                onPress: () {
+                                  controller.hide();
+                                  onVoiceHelp();
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                        builder: (context, controller, _) => IconButton(
+                          tooltip: tr(context, 'Действия помощника'),
+                          onPressed: controller.toggle,
+                          icon: Icon(
+                            LucideIcons.ellipsis,
+                            size: 20,
+                            color: colors.muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: tr(context, 'Закрыть'),
+                      onPressed: () {
+                        if (context.canPop()) context.pop();
+                      },
+                      icon: Icon(LucideIcons.x, size: 20, color: colors.ink),
+                    ),
+                  ],
                 ),
-                const PopupMenuItem(
-                  value: 'help',
-                  child: Text('Голосовой вызов'),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(
+                      LucideIcons.folderKanban,
+                      size: 14,
+                      color: colors.muted,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      tr(context, 'Контекст'),
+                      style: TextStyle(fontSize: 12, color: colors.muted),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        workspaceName.isEmpty
+                            ? tr(context, 'Рабочее пространство не выбрано')
+                            : workspaceName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: colors.ink),
+                      ),
+                    ),
+                  ],
                 ),
               ],
-              icon: const Icon(
-                LucideIcons.ellipsis,
-                size: 18,
-                color: _AiColors.muted,
+            ),
+          ),
+          Divider(height: 1, color: colors.border),
+          Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: tr(context, 'История диалогов'),
+                      onPressed: onHistory,
+                      icon: const Icon(LucideIcons.panelLeft, size: 18),
+                      color: colors.muted,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        tr(context, 'Новый чат'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: colors.ink,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: tr(context, 'Новый диалог'),
+                      onPressed: onNewConversation,
+                      icon: const Icon(LucideIcons.plus, size: 18),
+                      color: colors.muted,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            IconButton(
-              tooltip: 'Закрыть',
-              onPressed: () => Navigator.maybePop(context),
-              icon: const Icon(LucideIcons.x, size: 18, color: _AiColors.ink),
-            ),
-          ],
-        ),
-        const SizedBox(height: 15),
-        Row(
-          children: [
-            const Icon(
-              LucideIcons.folderKanban,
-              size: 14,
-              color: _AiColors.muted,
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'Контекст',
-              style: TextStyle(fontSize: 12, color: _AiColors.muted),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                workspaceName.isEmpty
-                    ? 'Рабочее пространство не выбрано'
-                    : workspaceName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: _AiColors.ink),
+              PositionedDirectional(
+                top: 0,
+                start: 16,
+                child: Container(width: 48, height: 2, color: colors.accent),
               ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class AssistantWebWelcome extends StatelessWidget {
@@ -135,34 +222,42 @@ class AssistantWebWelcome extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        hasWorkspace ? 'Что поручим агенту?' : 'Выберите рабочее пространство',
+        hasWorkspace
+            ? tr(context, 'Что поручим агенту?')
+            : tr(context, 'Выберите рабочее пространство'),
         style: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w500,
           letterSpacing: -.35,
           height: 1.3,
-          color: _AiColors.ink,
+          color: AppColors.of(context).ink,
         ),
       ),
       const SizedBox(height: 10),
       Text(
         hasWorkspace
-            ? 'Найду нужные данные, покажу задачи и сроки, подготовлю новую задачу или изменения существующей.'
-            : 'Выберите пространство в боковом меню — тогда агент сможет работать с его задачами, проектами и сообщениями.',
-        style: const TextStyle(
+            ? tr(
+                context,
+                'Найду нужные данные, покажу задачи и сроки, подготовлю новую задачу или изменения существующей.',
+              )
+            : tr(
+                context,
+                'Выберите пространство в боковом меню — тогда агент сможет работать с его задачами, проектами и сообщениями.',
+              ),
+        style: TextStyle(
           fontSize: 14,
           height: 1.6,
-          color: _AiColors.muted,
+          color: AppColors.of(context).muted,
         ),
       ),
       if (hasWorkspace) ...[
         const SizedBox(height: 28),
-        const Text(
-          'Начните с поручения',
+        Text(
+          tr(context, 'Начните с поручения'),
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: _AiColors.muted,
+            color: AppColors.of(context).muted,
           ),
         ),
         const SizedBox(height: 8),
@@ -196,7 +291,7 @@ class AssistantWebWelcome extends StatelessWidget {
             onPressed: () => onSuggestion(item.prompt),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
-              foregroundColor: _AiColors.ink,
+              foregroundColor: AppColors.of(context).ink,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -211,7 +306,7 @@ class AssistantWebWelcome extends StatelessWidget {
                     children: [
                       Text(
                         item.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -219,18 +314,18 @@ class AssistantWebWelcome extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         item.description,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: _AiColors.muted,
+                          color: AppColors.of(context).muted,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   LucideIcons.arrowUpRight,
                   size: 16,
-                  color: _AiColors.muted,
+                  color: AppColors.of(context).muted,
                 ),
               ],
             ),
@@ -254,9 +349,14 @@ class AssistantWebMessage extends StatelessWidget {
             : CrossAxisAlignment.start,
         children: [
           if (user)
-            const Text(
-              'Вы',
-              style: TextStyle(fontSize: 14, color: _AiColors.muted),
+            Text(
+              message.cancelled
+                  ? tr(context, 'Вы · ответ остановлен')
+                  : tr(context, 'Вы'),
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.of(context).muted,
+              ),
             )
           else
             Row(
@@ -264,15 +364,23 @@ class AssistantWebMessage extends StatelessWidget {
                 SizedBox(
                   width: 20,
                   height: 20,
-                  child: SvgPicture.asset('assets/images/JBee.svg'),
+                  child: SvgPicture.asset(
+                    'assets/images/JBee.svg',
+                    colorFilter: Theme.of(context).brightness == Brightness.dark
+                        ? ColorFilter.mode(
+                            AppColors.of(context).accent,
+                            BlendMode.srcIn,
+                          )
+                        : null,
+                  ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Ai',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: _AiColors.ink,
+                    color: AppColors.of(context).ink,
                   ),
                 ),
               ],
@@ -287,7 +395,7 @@ class AssistantWebMessage extends StatelessWidget {
                 : EdgeInsets.zero,
             decoration: user
                 ? BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: .1),
+                    color: AppColors.of(context).accent.withValues(alpha: .1),
                     borderRadius: BorderRadius.circular(12),
                   )
                 : null,
@@ -306,45 +414,71 @@ class AssistantWebMessage extends StatelessWidget {
                       ],
                     ),
                   ),
-                if (user)
+                if (message.attachments.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final file in message.attachments)
+                          AssistantFileTile(file: file),
+                      ],
+                    ),
+                  ),
+                if (message.attachmentMessage?.isNotEmpty == true)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      message.attachmentMessage!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: AppColors.of(context).muted,
+                      ),
+                    ),
+                  ),
+                if (user && message.content.isNotEmpty)
                   SelectableText(
                     message.content,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       height: 1.6,
-                      color: _AiColors.ink,
+                      color: AppColors.of(context).ink,
                     ),
                   )
-                else
+                else if (!user && message.content.isNotEmpty)
                   MarkdownBody(
                     data: message.content,
                     selectable: true,
                     styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
                         .copyWith(
-                          p: const TextStyle(
+                          p: TextStyle(
                             fontSize: 14,
                             height: 1.65,
-                            color: _AiColors.ink,
+                            color: AppColors.of(context).ink,
                           ),
-                          h1: const TextStyle(
+                          h1: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
                           ),
-                          h2: const TextStyle(
+                          h2: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
-                          h3: const TextStyle(
+                          h3: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
-                          a: const TextStyle(color: AppColors.accent),
+                          a: TextStyle(color: AppColors.of(context).accent),
                           blockSpacing: 8,
                           codeblockDecoration: BoxDecoration(
-                            color: _AiColors.surface,
+                            color: AppColors.of(context).subtleSurface,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          tableBorder: TableBorder.all(color: AppColors.border),
+                          tableBorder: TableBorder.all(
+                            color: AppColors.of(context).border,
+                          ),
                         ),
                     onTapLink: (text, href, title) {
                       final uri = Uri.tryParse(href ?? '');
@@ -389,7 +523,7 @@ class AssistantImageThumb extends StatelessWidget {
           errorBuilder: (_, _, _) => SizedBox(
             width: size,
             height: size,
-            child: const Icon(LucideIcons.imageOff, size: 16),
+            child: Icon(LucideIcons.imageOff, size: 16),
           ),
         ),
       );
@@ -397,7 +531,7 @@ class AssistantImageThumb extends StatelessWidget {
       return SizedBox(
         width: size,
         height: size,
-        child: const Icon(LucideIcons.imageOff, size: 16),
+        child: Icon(LucideIcons.imageOff, size: 16),
       );
     }
   }
@@ -412,66 +546,50 @@ class AssistantWebComposer extends StatelessWidget {
     required this.sending,
     required this.listening,
     required this.picking,
-    required this.images,
+    required this.attachments,
     required this.onSend,
     required this.onVoice,
     required this.onAttach,
     required this.onRemove,
+    this.onDayPlan,
   });
   final TextEditingController input;
   final FocusNode focus;
   final bool enabled, sending, listening, picking;
-  final List<String> images;
+  final List<AssistantAttachment> attachments;
   final VoidCallback onSend, onVoice, onAttach;
   final ValueChanged<int> onRemove;
+  final VoidCallback? onDayPlan;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      border: Border(top: BorderSide(color: AppColors.border)),
+    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+    decoration: BoxDecoration(
+      color: AppColors.of(context).canvas,
+      border: Border(top: BorderSide(color: AppColors.of(context).border)),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (images.isNotEmpty)
+        if (attachments.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
-                for (var i = 0; i < images.length; i++)
-                  Stack(
-                    children: [
-                      AssistantImageThumb(data: images[i]),
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: InkWell(
-                          onTap: enabled ? () => onRemove(i) : null,
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              color: _AiColors.ink.withValues(alpha: .8),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Icon(
-                              LucideIcons.x,
-                              size: 12,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                for (var i = 0; i < attachments.length; i++)
+                  AssistantFileTile(
+                    file: attachments[i],
+                    onRemove: enabled ? () => onRemove(i) : null,
                   ),
               ],
             ),
           ),
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.of(context).border),
+            color: AppColors.of(context).subtleSurface,
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
             children: [
@@ -479,23 +597,24 @@ class AssistantWebComposer extends StatelessWidget {
                 key: const Key('assistant-input'),
                 controller: input,
                 focusNode: focus,
-                minLines: MediaQuery.viewInsetsOf(context).bottom > 0 ? 1 : 2,
+                minLines: 1,
                 maxLines: 5,
                 enabled: enabled,
-                style: const TextStyle(
-                  fontSize: 14,
+                cursorColor: AppColors.of(context).accent,
+                style: TextStyle(
+                  fontSize: 15,
                   height: 1.5,
-                  color: _AiColors.ink,
+                  color: AppColors.of(context).ink,
                 ),
                 decoration: InputDecoration(
                   hintText: enabled
-                      ? 'Опишите задачу для агента…'
-                      : 'Сначала выберите рабочее пространство',
-                  hintStyle: const TextStyle(
-                    fontSize: 14,
-                    color: _AiColors.muted,
+                      ? tr(context, 'Опишите задачу для агента…')
+                      : tr(context, 'Сначала выберите рабочее пространство'),
+                  hintStyle: TextStyle(
+                    fontSize: 15,
+                    color: AppColors.of(context).muted,
                   ),
-                  contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                  contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                   filled: false,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
@@ -509,7 +628,10 @@ class AssistantWebComposer extends StatelessWidget {
                   children: [
                     IconButton(
                       key: const Key('assistant-attach'),
-                      tooltip: 'Прикрепить изображение',
+                      tooltip: tr(
+                        context,
+                        'Прикрепить файл (до 3 файлов по 8 МБ)',
+                      ),
                       onPressed: enabled && !picking ? onAttach : null,
                       icon: picking
                           ? const SizedBox(
@@ -517,44 +639,60 @@ class AssistantWebComposer extends StatelessWidget {
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(
+                          : Icon(
                               LucideIcons.paperclip,
-                              size: 16,
-                              color: _AiColors.muted,
+                              size: 20,
+                              color: AppColors.of(context).muted,
                             ),
                     ),
                     IconButton(
                       key: const Key('assistant-microphone'),
                       tooltip: listening
-                          ? 'Остановить запись'
-                          : 'Задать вопрос голосом',
+                          ? tr(context, 'Остановить запись')
+                          : tr(context, 'Задать вопрос голосом'),
                       onPressed: enabled ? onVoice : null,
                       icon: Icon(
                         listening ? LucideIcons.square : LucideIcons.mic,
-                        size: 16,
-                        color: listening ? AppColors.accent : _AiColors.muted,
+                        size: 20,
+                        color: listening
+                            ? AppColors.of(context).accent
+                            : AppColors.of(context).muted,
                       ),
                     ),
+                    if (onDayPlan != null)
+                      IconButton(
+                        key: const Key('assistant-ai-day-plan'),
+                        tooltip: tr(context, 'План дня через AI'),
+                        onPressed: enabled && !listening && !picking
+                            ? onDayPlan
+                            : null,
+                        icon: const Icon(LucideIcons.calendarDays, size: 20),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          foregroundColor: AppColors.of(context).muted,
+                        ),
+                      ),
                     const Spacer(),
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: input,
                       builder: (context, value, _) => SizedBox(
-                        width: 32,
-                        height: 32,
+                        width: 44,
+                        height: 44,
                         child: FilledButton(
                           key: const Key('assistant-send'),
                           onPressed:
                               enabled &&
                                   !picking &&
                                   (value.text.trim().isNotEmpty ||
-                                      images.isNotEmpty)
+                                      attachments.isNotEmpty)
                               ? onSend
                               : null,
                           style: FilledButton.styleFrom(
                             padding: EdgeInsets.zero,
-                            backgroundColor: AppColors.accent,
+                            backgroundColor: AppColors.of(context).accent,
+                            foregroundColor: AppColors.of(context).onAccent,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: sending
@@ -566,7 +704,7 @@ class AssistantWebComposer extends StatelessWidget {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(LucideIcons.send, size: 15),
+                              : Icon(LucideIcons.arrowUp, size: 20),
                         ),
                       ),
                     ),
@@ -576,19 +714,23 @@ class AssistantWebComposer extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 10),
-        const Row(
+        const SizedBox(height: 8),
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(LucideIcons.shieldCheck, size: 12, color: _AiColors.muted),
+            Icon(
+              LucideIcons.shieldCheck,
+              size: 14,
+              color: AppColors.of(context).muted,
+            ),
             SizedBox(width: 6),
             Expanded(
               child: Text(
-                'Создание задач требует подтверждения. Изменения своих задач сохраняются сразу.',
+                tr(context, 'Создание — с подтверждением. Изменения — сразу.'),
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.45,
-                  color: _AiColors.muted,
+                  color: AppColors.of(context).muted,
                 ),
               ),
             ),
@@ -597,4 +739,109 @@ class AssistantWebComposer extends StatelessWidget {
       ],
     ),
   );
+}
+
+class AssistantFileTile extends StatelessWidget {
+  const AssistantFileTile({super.key, required this.file, this.onRemove});
+  final AssistantAttachment file;
+  final VoidCallback? onRemove;
+  @override
+  Widget build(BuildContext context) {
+    final report = file.dataUrl == null;
+    final unsupported = file.status == 'unsupported';
+    final label = !report
+        ? (file.size < 1024 * 1024
+              ? '${(file.size / 1024).ceil()} КБ'
+              : '${(file.size / (1024 * 1024)).toStringAsFixed(1)} МБ')
+        : unsupported
+        ? 'Не прочитан'
+        : file.status == 'analyzed'
+        ? file.truncated
+              ? 'Прочитан частично'
+              : file.analysisMode == 'vision'
+              ? 'Распознано изображение'
+              : file.analysisMode == 'text'
+              ? 'Прочитан текст'
+              : 'Файл обработан'
+        : 'Статус чтения неизвестен';
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 260),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.of(context).subtleSurface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.of(context).border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (file.isImage)
+            AssistantImageThumb(data: file.dataUrl!, size: 32)
+          else
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Icon(
+                unsupported || file.truncated
+                    ? LucideIcons.triangleAlert
+                    : LucideIcons.file,
+                size: 20,
+                color: unsupported
+                    ? AppColors.of(context).error
+                    : AppColors.of(context).accent,
+              ),
+            ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  file.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.of(context).muted,
+                  ),
+                ),
+                if (file.reason?.isNotEmpty == true)
+                  Text(
+                    file.reason!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.4,
+                      color: AppColors.of(context).muted,
+                    ),
+                  ),
+                if (file.truncated)
+                  Text(
+                    tr(context, 'Обработана только часть содержимого.'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.4,
+                      color: AppColors.of(context).muted,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (onRemove != null)
+            IconButton(
+              tooltip: tr(context, "Убрать {p0}", {'p0': file.name}),
+              onPressed: onRemove,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              padding: EdgeInsets.zero,
+              icon: Icon(LucideIcons.x, size: 16),
+            ),
+        ],
+      ),
+    );
+  }
 }

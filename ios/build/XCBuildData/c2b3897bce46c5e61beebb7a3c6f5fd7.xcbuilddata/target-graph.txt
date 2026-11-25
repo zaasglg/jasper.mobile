@@ -1,0 +1,11 @@
+Target dependency graph (5 targets)
+Target 'InboxHomeWidget' in project 'Runner'
+➜ Explicit dependency on target 'home-widget' in project 'home_widget'
+Target 'home-widget' in project 'home_widget'
+➜ Explicit dependency on target 'home_widget' in project 'home_widget'
+➜ Explicit dependency on target 'FlutterFramework' in project 'FlutterFramework'
+Target 'home_widget' in project 'home_widget'
+➜ Explicit dependency on target 'FlutterFramework' in project 'FlutterFramework'
+Target 'FlutterFramework' in project 'FlutterFramework'
+➜ Explicit dependency on target 'FlutterFramework' in project 'FlutterFramework'
+Target 'FlutterFramework' in project 'FlutterFramework' (no dependencies)

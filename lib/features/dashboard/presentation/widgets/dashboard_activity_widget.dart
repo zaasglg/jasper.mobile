@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_selector.dart';
 import 'dashboard_widget_skeleton.dart';
@@ -6,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/html_text.dart';
-import '../../../../core/widgets/user_avatar.dart';
 import 'dashboard_widget_panel.dart' show dashboardObject;
 
 class DashboardActivityWidget extends StatefulWidget {
@@ -96,7 +96,7 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
         'COMMENT_ADDED' => (
           label: 'Комментарий',
           icon: LucideIcons.messageSquare,
-          color: AppColors.muted,
+          color: AppColors.of(context).muted,
         ),
         'PROJECT_CREATED' => (
           label: 'Проект создан',
@@ -121,7 +121,7 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
         'USER_LOGIN' => (
           label: 'Вход в систему',
           icon: LucideIcons.logIn,
-          color: AppColors.muted,
+          color: AppColors.of(context).muted,
         ),
         'MENTION' => (
           label: 'Упоминание',
@@ -138,7 +138,11 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
           icon: LucideIcons.mail,
           color: const Color(0xFF3B82C4),
         ),
-        _ => (label: 'Событие', icon: LucideIcons.dot, color: AppColors.muted),
+        _ => (
+          label: 'Событие',
+          icon: LucideIcons.dot,
+          color: AppColors.of(context).muted,
+        ),
       };
   Widget _entry(Map<String, dynamic> entry) {
     final type = entry['type']?.toString().toUpperCase() ?? '';
@@ -191,37 +195,32 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 3,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: style.color.withValues(alpha: .09),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            style.label,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: style.color,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       Text(
-                        _time(entry['createdAt']),
-                        style: const TextStyle(
-                          fontSize: 9,
-                          color: AppColors.muted,
+                        style.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.3,
+                          color: type == 'USER_LOGIN'
+                              ? const Color(0xFF71717A)
+                              : style.color,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
+                      if (_time(entry['createdAt']).isNotEmpty)
+                        Text(
+                          _time(entry['createdAt']),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            height: 1.3,
+                            color: Color(0xFF71717A),
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -237,8 +236,10 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
                             ),
                           ),
                         TextSpan(
-                          text: text.isEmpty
-                              ? 'Событие рабочего пространства'
+                          text: type == 'USER_LOGIN'
+                              ? (name.isEmpty ? 'Пользователь' : '')
+                              : text.isEmpty
+                              ? tr(context, 'Событие рабочего пространства')
                               : text,
                         ),
                         if (displayId.isNotEmpty)
@@ -251,40 +252,12 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
                           ),
                       ],
                     ),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF72728A),
-                      height: 1.45,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.of(context).ink,
+                      height: 1.4,
                     ),
                   ),
-                  if (user.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Row(
-                        children: [
-                          UserAvatar(
-                            size: 16,
-                            userId: user['id']?.toString(),
-                            name: name,
-                            avatarUrl:
-                                (user['avatarUrl'] ?? user['avatar'])
-                                    as String?,
-                            backgroundColor: AppColors.muted,
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              name,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: AppColors.muted,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -297,12 +270,12 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
   Widget _entries(List<Map<String, dynamic>> entries) {
     final visible = entries.take(6).toList();
     if (visible.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 32),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
         child: Text(
-          'Нет событий',
+          tr(context, 'Нет событий'),
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, color: AppColors.muted),
+          style: TextStyle(fontSize: 12, color: AppColors.of(context).muted),
         ),
       );
     }
@@ -311,7 +284,7 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
         for (var i = 0; i < visible.length; i++) ...[
           _entry(visible[i]),
           if (i + 1 < visible.length)
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.of(context).border),
         ],
       ],
     );
@@ -321,16 +294,17 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
+      if (!WidgetCollapseScope.hidesHeading(context)) ...[
+        AppWidgetHeading(
+          icon: LucideIcons.clock,
+          title: tr(context, 'Последняя активность'),
+        ),
+        const SizedBox(height: 8),
+      ],
       Row(
         children: [
-          const Expanded(
-            child: AppWidgetHeading(
-              icon: LucideIcons.clock,
-              title: 'Последняя активность',
-            ),
-          ),
           DashboardSelector<String>(
-            tooltip: 'Категория активности',
+            tooltip: tr(context, 'Категория активности'),
             onSelected: _select,
             itemBuilder: (_) => [
               for (final entry in categories.entries)
@@ -347,15 +321,17 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
                   Text(
                     categories[_category]!,
                     style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.muted,
+                      fontSize: 12,
+                      height: 1.4,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF71717A),
                     ),
                   ),
                   const SizedBox(width: 5),
-                  const Icon(
+                  Icon(
                     LucideIcons.chevronDown,
                     size: 14,
-                    color: AppColors.muted,
+                    color: AppColors.of(context).muted,
                   ),
                 ],
               ),
@@ -364,7 +340,7 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
           ?widget.trailing,
         ],
       ),
-      const SizedBox(height: 6),
+      const SizedBox(height: 2),
       if (_category == 'all')
         _entries(widget.entries)
       else
@@ -377,16 +353,19 @@ class _DashboardActivityWidgetState extends State<DashboardActivityWidget> {
             if (snapshot.hasError) {
               return Column(
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.all(20),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
                     child: Text(
-                      'Не удалось загрузить активность',
-                      style: TextStyle(fontSize: 12, color: AppColors.muted),
+                      tr(context, 'Не удалось загрузить активность'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.of(context).muted,
+                      ),
                     ),
                   ),
                   TextButton(
                     onPressed: () => _select(_category),
-                    child: const Text('Повторить'),
+                    child: Text(tr(context, 'Повторить')),
                   ),
                 ],
               );

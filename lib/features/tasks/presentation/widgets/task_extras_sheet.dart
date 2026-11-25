@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/task_epic_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import 'task_labels_editor.dart';
@@ -13,6 +14,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
+import '../../../../core/theme/task_label_color.dart';
 import '../../../../core/widgets/app_form_surface.dart';
 import '../../data/models/task_detail_model.dart';
 import '../cubit/task_details_cubit.dart';
@@ -93,19 +96,19 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
                         Expanded(
                           child: Text(
                             switch (widget.tab) {
-                              TaskExtraTab.labels => 'Метки',
-                              TaskExtraTab.epics => 'Эпики',
-                              TaskExtraTab.resources => 'Ресурсы',
-                              TaskExtraTab.files => 'Файлы',
+                              TaskExtraTab.labels => tr(context, 'Метки'),
+                              TaskExtraTab.epics => tr(context, 'Эпики'),
+                              TaskExtraTab.resources => tr(context, 'Ресурсы'),
+                              TaskExtraTab.files => tr(context, 'Файлы'),
                             },
-                            style: GoogleFonts.manrope(
+                            style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
                         IconButton(
-                          tooltip: 'Закрыть',
+                          tooltip: tr(context, 'Закрыть'),
                           onPressed: busy
                               ? null
                               : () => Navigator.maybePop(context),
@@ -123,7 +126,7 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Text(
                         state.actionErrorMessage!,
-                        style: const TextStyle(color: AppColors.error),
+                        style: TextStyle(color: AppColors.of(context).error),
                       ),
                     ),
                   Flexible(
@@ -139,19 +142,22 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
                               contentPadding: EdgeInsets.zero,
                               title: Text(resource.name),
                               subtitle: Text(
-                                'План: ${resource.planValue} · Факт: ${resource.factValue}',
+                                tr(context, "План: {p0} · Факт: {p1}", {
+                                  'p0': resource.planValue,
+                                  'p1': resource.factValue,
+                                }),
                               ),
                               onTap: busy
                                   ? null
                                   : () => _editResource(cubit, resource),
                               trailing: IconButton(
-                                tooltip: 'Удалить ресурс',
+                                tooltip: tr(context, 'Удалить ресурс'),
                                 onPressed: busy
                                     ? null
                                     : () async {
                                         if (await showAppConfirmation(
                                           context,
-                                          'Удалить ресурс?',
+                                          tr(context, 'Удалить ресурс?'),
                                           resource.name,
                                           confirmLabel: 'Удалить',
                                           destructive: true,
@@ -168,7 +174,7 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
                               ),
                             ),
                           if (state.resources.isEmpty)
-                            const Text('Нет ресурсов'),
+                            Text(tr(context, 'Нет ресурсов')),
                           TextButton.icon(
                             onPressed: busy
                                 ? null
@@ -177,7 +183,7 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
                               LucideIcons.plus,
                               size: AppIconSizes.standard,
                             ),
-                            label: const Text('Добавить ресурс'),
+                            label: Text(tr(context, 'Добавить ресурс')),
                           ),
                         ],
                       ),
@@ -189,20 +195,24 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
                             ListTile(
                               contentPadding: EdgeInsets.zero,
                               title: Text(file.name),
-                              subtitle: Text('${(file.size / 1024).ceil()} КБ'),
+                              subtitle: Text(
+                                tr(context, "{p0} КБ", {
+                                  'p0': (file.size / 1024).ceil(),
+                                }),
+                              ),
                               leading: const Icon(
                                 LucideIcons.paperclip,
                                 size: AppIconSizes.standard,
                               ),
                               onTap: () => _download(file),
                               trailing: IconButton(
-                                tooltip: 'Удалить файл',
+                                tooltip: tr(context, 'Удалить файл'),
                                 onPressed: busy
                                     ? null
                                     : () async {
                                         if (await showAppConfirmation(
                                           context,
-                                          'Удалить файл?',
+                                          tr(context, 'Удалить файл?'),
                                           file.name,
                                           confirmLabel: 'Удалить',
                                           destructive: true,
@@ -217,14 +227,14 @@ class _TaskExtrasSheetState extends State<TaskExtrasSheet> {
                               ),
                             ),
                           if (state.detail.files.isEmpty)
-                            const Text('Нет файлов'),
+                            Text(tr(context, 'Нет файлов')),
                           TextButton.icon(
                             onPressed: busy ? null : () => _pickFiles(cubit),
                             icon: const Icon(
                               LucideIcons.plus,
                               size: AppIconSizes.standard,
                             ),
-                            label: const Text('Добавить файлы'),
+                            label: Text(tr(context, 'Добавить файлы')),
                           ),
                         ],
                       ),
@@ -362,7 +372,7 @@ class _EpicsEditorState extends State<_EpicsEditor> {
             onPressed: () => setState(() {
               _future = context.read<TaskDetailsCubit>().getEpics();
             }),
-            child: const Text('Повторить загрузку эпиков'),
+            child: Text(tr(context, 'Повторить загрузку эпиков')),
           ),
         );
       }
@@ -373,29 +383,97 @@ class _EpicsEditorState extends State<_EpicsEditor> {
         for (final epic in [...snapshot.data!, ...linked]) epic.id: epic,
       }.values.toList();
       if (available.isEmpty) {
-        return const Padding(
-          padding: EdgeInsets.all(20),
-          child: Text('В проекте нет эпиков'),
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.mdLg,
+            AppSpacing.sm,
+            AppSpacing.mdLg,
+            AppSpacing.mdLg,
+          ),
+          child: Text(tr(context, 'В проекте пока нет эпиков.')),
         );
       }
       return ListView(
         shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.xs,
+          AppSpacing.md,
+          AppSpacing.mdLg,
+        ),
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xs,
+              0,
+              AppSpacing.xs,
+              AppSpacing.smMd,
+            ),
+            child: Text(
+              tr(context, 'Можно выбрать несколько'),
+              style: AppTypography.caption(
+                context,
+              )?.copyWith(color: AppColors.of(context).muted),
+            ),
+          ),
           for (final epic in available)
-            CheckboxListTile(
-              title: Text(epic.name),
-              value: ids.contains(epic.id),
-              onChanged: cubit.state.isSaving
-                  ? null
-                  : (value) {
-                      final updated = {...ids};
-                      if (value == true) {
-                        updated.add(epic.id);
-                      } else {
-                        updated.remove(epic.id);
-                      }
-                      cubit.updateEpics(updated.toList());
-                    },
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Material(
+                color: ids.contains(epic.id)
+                    ? AppColors.accent.withValues(alpha: .07)
+                    : AppColors.of(context).subtleSurface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  side: BorderSide(
+                    color: ids.contains(epic.id)
+                        ? AppColors.accent.withValues(alpha: .28)
+                        : AppColors.of(context).border,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: CheckboxListTile(
+                  key: ValueKey<String>('task-epic-${epic.id}'),
+                  dense: true,
+                  visualDensity: const VisualDensity(vertical: -2),
+                  contentPadding: const EdgeInsets.only(
+                    left: AppSpacing.md,
+                    right: AppSpacing.sm,
+                  ),
+                  controlAffinity: ListTileControlAffinity.trailing,
+                  secondary: Container(
+                    width: AppSpacing.smMd,
+                    height: AppSpacing.smMd,
+                    decoration: BoxDecoration(
+                      color: taskLabelColor(epic.color),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  title: Text(
+                    epic.name.trim().isEmpty
+                        ? tr(context, 'Без названия')
+                        : epic.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.body(context)?.copyWith(
+                      color: AppColors.of(context).ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  value: ids.contains(epic.id),
+                  onChanged: cubit.state.isSaving
+                      ? null
+                      : (value) {
+                          final updated = {...ids};
+                          if (value == true) {
+                            updated.add(epic.id);
+                          } else {
+                            updated.remove(epic.id);
+                          }
+                          cubit.updateEpics(updated.toList());
+                        },
+                ),
+              ),
             ),
         ],
       );
@@ -432,7 +510,7 @@ class _ValuesDialogState extends State<_ValuesDialog> {
 
   @override
   Widget build(BuildContext context) => AppDialog(
-    title: Text(widget.title),
+    title: Text(tr(context, widget.title)),
     content: AppFormSurface(
       child: SingleChildScrollView(
         child: Column(
@@ -448,7 +526,7 @@ class _ValuesDialogState extends State<_ValuesDialog> {
                     decoration: InputDecoration(
                       suffixIcon: widget.numericFields && i > 0
                           ? IconButton(
-                              tooltip: 'Калькулятор',
+                              tooltip: tr(context, 'Калькулятор'),
                               icon: const Icon(LucideIcons.calculator),
                               onPressed: () async {
                                 final current =
@@ -477,7 +555,10 @@ class _ValuesDialogState extends State<_ValuesDialog> {
                 ),
               ),
             if (_error != null)
-              Text(_error!, style: const TextStyle(color: AppColors.error)),
+              Text(
+                tr(context, _error!),
+                style: TextStyle(color: AppColors.of(context).error),
+              ),
           ],
         ),
       ),
@@ -485,7 +566,7 @@ class _ValuesDialogState extends State<_ValuesDialog> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Отмена'),
+        child: Text(tr(context, 'Отмена')),
       ),
       TextButton(
         onPressed: () {
@@ -504,7 +585,7 @@ class _ValuesDialogState extends State<_ValuesDialog> {
           }
           Navigator.pop(context, values);
         },
-        child: const Text('Сохранить'),
+        child: Text(tr(context, 'Сохранить')),
       ),
     ],
   );
@@ -531,13 +612,13 @@ class _ResourceCalculatorState extends State<_ResourceCalculator> {
 
   @override
   Widget build(BuildContext context) => AppDialog(
-    title: const Text('Калькулятор'),
+    title: Text(tr(context, 'Калькулятор')),
     content: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Текущее значение: ${widget.current}',
+          tr(context, "Текущее значение: {p0}", {'p0': widget.current}),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 16),
@@ -562,8 +643,8 @@ class _ResourceCalculatorState extends State<_ResourceCalculator> {
             signed: true,
           ),
           decoration: InputDecoration(
-            hintText: 'Введите число',
-            errorText: _error,
+            hintText: tr(context, 'Введите число'),
+            errorText: trn(context, _error),
           ),
         ),
       ],
@@ -571,7 +652,7 @@ class _ResourceCalculatorState extends State<_ResourceCalculator> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Отмена'),
+        child: Text(tr(context, 'Отмена')),
       ),
       FilledButton(
         onPressed: () {
@@ -600,7 +681,7 @@ class _ResourceCalculatorState extends State<_ResourceCalculator> {
           }
           Navigator.pop(context, result);
         },
-        child: const Text('Применить'),
+        child: Text(tr(context, 'Применить')),
       ),
     ],
   );

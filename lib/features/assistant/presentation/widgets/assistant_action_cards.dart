@@ -1,3 +1,6 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../cubit/assistant_state.dart';
+import '../../domain/entities/assistant_tool.dart';
 import '../../domain/entities/assistant_draft.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../data/services/assistant_task_changes.dart';
@@ -34,20 +37,26 @@ class AssistantActionCards extends StatelessWidget {
     super.key,
     required this.message,
     required this.index,
+    this.readOnly = false,
   });
   final AssistantMessageModel message;
   final int index;
+  final bool readOnly;
   @override
   Widget build(BuildContext context) {
     final workspaceId = context.read<AssistantCubit>().state.workspaceId;
-    final activity = <String>{};
+    bool succeeded(AssistantTool tool) =>
+        tool.result != null &&
+        !tool.result!.hasError &&
+        (tool.name != 'update_task' ||
+            tool.result!.updated?['workspaceId'] == workspaceId);
+
     final files = <String, Map>{};
     final edits = <String, AssistantDraft>{};
     for (final tool in message.tools) {
       final result = tool.result;
       if (result == null || result.hasError) continue;
-      final label = _toolLabels[tool.name];
-      if (label != null) activity.add(label);
+
       if (tool.name == 'search_messages' && result.results != null) {
         for (final row in result.results!) {
           final file = row is Map ? row['attachment'] : null;
@@ -68,21 +77,62 @@ class AssistantActionCards extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (activity.isNotEmpty)
+        if (message.tools.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: ExpansionTile(
               tilePadding: EdgeInsets.zero,
               dense: true,
               title: Text(
-                'Использованные инструменты · ${activity.length}',
-                style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                tr(context, "Действия · {p0} выполнено", {
+                      'p0': message.tools.where(succeeded).length,
+                    }) +
+                    (message.tools.any((t) => t.result?.hasError == true)
+                        ? tr(context, ' · есть ошибки')
+                        : ''),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.of(context).ink,
+                ),
               ),
               children: [
-                for (final label in activity)
+                for (final tool in message.tools)
                   ListTile(
                     dense: true,
-                    title: Text(label, style: const TextStyle(fontSize: 12)),
+                    leading: Icon(
+                      !succeeded(tool) && tool.result?.hasError != true
+                          ? Icons.help_outline
+                          : tool.result!.hasError
+                          ? Icons.error_outline
+                          : Icons.check_circle_outline,
+                      size: 18,
+                      color: tool.result?.hasError == true
+                          ? AppColors.of(context).error
+                          : AppColors.of(context).muted,
+                    ),
+                    title: Text(
+                      tr(
+                        context,
+                        _toolLabels[tool.name] ?? 'Действие помощника',
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    subtitle: Text(
+                      tool.result == null
+                          ? tr(context, 'Нет подтверждения выполнения')
+                          : tool.result!.hasError
+                          ? tr(context, 'Не удалось выполнить')
+                          : !succeeded(tool)
+                          ? tr(context, 'Сервер не подтвердил сохранение')
+                          : tool.name == 'update_task'
+                          ? tr(context, "Изменения сохранены{p0}", {
+                              'p0': tool.result!.updated?['title'] is String
+                                  ? ': ${tool.result!.updated!['title']}'
+                                  : '',
+                            })
+                          : tr(context, 'Выполнено'),
+                      style: const TextStyle(fontSize: 12),
+                    ),
                   ),
               ],
             ),
@@ -93,7 +143,7 @@ class AssistantActionCards extends StatelessWidget {
             child: ListTile(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0xffe6e6e3)),
+                side: BorderSide(color: AppColors.of(context).border),
               ),
               leading: const Icon(Icons.insert_drive_file_outlined, size: 20),
               title: Text(
@@ -122,7 +172,7 @@ class AssistantActionCards extends StatelessWidget {
                         source: StorageSource.chat,
                         id: '',
                         workspaceId: workspaceId,
-                        title: 'Найденные файлы',
+                        title: tr(context, 'Найденные файлы'),
                       ),
                       StorageItem(
                         id: file['messageId'] as String,
@@ -149,7 +199,7 @@ class AssistantActionCards extends StatelessWidget {
                       appSnackBar(
                         context: context,
                         tone: AppSnackBarTone.error,
-                        content: Text('Не удалось открыть файл.'),
+                        content: Text(tr(context, 'Не удалось открыть файл.')),
                       ),
                     );
                   }
@@ -160,12 +210,14 @@ class AssistantActionCards extends StatelessWidget {
         if (message.draft != null)
           _DraftCard(
             key: ValueKey('create-$index'),
+            readOnly: readOnly,
             draft: message.draft!,
             index: index,
           ),
         for (final draft in edits.values)
           _DraftCard(
             key: ValueKey('edit-$index-${draft.taskId}-${draft.patch}'),
+            readOnly: readOnly,
             draft: draft,
             index: index,
             edit: true,
@@ -181,10 +233,11 @@ class _DraftCard extends StatefulWidget {
     required this.draft,
     required this.index,
     this.edit = false,
+    this.readOnly = false,
   });
   final AssistantDraft draft;
   final int index;
-  final bool edit;
+  final bool edit, readOnly;
   @override
   State<_DraftCard> createState() => _DraftCardState();
 }
@@ -201,6 +254,7 @@ class _DraftCardState extends State<_DraftCard> {
   void initState() {
     super.initState();
     _resolved = cubit.state.messages[widget.index].actionStates[actionKey];
+    if (widget.readOnly && _resolved == null) _resolved = 'history';
     if (!widget.edit && _resolved == null) {
       _projectId = cubit.currentProjectId;
       _load();
@@ -228,29 +282,38 @@ class _DraftCardState extends State<_DraftCard> {
   }
 
   Future<void> _submit() async {
-    if (_busy || _resolved != null) return;
+    final operationCubit = cubit;
+    if (_busy ||
+        _resolved != null ||
+        widget.readOnly ||
+        !operationCubit.beginAction()) {
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       if (widget.edit) {
-        await cubit.actions!.applyDraft(cubit.state.workspaceId, widget.draft);
+        await operationCubit.actions!.applyDraft(
+          operationCubit.state.workspaceId,
+          widget.draft,
+        );
       } else {
-        await cubit.actions!.createDraft(
-          cubit.state.workspaceId,
+        await operationCubit.actions!.createDraft(
+          operationCubit.state.workspaceId,
           _projectId!,
           widget.draft,
         );
       }
       notifyAssistantTaskChanges();
-      if (!mounted) return;
-      setState(() => _resolved = widget.edit ? 'applied' : 'created');
-      cubit.resolve(
+      operationCubit.resolve(
         widget.index,
         widget.edit ? 'applied' : 'created',
         actionKey: actionKey,
       );
+      if (!mounted) return;
+      setState(() => _resolved = widget.edit ? 'applied' : 'created');
     } catch (error) {
       if (mounted) {
         setState(
@@ -260,6 +323,7 @@ class _DraftCardState extends State<_DraftCard> {
         );
       }
     } finally {
+      operationCubit.endAction();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -307,9 +371,12 @@ class _DraftCardState extends State<_DraftCard> {
           const SizedBox(height: 8),
           Text(
             widget.edit
-                ? 'Проверьте изменения перед сохранением.'
-                : 'Задача ещё не создана. Проверьте черновик и подтвердите.',
-            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                ? tr(context, 'Проверьте изменения перед сохранением.')
+                : tr(
+                    context,
+                    'Задача ещё не создана. Проверьте черновик и подтвердите.',
+                  ),
+            style: TextStyle(fontSize: 12, color: AppColors.of(context).muted),
           ),
           if (widget.edit) ...[
             for (final key in patch.keys)
@@ -334,7 +401,7 @@ class _DraftCardState extends State<_DraftCard> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Срок: ${draft.dueDate}',
+                  tr(context, "Срок: {p0}", {'p0': draft.dueDate}),
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
@@ -342,7 +409,12 @@ class _DraftCardState extends State<_DraftCard> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Участник: ${draft.suggestedAssigneeName}${draft.resolvedAssigneeId == null ? ' (не найден)' : ''}',
+                  tr(context, "Участник: {p0}{p1}", {
+                    'p0': draft.suggestedAssigneeName,
+                    'p1': draft.resolvedAssigneeId == null
+                        ? ' (не найден)'
+                        : '',
+                  }),
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
@@ -354,7 +426,7 @@ class _DraftCardState extends State<_DraftCard> {
                     : DropdownButtonFormField<String>(
                         initialValue: _projectId,
                         isExpanded: true,
-                        hint: const Text('Выберите проект'),
+                        hint: Text(tr(context, 'Выберите проект')),
                         items: [
                           for (final project in _projects)
                             DropdownMenuItem(
@@ -375,23 +447,33 @@ class _DraftCardState extends State<_DraftCard> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                _error!,
-                style: const TextStyle(color: AppColors.error, fontSize: 12),
+                tr(context, _error!),
+                style: TextStyle(
+                  color: AppColors.of(context).error,
+                  fontSize: 12,
+                ),
               ),
             ),
           if (_error != null && !widget.edit && _projects.isEmpty)
             TextButton(
               onPressed: _loading ? null : _load,
-              child: const Text('Загрузить проекты'),
+              child: Text(tr(context, 'Загрузить проекты')),
             ),
           const SizedBox(height: 12),
           if (_resolved != null)
             Text(
               _resolved == 'created'
-                  ? 'Задача создана'
+                  ? tr(context, 'Задача создана')
                   : _resolved == 'applied'
-                  ? 'Изменения сохранены'
-                  : 'Изменения отменены',
+                  ? tr(context, 'Изменения сохранены')
+                  : _resolved == 'history'
+                  ? tr(
+                      context,
+                      'Черновик из истории. Отправьте новый запрос, чтобы проверить его актуальность.',
+                    )
+                  : widget.edit
+                  ? tr(context, 'Изменения отменены')
+                  : tr(context, 'Создание отменено'),
               style: const TextStyle(color: AppColors.accent, fontSize: 13),
             )
           else
@@ -400,15 +482,19 @@ class _DraftCardState extends State<_DraftCard> {
               children: [
                 FilledButton(
                   onPressed:
-                      _busy || _loading || (!widget.edit && _projectId == null)
+                      _busy ||
+                          cubit.state.actionBusy ||
+                          cubit.state.status == AssistantStatus.sending ||
+                          _loading ||
+                          (!widget.edit && _projectId == null)
                       ? null
                       : _submit,
                   child: Text(
                     _busy
-                        ? 'Сохраняю…'
+                        ? tr(context, 'Сохраняю…')
                         : widget.edit
-                        ? 'Применить'
-                        : 'Добавить задачу',
+                        ? tr(context, 'Применить')
+                        : tr(context, 'Добавить задачу'),
                   ),
                 ),
                 TextButton(
@@ -422,7 +508,7 @@ class _DraftCardState extends State<_DraftCard> {
                             actionKey: actionKey,
                           );
                         },
-                  child: const Text('Отменить'),
+                  child: Text(tr(context, 'Отменить')),
                 ),
               ],
             ),

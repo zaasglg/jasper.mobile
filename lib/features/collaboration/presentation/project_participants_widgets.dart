@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/app_icon_sizes.dart';
@@ -58,7 +59,7 @@ class ParticipantsProjectHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'ПРОЕКТ',
+          tr(context, 'ПРОЕКТ'),
           style: AppTypography.caption(context)?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w600,
@@ -79,12 +80,14 @@ class ParticipantsProjectHeader extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Доступ к проекту',
+                tr(context, 'Доступ к проекту'),
                 style: AppTypography.title(context),
               ),
             ),
             Semantics(
-              label: 'Пользователей с доступом: $count',
+              label: tr(context, "Пользователей с доступом: {p0}", {
+                'p0': count,
+              }),
               child: ExcludeSemantics(
                 child: ParticipantBadge('$count', accent: true),
               ),
@@ -155,8 +158,9 @@ class ProjectParticipantRow extends StatelessWidget {
                       runSpacing: AppSpacing.xs,
                       children: [
                         Semantics(
-                          label:
-                              'Роль в проекте: ${memberRoleLabel(member.role)}',
+                          label: tr(context, "Роль в проекте: {p0}", {
+                            'p0': memberRoleLabel(member.role),
+                          }),
                           child: ParticipantBadge(memberRoleLabel(member.role)),
                         ),
                         if (member.access == 'project' ||
@@ -194,7 +198,7 @@ class ProjectParticipantRow extends StatelessWidget {
               if (onActions != null)
                 IconButton(
                   key: ValueKey('participant_actions_${member.userId}'),
-                  tooltip: 'Действия участника',
+                  tooltip: tr(context, 'Действия участника'),
                   onPressed: onActions,
                   icon: const Icon(
                     LucideIcons.ellipsis,

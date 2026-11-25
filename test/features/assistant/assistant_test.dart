@@ -1,3 +1,7 @@
+import 'package:jospar/features/assistant/presentation/widgets/assistant_web_layout.dart';
+import 'package:jospar/features/assistant/domain/entities/assistant_request.dart';
+import 'package:jospar/features/assistant/data/services/assistant_attachment_picker.dart';
+import 'package:jospar/features/assistant/domain/entities/assistant_attachment.dart';
 import 'package:jospar/features/assistant/data/models/assistant_message_dto.dart';
 import 'package:jospar/features/assistant/data/services/assistant_actions.dart';
 import 'package:jospar/features/assistant/presentation/widgets/assistant_action_cards.dart';
@@ -23,6 +27,52 @@ import 'package:jospar/features/workspaces/domain/entities/workspace_model.dart'
 import 'package:jospar/features/workspaces/domain/repositories/workspace_repository.dart';
 
 void main() {
+  testWidgets('compact composer fits large text and keeps actions available', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.8;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final input = TextEditingController(text: 'Мой вопрос');
+    final focus = FocusNode();
+    addTearDown(input.dispose);
+    addTearDown(focus.dispose);
+    var sent = 0;
+    var plans = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: AssistantWebComposer(
+              input: input,
+              focus: focus,
+              enabled: true,
+              sending: false,
+              listening: false,
+              picking: false,
+              attachments: const [],
+              onSend: () => sent++,
+              onVoice: () {},
+              onAttach: () {},
+              onRemove: (_) {},
+              onDayPlan: () => plans++,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('assistant-ai-day-plan')));
+    await tester.tap(find.byKey(const Key('assistant-send')));
+    expect(plans, 1);
+    expect(sent, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   setUp(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
     await sl.reset();
@@ -32,6 +82,83 @@ void main() {
     });
   });
   tearDown(() => sl.reset());
+  test(
+    'file-only retry keeps its file and does not duplicate a user turn',
+    () async {
+      final repo = _Repository()..fail = true;
+      final cubit = AssistantCubit(
+        repo,
+        _Workspaces(),
+        const WorkspaceSelectionStorage(FlutterSecureStorage()),
+      );
+      addTearDown(cubit.close);
+      await cubit.initialize();
+      final file = AssistantAttachmentPicker.fromBytes(
+        'plan.txt',
+        Uint8List.fromList(utf8.encode('Plan')),
+      );
+      await cubit.ask('', attachments: [file]);
+      expect(cubit.state.messages.single.attachments, [file]);
+      repo.fail = false;
+      await cubit.retry();
+      expect(repo.attachmentRequests, [
+        [file],
+        [file],
+      ]);
+      expect(cubit.state.messages.where((m) => m.role == 'user').length, 1);
+    },
+  );
+  test('unsupported file extraction avoids a second model request', () async {
+    final repo = _Repository();
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (o, h) {
+            h.resolve(
+              Response(
+                requestOptions: o,
+                data: {
+                  'isTaskDetected': false,
+                  'attachmentMessage': 'Нет текстового слоя',
+                  'attachments': [
+                    {
+                      'name': 'scan.pdf',
+                      'mimeType': 'application/pdf',
+                      'size': 4,
+                      'status': 'unsupported',
+                      'reason': 'Нет текстового слоя',
+                    },
+                  ],
+                },
+              ),
+            );
+          },
+        ),
+      );
+    const selection = WorkspaceSelectionStorage(FlutterSecureStorage());
+    final cubit = AssistantCubit(
+      repo,
+      _Workspaces(),
+      selection,
+      actions: AssistantActions(dio, selection),
+    );
+    addTearDown(cubit.close);
+    await cubit.initialize();
+    await cubit.ask(
+      '',
+      attachments: const [
+        AssistantAttachment(
+          name: 'scan.pdf',
+          mimeType: 'application/pdf',
+          size: 4,
+          dataUrl: 'data:application/pdf;base64,dGVzdA==',
+        ),
+      ],
+    );
+    expect(repo.attachmentRequests, isEmpty);
+    expect(cubit.state.messages.last.content, 'Нет текстового слоя');
+    expect(cubit.state.messages.last.attachments.single.status, 'unsupported');
+  });
   test('tool results and project context survive API parsing', () async {
     final dio = Dio();
     dio.interceptors.add(
@@ -101,12 +228,94 @@ void main() {
     expect(find.text('Добавить задачу'), findsOneWidget);
     await tester.tap(find.text('Отменить'));
     await tester.pumpAndSettle();
-    expect(find.text('Изменения отменены'), findsOneWidget);
+    expect(find.text('Создание отменено'), findsOneWidget);
     expect((_Actions.created), 0);
     await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(page());
     await tester.pumpAndSettle();
-    expect(find.text('Изменения отменены'), findsOneWidget);
+    expect(find.text('Создание отменено'), findsOneWidget);
+  });
+  testWidgets('historical drafts cannot create tasks again', (tester) async {
+    final cubit = AssistantCubit(
+      _Repository(),
+      _Workspaces(),
+      const WorkspaceSelectionStorage(FlutterSecureStorage()),
+      actions: _Actions(),
+    );
+    addTearDown(cubit.close);
+    await cubit.initialize();
+    await cubit.ask('Создай задачу');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider.value(
+          value: cubit,
+          child: Scaffold(
+            body: AssistantActionCards(
+              message: cubit.state.messages.last,
+              index: 1,
+              readOnly: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Добавить задачу'), findsNothing);
+    expect(find.textContaining('Черновик из истории'), findsOneWidget);
+    expect(_Actions.created, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('action summary separates confirmed updates and failures', (
+    tester,
+  ) async {
+    final reply = AssistantMessageDto.fromJson({
+      'role': 'assistant',
+      'content': 'Проверено',
+      'toolCalls': [
+        {
+          'name': 'update_task',
+          'result': {
+            'updated': {
+              'id': 't',
+              'title': 'Отчёт',
+              'workspaceId': 'workspace',
+            },
+          },
+        },
+        {'name': 'update_task', 'result': {}},
+        {
+          'name': 'search_messages',
+          'result': {'error': 'Недоступно'},
+        },
+      ],
+    }).toEntity();
+    final cubit = _cubit(_Repository()..reply = reply);
+    addTearDown(cubit.close);
+    await cubit.initialize();
+    await cubit.ask('Проверь');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider.value(
+          value: cubit,
+          child: Scaffold(
+            body: SingleChildScrollView(
+              child: AssistantActionCards(
+                message: cubit.state.messages.last,
+                index: 1,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Действия · 1 выполнено · есть ошибки'));
+    await tester.pumpAndSettle();
+    expect(find.text('Изменения сохранены: Отчёт'), findsOneWidget);
+    expect(find.text('Сервер не подтвердил сохранение'), findsOneWidget);
+    expect(find.text('Не удалось выполнить'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
   testWidgets('confirm creates a draft only once', (tester) async {
     final cubit = AssistantCubit(
@@ -304,6 +513,117 @@ void main() {
       [image],
     ]);
   });
+  testWidgets(
+    'widget opens keyboard without activating microphone or sending',
+    (tester) async {
+      final voice = _Voice();
+      sl.registerSingleton<AssistantVoice>(voice);
+      final cubit = _cubit(_Repository());
+      addTearDown(cubit.close);
+      addTearDown(voice.eventsController.close);
+      await cubit.initialize();
+      await tester.pumpWidget(
+        BlocProvider.value(
+          value: cubit,
+          child: const MaterialApp(home: AssistantScreen(startKeyboard: true)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final input = tester.widget<TextField>(
+        find.byKey(const Key('assistant-input')),
+      );
+      expect(input.focusNode!.hasFocus, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(voice.listenCount, 0);
+      expect(cubit.state.messages, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets('draft follows conversation selection through history UI', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final voice = _Voice();
+    sl.registerSingleton<AssistantVoice>(voice);
+    final cubit = _cubit(_Repository());
+    addTearDown(cubit.close);
+    addTearDown(voice.eventsController.close);
+    await cubit.initialize();
+    cubit.updateDraft('Первый черновик');
+    await tester.pumpWidget(
+      BlocProvider.value(
+        value: cubit,
+        child: MaterialApp(
+          theme: ThemeData.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1.5)),
+            child: child!,
+          ),
+          home: const AssistantScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    TextField field() =>
+        tester.widget<TextField>(find.byKey(const Key('assistant-input')));
+    expect(field().controller!.text, 'Первый черновик');
+    await tester.tap(find.byTooltip('Новый диалог'));
+    await tester.pumpAndSettle();
+    expect(field().controller!.text, isEmpty);
+    await tester.enterText(
+      find.byKey(const Key('assistant-input')),
+      'Второй черновик',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byTooltip('История диалогов'));
+    await tester.pumpAndSettle();
+    final drawer = tester.widget<Drawer>(find.byType(Drawer));
+    expect(drawer.backgroundColor, Colors.white);
+    expect(drawer.surfaceTintColor, Colors.transparent);
+    await tester.tap(find.text('Первый черновик'));
+    await tester.pumpAndSettle();
+    expect(field().controller!.text, 'Первый черновик');
+    expect(voice.listenCount, 0);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('stop button cancels waiting and discards the late answer', (
+    tester,
+  ) async {
+    final voice = _Voice();
+    sl.registerSingleton<AssistantVoice>(voice);
+    final reply = Completer<AssistantMessageModel>();
+    final repository = _Repository()..waiting = reply;
+    final cubit = _cubit(repository);
+    addTearDown(cubit.close);
+    addTearDown(voice.eventsController.close);
+    await cubit.initialize();
+    await tester.pumpWidget(
+      BlocProvider.value(
+        value: cubit,
+        child: const MaterialApp(home: AssistantScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final pending = cubit.ask('Долгий запрос');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Остановить'));
+    await tester.pumpAndSettle();
+    expect(repository.lastRequest!.isCancelled, isTrue);
+    expect(find.textContaining('Ответ остановлен.'), findsOneWidget);
+    reply.complete(
+      const AssistantMessageModel(role: 'assistant', content: 'Поздний ответ'),
+    );
+    await pending;
+    await tester.pumpAndSettle();
+    expect(find.text('Поздний ответ'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('website starter fills the composer without sending a request', (
     tester,
   ) async {
@@ -424,16 +744,24 @@ class _Workspaces implements WorkspaceRepository {
 class _Repository implements AssistantRepository {
   bool fail = false;
   AssistantMessageModel? reply;
+  Completer<AssistantMessageModel>? waiting;
+  AssistantRequest? lastRequest;
   final imageRequests = <List<String>>[];
+  final attachmentRequests = <List<AssistantAttachment>>[];
   @override
   Future<AssistantMessageModel> chat({
     required String workspaceId,
     required List<AssistantMessageModel> messages,
     List<String> images = const [],
+    List<AssistantAttachment> attachments = const [],
     String? currentProjectId,
+    AssistantRequest? request,
   }) async {
+    lastRequest = request;
     imageRequests.add(List.from(images));
+    attachmentRequests.add(List.from(attachments));
     if (fail) throw const AssistantException('Нет сети');
+    if (waiting != null) return waiting!.future;
     return reply ??
         const AssistantMessageModel(
           role: 'assistant',
@@ -517,8 +845,9 @@ class _Actions extends AssistantActions {
     String workspaceId,
     String text,
     List<String> images,
-    String? projectId,
-  ) async => detect ? {'title': 'Проверить'} : null;
+    String? projectId, {
+    AssistantRequest? request,
+  }) async => detect ? {'title': 'Проверить'} : null;
   @override
   Future<List<Map<String, dynamic>>> projects(String workspaceId) async => [
     {'id': 'project', 'name': 'Проект', 'workspaceId': 'workspace'},

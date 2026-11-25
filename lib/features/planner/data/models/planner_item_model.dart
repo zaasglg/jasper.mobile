@@ -1,3 +1,5 @@
+import 'dart:convert';
+import '../../../tasks/data/models/task_detail_model.dart';
 import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../projects/data/models/project_task_dto.dart';
 import 'package:equatable/equatable.dart';
@@ -18,9 +20,27 @@ class PlannerItemModel extends Equatable {
     this.task,
     this.external = false,
     this.allDay = false,
+    this.icon,
+    this.creatorName,
+    this.reminderMinutes = 0,
+    this.checklists = const [],
+    this.detail = const {},
   });
 
   factory PlannerItemModel.fromJson(Map<String, dynamic> json) {
+    final rawDetail = json['detail'];
+    Object? decoded = rawDetail;
+    if (rawDetail is String) {
+      try {
+        decoded = jsonDecode(rawDetail);
+      } catch (_) {
+        decoded = null;
+      }
+    }
+    final detail = decoded is Map
+        ? Map<String, dynamic>.from(decoded)
+        : <String, dynamic>{};
+    final creator = json['creator'];
     final taskJson = json['task'];
     final inbox = json['inboxTask'];
     final project = json['project'];
@@ -29,7 +49,25 @@ class PlannerItemModel extends Equatable {
             Map<String, dynamic>.from(taskJson),
           ).toEntity()
         : null;
+    final scheduled = DateTime.tryParse(json['scheduledAt']?.toString() ?? '');
+    final hasTime = json['hasTime'] != false;
+    final local = scheduled?.toLocal();
+    final plannedDay =
+        _readDay(json['plannedDate']) ??
+        (!hasTime && local != null
+            ? DateTime(local.year, local.month, local.day)
+            : null);
     return PlannerItemModel(
+      creatorName: creator is Map ? creator['name']?.toString() : null,
+      reminderMinutes: json['reminderMinutes'] is num
+          ? (json['reminderMinutes'] as num).toInt().clamp(0, 10080)
+          : 0,
+      detail: detail,
+      checklists: TaskDetailModel.fromJson(detail).checklists,
+
+      icon: json['icon'] is String && (json['icon'] as String).trim().isNotEmpty
+          ? (json['icon'] as String).trim().toLowerCase()
+          : null,
       id: json['id']?.toString() ?? '',
       title:
           task?.title ??
@@ -44,8 +82,8 @@ class PlannerItemModel extends Equatable {
           : project is Map
           ? project['name']?.toString() ?? 'Проект'
           : 'Ежедневник',
-      scheduledAt: DateTime.tryParse(json['scheduledAt']?.toString() ?? ''),
-      plannedDate: _readDay(json['plannedDate']),
+      scheduledAt: hasTime ? scheduled : null,
+      plannedDate: plannedDay,
       durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 30,
       // A linked task supplies context, not the lifecycle of this day's entry.
       completed: json['completed'] == true,
@@ -58,6 +96,10 @@ class PlannerItemModel extends Equatable {
 
   final String id, title, projectName;
   final String? projectId, taskId, inboxTaskId;
+  final String? icon, creatorName;
+  final int reminderMinutes;
+  final List<TaskChecklistModel> checklists;
+  final Map<String, dynamic> detail;
   final DateTime? scheduledAt;
 
   /// Calendar date without a timezone; never an execution time at midnight.
@@ -91,6 +133,14 @@ class PlannerItemModel extends Equatable {
   }
 
   Map<String, dynamic> toJson() => {
+    if (icon != null) 'icon': icon,
+    if (creatorName != null) 'creator': {'name': creatorName},
+    'reminderMinutes': reminderMinutes,
+    'detail': {
+      ...detail,
+      if (checklists.isNotEmpty || detail.containsKey('checklists'))
+        'checklists': checklists.map((list) => list.toJson()).toList(),
+    },
     'external': external,
     'allDay': allDay,
     'id': id,
@@ -99,7 +149,18 @@ class PlannerItemModel extends Equatable {
     'taskId': taskId,
     'inboxTaskId': inboxTaskId,
     'project': {'name': projectName},
-    'scheduledAt': scheduledAt?.toUtc().toIso8601String(),
+    'hasTime': scheduledAt != null,
+    'scheduledAt':
+        (scheduledAt ??
+                (plannedDate == null
+                    ? null
+                    : DateTime(
+                        plannedDate!.year,
+                        plannedDate!.month,
+                        plannedDate!.day,
+                      )))
+            ?.toUtc()
+            .toIso8601String(),
     'plannedDate': plannedDate == null
         ? null
         : '${plannedDate!.year.toString().padLeft(4, '0')}-${plannedDate!.month.toString().padLeft(2, '0')}-${plannedDate!.day.toString().padLeft(2, '0')}',
@@ -125,7 +186,17 @@ class PlannerItemModel extends Equatable {
     ProjectTaskModel? task,
     bool? external,
     bool? allDay,
+    Object? icon = _unchanged,
+    String? creatorName,
+    int? reminderMinutes,
+    List<TaskChecklistModel>? checklists,
+    Map<String, dynamic>? detail,
   }) => PlannerItemModel(
+    creatorName: creatorName ?? this.creatorName,
+    reminderMinutes: reminderMinutes ?? this.reminderMinutes,
+    checklists: checklists ?? this.checklists,
+    detail: detail ?? this.detail,
+    icon: identical(icon, _unchanged) ? this.icon : icon as String?,
     id: id ?? this.id,
     title: title ?? this.title,
     projectId: projectId ?? this.projectId,
@@ -162,6 +233,11 @@ class PlannerItemModel extends Equatable {
     external,
     allDay,
     task,
+    icon,
+    creatorName,
+    reminderMinutes,
+    checklists,
+    detail,
   ];
   static const _unchanged = Object();
 }

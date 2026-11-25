@@ -7,6 +7,7 @@ class UserProfile extends Equatable {
     required this.email,
     this.avatarUrl,
     this.role = '',
+    this.locale = 'ru',
   });
 
   final String id;
@@ -14,6 +15,7 @@ class UserProfile extends Equatable {
   final String email;
   final String? avatarUrl;
   final String role;
+  final String locale;
 
   String get roleLabel => switch (role.trim().toUpperCase()) {
     'SUPER_ADMIN' || 'SUPERADMIN' => 'Суперадмин',
@@ -30,6 +32,7 @@ class UserProfile extends Equatable {
     String? email,
     String? avatarUrl,
     String? role,
+    String? locale,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -37,9 +40,17 @@ class UserProfile extends Equatable {
       email: email ?? this.email,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       role: role ?? this.role,
+      locale: locale ?? this.locale,
     );
   }
 
   @override
-  List<Object?> get props => <Object?>[id, name, email, avatarUrl, role];
+  List<Object?> get props => <Object?>[
+    id,
+    name,
+    email,
+    avatarUrl,
+    role,
+    locale,
+  ];
 }

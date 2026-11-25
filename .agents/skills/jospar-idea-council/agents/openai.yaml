@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jospar Idea Council"
+  short_description: "Multi-agent council that debates and votes on ideas"
+  default_prompt: "Convene the Jospar idea council to debate this idea, vote, and produce a shared recommendation."

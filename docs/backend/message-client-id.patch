@@ -1,0 +1,127 @@
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index 318a46e..f9803b5 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -957,6 +957,7 @@ model VideoRoomHidden {
+ 
+ model Message {
+   id          String      @id @default(cuid())
++  clientId    String?
+   threadId    String
+   workspaceId String
+   workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+@@ -979,6 +980,7 @@ model Message {
+   poll      Poll?
+ 
+   @@index([workspaceId, threadId, createdAt(sort: Asc)])
++  @@unique([userId, clientId])
+   @@index([userId])
+   @@index([taskRef])
+   @@map("messages")
+diff --git a/src/messages/dto/create-message.dto.ts b/src/messages/dto/create-message.dto.ts
+index 9bb71ec..f76d82c 100644
+--- a/src/messages/dto/create-message.dto.ts
++++ b/src/messages/dto/create-message.dto.ts
+@@ -1,11 +1,12 @@
+-import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
++import { IsEnum, IsInt, IsOptional, IsString, IsUUID } from 'class-validator';
+ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ import { MessageKind } from '@prisma/client';
+ 
+ export class CreateMessageDto {
+   @ApiProperty() @IsString() threadId: string;
+   @ApiPropertyOptional() @IsString() @IsOptional() workspaceId?: string;
+-  @ApiProperty() @IsString() userId: string;
++  @ApiPropertyOptional({ deprecated: true, description: 'Ignored. Author is determined by JWT.' }) @IsString() @IsOptional() userId?: string;
++  @ApiPropertyOptional({ format: 'uuid', description: 'Stable retry identifier, unique per author.' }) @IsUUID('4') @IsOptional() clientId?: string;
+   @ApiPropertyOptional({ enum: MessageKind }) @IsEnum(MessageKind) @IsOptional() kind?: MessageKind;
+   @ApiPropertyOptional() @IsString() @IsOptional() text?: string;
+   @ApiPropertyOptional() @IsInt() @IsOptional() duration?: number;
+diff --git a/src/messages/message-receipts.spec.ts b/src/messages/message-receipts.spec.ts
+index c91bd6d..2828746 100644
+--- a/src/messages/message-receipts.spec.ts
++++ b/src/messages/message-receipts.spec.ts
+@@ -44,6 +44,34 @@ describe('message delivery receipts', () => {
+     expect(db.threadPreference.findMany).not.toHaveBeenCalled();
+   });
+ 
++  it('replays a client identifier without creating a duplicate or notification', async () => {
++    const { db, service } = setup();
++    const existing = { id: 'existing', clientId: '550e8400-e29b-41d4-a716-446655440000', userId: actor.id, workspaceId: 'ws', threadId: 'dm:alice:bob', createdAt: new Date(), favorites: [], reactions: [] };
++    db.message.findUnique.mockResolvedValue(existing);
++    const result = await service.create({ clientId: existing.clientId, threadId: existing.threadId, workspaceId: 'ws', userId: 'forged', text: 'retry' }, actor);
++    expect(result.id).toBe(existing.id);
++    expect(db.message.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { userId_clientId: { userId: actor.id, clientId: existing.clientId } } }));
++    expect(db.message.create).not.toHaveBeenCalled();
++    expect(db.threadPreference.updateMany).not.toHaveBeenCalled();
++  });
++
++  it('rejects message creation without a JWT actor even with a body userId', async () => {
++    const { db, service } = setup();
++    await expect(service.create({ threadId: 'channel', userId: 'forged' })).rejects.toThrow('Authentication required');
++    expect(db.message.create).not.toHaveBeenCalled();
++  });
++
++  it('returns the winning message after a concurrent unique constraint conflict', async () => {
++    const { db, service } = setup();
++    const existing = { id: 'winner', clientId: '550e8400-e29b-41d4-a716-446655440000', userId: actor.id, workspaceId: 'ws', threadId: 'dm:alice:bob', createdAt: new Date(), favorites: [], reactions: [] };
++    db.message.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(existing);
++    db.message.create.mockRejectedValue({ code: 'P2002' });
++    const result = await service.create({ clientId: existing.clientId, threadId: existing.threadId, workspaceId: 'ws', text: 'retry' }, actor);
++    expect(result.id).toBe('winner');
++    expect(db.message.create).toHaveBeenCalledTimes(1);
++    expect(db.threadPreference.updateMany).not.toHaveBeenCalled();
++  });
++
+   it('returns recipient statuses without inventing per-message timestamps', async () => {
+     const { db, service } = setup();
+     db.message.findUnique.mockResolvedValue({ id: 'm', userId: 'alice', threadId: 'dm:alice:bob', workspaceId: 'ws', createdAt: new Date('2026-09-24T08:00:00Z') });
+diff --git a/src/messages/messages.service.ts b/src/messages/messages.service.ts
+index 94eb698..6f7650e 100644
+--- a/src/messages/messages.service.ts
++++ b/src/messages/messages.service.ts
+@@ -196,6 +196,7 @@ export class MessagesService {
+   }
+ 
+   async create(dto: CreateMessageDto, actor?: { id: string; role: UserRole }) {
++    if (!actor?.id) throw new ForbiddenException('Authentication required');
+     this.assertDmAccess(dto.threadId, actor?.id);
+     const workspaceId = dto.workspaceId ?? (await this.defaultWorkspaceId(actor));
+     if (!workspaceId) throw new NotFoundException('No workspace found');
+@@ -210,10 +211,34 @@ export class MessagesService {
+       if (m?.[1]) taskRef = m[1];
+     }
+ 
++    const existingMessage = async () => {
++      const existing = await this.prisma.message.findUnique({
++        where: { userId_clientId: { userId: actor.id, clientId: dto.clientId! } },
++        include: this.includeFor(actor.id),
++      });
++      if (existing && (existing.workspaceId !== workspaceId || existing.threadId !== dto.threadId)) {
++        throw new ForbiddenException('Client identifier belongs to another conversation');
++      }
++      return existing;
++    };
++    const formatExisting = async (message: MessageWithRelations) => this.formatMessage(
++      message, actor.id, await this.getPeerReceiptCursors(dto.threadId, workspaceId, actor.id),
++    );
++    if (dto.clientId) {
++      const existing = await existingMessage();
++      if (existing) return formatExisting(existing);
++    }
+     const msg = await this.prisma.message.create({
+-      data: { ...dto, taskRef, workspaceId, userId: actor?.id ?? dto.userId },
+-      include: this.includeFor(actor?.id ?? ''),
++      data: { ...dto, taskRef, workspaceId, userId: actor.id },
++      include: this.includeFor(actor.id),
++    }).catch(async (error: unknown) => {
++      if (dto.clientId && (error as { code?: string })?.code === 'P2002') {
++        const existing = await existingMessage();
++        if (existing) return { ...existing, replayed: true as const };
++      }
++      throw error;
+     });
++    if ('replayed' in msg) return formatExisting(msg);
+     // New DM activity should resurface the chat for both participants.
+     if (actor?.id) {
+       const peerIds = dto.threadId.slice(3).split(':').filter(Boolean);

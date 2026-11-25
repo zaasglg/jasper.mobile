@@ -12,6 +12,57 @@ class ProjectRepositoryImpl implements ProjectRepository {
   final Dio _dio;
 
   @override
+  Future<void> setPinned(String id, bool pinned) => _changeProject(
+    'projects/${Uri.encodeComponent(id)}',
+    {'isPinned': pinned},
+  );
+
+  @override
+  Future<void> archiveProject(String id) =>
+      _changeProject('projects/${Uri.encodeComponent(id)}/archive', null);
+
+  Future<void> _changeProject(String path, Map<String, dynamic>? data) async {
+    try {
+      await _dio.patch<dynamic>(path, data: data);
+    } on DioException catch (error) {
+      throw ProjectException(
+        error.response?.statusCode == 403
+            ? 'Недостаточно прав для этого действия.'
+            : 'Не удалось изменить проект. Попробуйте ещё раз.',
+      );
+    }
+  }
+
+  @override
+  Future<void> moveProject(
+    String id, {
+    required String workspaceId,
+    String? parentId,
+    String? anchorId,
+    required String placement,
+  }) async {
+    try {
+      await _dio.patch<dynamic>(
+        'projects/${Uri.encodeComponent(id)}/move',
+        data: {
+          'workspaceId': workspaceId,
+          'group': 'tree',
+          'parentId': parentId,
+          ...{'anchorId': ?anchorId},
+          'placement': placement,
+        },
+      );
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      throw ProjectException(
+        status == 403
+            ? 'Недостаточно прав для перемещения проекта.'
+            : 'Не удалось переместить проект. Попробуйте ещё раз.',
+      );
+    }
+  }
+
+  @override
   Future<List<ProjectModel>> getProjects() async {
     try {
       final response = await _dio.get<dynamic>('projects');

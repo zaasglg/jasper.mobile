@@ -6,6 +6,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/tasks/data/repositories/task_details_repository_impl.dart';
 
 void main() {
+  test(
+    'changing column patches status without overwriting progress or detail',
+    () async {
+      final adapter = _TaskDetailsAdapter();
+      final repository = TaskDetailsRepositoryImpl(
+        Dio()..httpClientAdapter = adapter,
+      );
+      await repository.updateStatus('task-1', 'PROGRESS');
+      expect(adapter.statusPatch, {'status': 'PROGRESS'});
+    },
+  );
   test('creates project epic with trimmed name and selected color', () async {
     final adapter = _TaskDetailsAdapter();
     final repository = TaskDetailsRepositoryImpl(
@@ -78,6 +89,7 @@ void main() {
 }
 
 class _TaskDetailsAdapter implements HttpClientAdapter {
+  Map<String, dynamic>? statusPatch;
   Map<String, dynamic>? epicBody;
   Map<String, dynamic>? titlePatch;
   String? updatedDescription;
@@ -110,6 +122,10 @@ class _TaskDetailsAdapter implements HttpClientAdapter {
     }
     if (options.path == 'project-tasks/task-1' && options.method == 'PATCH') {
       final body = Map<String, dynamic>.from(options.data as Map);
+      if (body.containsKey('status')) {
+        statusPatch = body;
+        return _jsonResponse(_taskJson(description: 'Описание'));
+      }
       if (body.containsKey('timerAction')) {
         lastTimerAction = body['timerAction'] as String;
         return _jsonResponse(_taskJson(description: 'Описание'));

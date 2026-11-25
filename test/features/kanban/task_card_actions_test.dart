@@ -370,7 +370,7 @@ void main() {
     expect(adapter.requests.where((r) => r.method == 'DELETE'), isEmpty);
     await tester.tap(find.text('Отмена'));
     await tester.pumpAndSettle();
-    await action(tester, 'Обложка');
+    await action(tester, 'Изменить обложку');
     await tester.tap(find.bySemanticsLabel('Цвет #6366F1'));
     await tester.tap(find.widgetWithText(FilledButton, 'Сохранить'));
     await tester.pumpAndSettle();
@@ -384,24 +384,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('translation shows preview and applies only after confirmation', (
-    tester,
-  ) async {
-    final adapter = _Adapter();
-    final cubit = KanbanCubit(_repository(adapter));
-    await tester.runAsync(() => cubit.load('project'));
-    addTearDown(cubit.close);
-    await pumpBoard(tester, cubit);
-    await action(tester, 'Перевести задачу');
-    await tester.tap(find.text('Получить перевод'));
-    await tester.pumpAndSettle();
-    expect(find.text('Аударма'), findsOneWidget);
-    expect(adapter.requests.where((r) => r.method == 'PATCH'), isEmpty);
-    await tester.ensureVisible(find.text('Применить перевод'));
-    await tester.tap(find.text('Применить перевод'));
-    await tester.pumpAndSettle();
-    expect(cubit.state.tasks.single.title, 'Аударма');
-    expect(adapter.requests.where((r) => r.method == 'PATCH'), hasLength(1));
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'translation displays selected language and restores original without writes',
+    (tester) async {
+      final adapter = _Adapter();
+      final cubit = KanbanCubit(_repository(adapter));
+      await tester.runAsync(() => cubit.load('project'));
+      addTearDown(cubit.close);
+      await pumpBoard(tester, cubit);
+      await action(tester, 'Перевести задачу');
+      await tester.tap(find.text('Казахский'));
+      await tester.pumpAndSettle();
+      expect(find.text('Аударма'), findsOneWidget);
+      expect(adapter.requests.where((r) => r.method == 'PATCH'), isEmpty);
+      expect(cubit.state.tasks.single.title, isNot('Аударма'));
+      expect(find.text('Язык перевода'), findsNothing);
+      await tester.tap(find.byTooltip('Показать оригинал'));
+      await tester.pumpAndSettle();
+      expect(find.text('Аударма'), findsNothing);
+      expect(cubit.state.translatedTitles, isEmpty);
+      expect(adapter.requests.where((r) => r.method == 'PATCH'), isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

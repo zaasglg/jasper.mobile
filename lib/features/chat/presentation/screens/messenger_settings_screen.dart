@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../widgets/conversation_menu.dart';
 import 'package:equatable/equatable.dart';
@@ -78,58 +79,62 @@ class MessengerSettingsScreen extends StatelessWidget {
 class _SettingsBody extends StatelessWidget {
   const _SettingsBody();
   @override
-  Widget build(
-    BuildContext context,
-  ) => BlocConsumer<MessengerSettingsCubit, MessengerSettingsState>(
-    listener: (context, state) {
-      if (state.error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          appSnackBar(
-            context: context,
-            tone: AppSnackBarTone.error,
-            content: Text(state.error!),
+  Widget build(BuildContext context) =>
+      BlocConsumer<MessengerSettingsCubit, MessengerSettingsState>(
+        listener: (context, state) {
+          if (state.error != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              appSnackBar(
+                context: context,
+                tone: AppSnackBarTone.error,
+                content: Text(tr(context, state.error!)),
+              ),
+            );
+          }
+        },
+        builder: (context, state) => Scaffold(
+          appBar: AppBar(title: Text(tr(context, 'Настройки мессенджера'))),
+          body: RefreshIndicator(
+            onRefresh: context.read<MessengerSettingsCubit>().load,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              children: [
+                if (state.loading || state.busy)
+                  const LinearProgressIndicator(minHeight: 2),
+                Text(
+                  tr(context, 'Каналы'),
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                if (state.error != null)
+                  TextButton(
+                    onPressed: context.read<MessengerSettingsCubit>().load,
+                    child: Text(tr(context, 'Повторить загрузку')),
+                  ),
+                for (final channel in state.chats.where((e) => e.isChannel))
+                  ListTile(
+                    leading: const Icon(
+                      LucideIcons.hash,
+                      size: AppIconSizes.standard,
+                    ),
+                    title: Text(channel.title),
+                    trailing: ConversationMenuButton(
+                      conversation: channel,
+                      repository: context
+                          .read<MessengerSettingsCubit>()
+                          .repository,
+                      chats: state.chats,
+                      onChanged: context.read<MessengerSettingsCubit>().load,
+                    ),
+                  ),
+                if (!state.loading && state.chats.every((e) => !e.isChannel))
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text(tr(context, 'Нет доступных каналов')),
+                  ),
+              ],
+            ),
           ),
-        );
-      }
-    },
-    builder: (context, state) => Scaffold(
-      appBar: AppBar(title: const Text('Настройки мессенджера')),
-      body: RefreshIndicator(
-        onRefresh: context.read<MessengerSettingsCubit>().load,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          children: [
-            if (state.loading || state.busy)
-              const LinearProgressIndicator(minHeight: 2),
-            const Text('Каналы', style: TextStyle(fontWeight: FontWeight.w700)),
-            if (state.error != null)
-              TextButton(
-                onPressed: context.read<MessengerSettingsCubit>().load,
-                child: const Text('Повторить загрузку'),
-              ),
-            for (final channel in state.chats.where((e) => e.isChannel))
-              ListTile(
-                leading: const Icon(
-                  LucideIcons.hash,
-                  size: AppIconSizes.standard,
-                ),
-                title: Text(channel.title),
-                trailing: ConversationMenuButton(
-                  conversation: channel,
-                  repository: context.read<MessengerSettingsCubit>().repository,
-                  chats: state.chats,
-                  onChanged: context.read<MessengerSettingsCubit>().load,
-                ),
-              ),
-            if (!state.loading && state.chats.every((e) => !e.isChannel))
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Text('Нет доступных каналов'),
-              ),
-          ],
         ),
-      ),
-    ),
-  );
+      );
 }

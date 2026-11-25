@@ -10,6 +10,7 @@ class UserProfileDto extends Equatable {
     required this.email,
     this.avatarUrl,
     this.role = '',
+    this.locale = 'ru',
   });
 
   factory UserProfileDto.fromJson(Map<String, dynamic> json) {
@@ -21,6 +22,7 @@ class UserProfileDto extends Equatable {
       name: json['name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       role: json['role']?.toString() ?? '',
+      locale: json['locale'] == 'kk' ? 'kk' : 'ru',
       avatarUrl: rawAvatarUrl is String && rawAvatarUrl.trim().isNotEmpty
           ? _resolveAvatarUrl(rawAvatarUrl.trim())
           : null,
@@ -32,6 +34,7 @@ class UserProfileDto extends Equatable {
   final String email;
   final String? avatarUrl;
   final String role;
+  final String locale;
 
   factory UserProfileDto.fromEntity(UserProfile entity) => UserProfileDto(
     id: entity.id,
@@ -39,6 +42,7 @@ class UserProfileDto extends Equatable {
     email: entity.email,
     avatarUrl: entity.avatarUrl,
     role: entity.role,
+    locale: entity.locale,
   );
 
   UserProfile toEntity() => UserProfile(
@@ -47,6 +51,7 @@ class UserProfileDto extends Equatable {
     email: email,
     avatarUrl: avatarUrl,
     role: role,
+    locale: locale,
   );
 
   static String _resolveAvatarUrl(String value) {
@@ -61,6 +66,7 @@ class UserProfileDto extends Equatable {
     'email': email,
     'avatarUrl': avatarUrl,
     'role': role,
+    'locale': locale,
   };
 
   UserProfileDto copyWith({
@@ -69,6 +75,7 @@ class UserProfileDto extends Equatable {
     String? email,
     String? avatarUrl,
     String? role,
+    String? locale,
   }) {
     return UserProfileDto(
       id: id ?? this.id,
@@ -76,9 +83,17 @@ class UserProfileDto extends Equatable {
       email: email ?? this.email,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       role: role ?? this.role,
+      locale: locale ?? this.locale,
     );
   }
 
   @override
-  List<Object?> get props => <Object?>[id, name, email, avatarUrl, role];
+  List<Object?> get props => <Object?>[
+    id,
+    name,
+    email,
+    avatarUrl,
+    role,
+    locale,
+  ];
 }

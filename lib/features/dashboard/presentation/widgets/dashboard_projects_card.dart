@@ -1,3 +1,5 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
@@ -27,7 +29,7 @@ class DashboardProjectsCard extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 396),
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.of(context).canvas,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: _border),
           ),
@@ -61,9 +63,9 @@ class DashboardProjectsCard extends StatelessWidget {
       );
     }
     if (state.projects.isEmpty) {
-      return const _ProjectsMessage(
+      return _ProjectsMessage(
         icon: LucideIcons.folderOpen,
-        message: 'В этом workspace пока нет проектов',
+        message: tr(context, 'В этом workspace пока нет проектов'),
       );
     }
 
@@ -105,10 +107,10 @@ class _CardHeader extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: <Widget>[
-            const Expanded(
+            Expanded(
               child: AppWidgetHeading(
                 icon: LucideIcons.folderKanban,
-                title: 'Проекты',
+                title: tr(context, 'Проекты'),
               ),
             ),
             TextButton.icon(
@@ -118,7 +120,7 @@ class _CardHeader extends StatelessWidget {
               style: TextButton.styleFrom(
                 foregroundColor: DashboardProjectsCard._ink,
                 padding: const EdgeInsets.symmetric(horizontal: 2),
-                textStyle: GoogleFonts.manrope(
+                textStyle: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -127,7 +129,7 @@ class _CardHeader extends StatelessWidget {
                 LucideIcons.arrowRight,
                 size: AppIconSizes.standard,
               ),
-              label: const Text('Задачи'),
+              label: Text(tr(context, 'Задачи')),
             ),
           ],
         ),
@@ -168,7 +170,10 @@ class _ProjectProgressRow extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: '$title, ${progress.round()} процентов',
+      label: tr(context, "{p0}, {p1} процентов", {
+        'p0': title,
+        'p1': progress.round(),
+      }),
       child: InkWell(
         key: Key('dashboard-project-${project.id}'),
         onTap: onTap,
@@ -186,7 +191,7 @@ class _ProjectProgressRow extends StatelessWidget {
                 ),
                 child: Text(
                   _initial(title),
-                  style: GoogleFonts.manrope(
+                  style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: colors.$2,
@@ -202,10 +207,10 @@ class _ProjectProgressRow extends StatelessWidget {
                       children: <Widget>[
                         Expanded(
                           child: Text(
-                            title.isEmpty ? 'Без названия' : title,
+                            title.isEmpty ? tr(context, 'Без названия') : title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.manrope(
+                            style: GoogleFonts.inter(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: DashboardProjectsCard._ink,
@@ -215,7 +220,7 @@ class _ProjectProgressRow extends StatelessWidget {
                         const SizedBox(width: 12),
                         Text(
                           '${progress.round()}%',
-                          style: GoogleFonts.manrope(
+                          style: GoogleFonts.inter(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: DashboardProjectsCard._muted,
@@ -283,7 +288,7 @@ class _ProjectsMessage extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.manrope(
+                style: GoogleFonts.inter(
                   fontSize: 14,
                   height: 1.4,
                   color: DashboardProjectsCard._muted,

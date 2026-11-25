@@ -1,3 +1,5 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../../core/widgets/task_completion_indicator.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import '../../../tasks/domain/utils/task_column_label.dart';
 import 'package:flutter/material.dart';
@@ -64,14 +66,18 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
   Widget _pill(String text, {bool active = false}) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
     decoration: BoxDecoration(
-      color: active ? AppColors.accent : const Color(0xFFF1F1EF),
+      color: active
+          ? AppColors.of(context).accent
+          : AppColors.of(context).badgeSurface,
       borderRadius: BorderRadius.circular(20),
     ),
     child: Text(
       text,
       style: TextStyle(
         fontSize: 10,
-        color: active ? Colors.white : AppColors.muted,
+        color: active
+            ? AppColors.of(context).onAccent
+            : AppColors.of(context).muted,
       ),
     ),
   );
@@ -91,12 +97,18 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
           minimumSize: Size.zero,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          foregroundColor: selected ? const Color(0xFF252537) : AppColors.muted,
-          backgroundColor: selected ? Colors.white : Colors.transparent,
+          foregroundColor: selected
+              ? AppColors.of(context).ink
+              : AppColors.of(context).muted,
+          backgroundColor: selected
+              ? AppColors.of(context).badgeSurface
+              : Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(9),
             side: BorderSide(
-              color: selected ? AppColors.border : Colors.transparent,
+              color: selected
+                  ? AppColors.of(context).border
+                  : Colors.transparent,
             ),
           ),
         ),
@@ -105,7 +117,7 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
           children: [
             Icon(icon, size: 13),
             const SizedBox(width: 4),
-            Text(label, style: const TextStyle(fontSize: 11)),
+            Text(tr(context, label), style: const TextStyle(fontSize: 11)),
             const SizedBox(width: 4),
             _pill('$count', active: selected),
           ],
@@ -115,7 +127,7 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
   }
 
   Widget _taskCard(Map<String, dynamic> task) {
-    final done = ((task['progress'] as num?) ?? 0) >= 100;
+    final done = dashboardDone(task);
     final status = taskColumnLabel(
       task['status']?.toString() ?? '',
       name: task['columnName']?.toString(),
@@ -126,10 +138,10 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: Colors.white,
+        color: AppColors.of(context).canvas,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFFE3E3E1)),
+          side: BorderSide(color: AppColors.of(context).border),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -144,9 +156,9 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
                     Expanded(
                       child: Text(
                         task['displayId']?.toString() ?? '',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.muted,
+                          color: AppColors.of(context).muted,
                           fontWeight: FontWeight.w600,
                           letterSpacing: .4,
                         ),
@@ -159,14 +171,14 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF6F6F5),
+                        color: AppColors.of(context).subtleSurface,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         status,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.muted,
+                          color: AppColors.of(context).muted,
                         ),
                       ),
                     ),
@@ -176,11 +188,7 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      done ? LucideIcons.circleCheck : LucideIcons.circle,
-                      size: 19,
-                      color: done ? AppColors.accent : const Color(0xFFD8D8D5),
-                    ),
+                    TaskCompletionIndicator(completed: done, size: 19),
                     const SizedBox(width: 9),
                     Expanded(
                       child: Text(
@@ -222,7 +230,9 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
       Icon(
         icon,
         size: 13,
-        color: danger ? const Color(0xFFBE2A1D) : AppColors.muted,
+        color: danger
+            ? AppColors.of(context).error
+            : AppColors.of(context).muted,
       ),
       const SizedBox(width: 5),
       Flexible(
@@ -230,7 +240,9 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
           label,
           style: TextStyle(
             fontSize: 11,
-            color: danger ? const Color(0xFFBE2A1D) : AppColors.muted,
+            color: danger
+                ? AppColors.of(context).error
+                : AppColors.of(context).muted,
           ),
         ),
       ),
@@ -257,7 +269,7 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Задачи · ${widget.title}',
+                          tr(context, "Задачи · {p0}", {'p0': widget.title}),
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
@@ -266,9 +278,9 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
                         const SizedBox(height: 6),
                         Text(
                           '${_plural(projects.length, 'проект', 'проекта', 'проектов')} · ${_plural(widget.tasks.length, 'задача', 'задачи', 'задач')}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.muted,
+                            color: AppColors.of(context).muted,
                           ),
                         ),
                       ],
@@ -281,15 +293,18 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
                 ],
               ),
             ),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.of(context).border),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 children: [
                   if (widget.tasks.isEmpty)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.all(24),
-                      child: Text('Нет задач', textAlign: TextAlign.center),
+                      child: Text(
+                        tr(context, 'Нет задач'),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   for (final project in projects)
                     Builder(
@@ -317,18 +332,18 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
                                   Flexible(
                                     child: Text(
                                       project.name.toUpperCase(),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
-                                        color: AppColors.muted,
+                                        color: AppColors.of(context).muted,
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
-                                  const Expanded(
+                                  Expanded(
                                     child: Divider(
                                       height: 1,
-                                      color: AppColors.border,
+                                      color: AppColors.of(context).border,
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -344,7 +359,9 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
                                   child: Container(
                                     padding: const EdgeInsets.all(3),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFF6F6F5),
+                                      color: AppColors.of(
+                                        context,
+                                      ).subtleSurface,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Row(
@@ -376,14 +393,14 @@ class _DashboardTaskListSheetState extends State<DashboardTaskListSheet> {
                                 ),
                               ),
                             if (visible.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(20),
+                              Padding(
+                                padding: const EdgeInsets.all(20),
                                 child: Text(
-                                  'Нет задач',
+                                  tr(context, 'Нет задач'),
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: AppColors.muted,
+                                    color: AppColors.of(context).muted,
                                   ),
                                 ),
                               ),

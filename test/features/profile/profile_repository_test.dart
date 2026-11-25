@@ -49,6 +49,37 @@ void main() {
       expect(requests.single.path, 'users/me');
     });
   }
+  for (final locale in ['ru', 'kk']) {
+    test(
+      'PATCH saves only locale and parses confirmed profile: $locale',
+      () async {
+        response = {
+          'data': {...response as Map, 'locale': locale},
+        };
+        final profile = await repository.updateLocale(locale);
+        expect(profile.locale, locale);
+        expect(requests.single.method, 'PATCH');
+        expect(requests.single.path, 'users/me/profile');
+        expect(requests.single.data, {'locale': locale});
+      },
+    );
+  }
+  for (final locale in [null, 'ru', 'en']) {
+    test('rejects unconfirmed locale: $locale', () async {
+      response = {...response as Map, 'locale': locale};
+      await expectLater(
+        repository.updateLocale('kk'),
+        throwsA(isA<ProfileException>()),
+      );
+    });
+  }
+  test('unsupported locale never sends a request', () async {
+    await expectLater(
+      repository.updateLocale('en'),
+      throwsA(isA<ProfileException>()),
+    );
+    expect(requests, isEmpty);
+  });
   for (final avatar in ['data:image/png;base64,photo', '']) {
     test('PATCH includes exact avatar string then reloads: $avatar', () async {
       final profile = await repository.updateAvatar(avatar);

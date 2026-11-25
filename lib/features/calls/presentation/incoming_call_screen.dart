@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
@@ -48,7 +49,7 @@ class IncomingCallScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Text(
-                    'ЗВОНОК JOSPAR',
+                    tr(context, 'ЗВОНОК JOSPAR'),
                     style: Theme.of(
                       context,
                     ).textTheme.labelLarge?.copyWith(color: Colors.white),
@@ -57,7 +58,9 @@ class IncomingCallScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(
-                room.callerName.isEmpty ? 'Входящий звонок' : room.callerName,
+                room.callerName.isEmpty
+                    ? tr(context, 'Входящий звонок')
+                    : room.callerName,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(
@@ -66,7 +69,9 @@ class IncomingCallScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                room.video ? 'Входящий видеозвонок' : 'Входящий аудиозвонок',
+                room.video
+                    ? tr(context, 'Входящий видеозвонок')
+                    : tr(context, 'Входящий аудиозвонок'),
                 style: Theme.of(
                   context,
                 ).textTheme.bodyLarge?.copyWith(color: Colors.white70),

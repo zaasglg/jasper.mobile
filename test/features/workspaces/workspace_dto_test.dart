@@ -150,7 +150,7 @@ void main() {
     expect(catalog.toJson()['workspaces'], [
       WorkspaceDto.fromEntity(catalog.workspaces.single).toJson(),
     ]);
-    expect(catalog.toJson()['user'], json['user']);
+    expect(catalog.toJson()['user'], {...json['user'] as Map, 'locale': 'ru'});
     expect(TaskCreationCatalog.fromJson(catalog.toJson()), catalog);
   });
 }

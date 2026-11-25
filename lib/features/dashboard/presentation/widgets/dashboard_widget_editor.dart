@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import 'dashboard_resource_options.dart';
 import 'dashboard_selector.dart';
@@ -31,8 +32,8 @@ Future<void> showDashboardWidgetPicker(
         controller: controller,
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         children: [
-          const Text(
-            'Добавить виджет',
+          Text(
+            tr(context, 'Добавить виджет'),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
@@ -51,10 +52,12 @@ Future<void> showDashboardWidgetPicker(
                   leading: Icon(
                     dashboardWidgetIcon(definition.id),
                     size: 16,
-                    color: enabled ? AppColors.accent : AppColors.muted,
+                    color: enabled
+                        ? AppColors.accent
+                        : AppColors.of(context).muted,
                   ),
                   title: Text(
-                    definition.title,
+                    tr(context, definition.title),
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -62,11 +65,11 @@ Future<void> showDashboardWidgetPicker(
                   ),
                   subtitle: Text(
                     existing && !enabled
-                        ? 'Уже на дашборде'
-                        : definition.description,
-                    style: const TextStyle(
+                        ? tr(context, 'Уже на дашборде')
+                        : tr(context, definition.description),
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.muted,
+                      color: AppColors.of(context).muted,
                     ),
                   ),
                   trailing: Icon(
@@ -128,7 +131,6 @@ Future<void> showDashboardWidgetSettings(
     'team',
     'mentions',
     'resource',
-    'task-map',
   ].contains(slot.id);
   final result = await showModalBottomSheet<bool>(
     context: context,
@@ -155,9 +157,12 @@ Future<void> showDashboardWidgetSettings(
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
-                  const Text(
-                    'Высота',
-                    style: TextStyle(fontSize: 12, color: AppColors.muted),
+                  Text(
+                    tr(context, 'Высота'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.of(context).muted,
+                    ),
                   ),
                   Slider(
                     value: height.clamp(minimumHeight, 900),
@@ -170,22 +175,22 @@ Future<void> showDashboardWidgetSettings(
                   const SizedBox(height: 8),
                   DashboardSelectorField<String>(
                     initialValue: size,
-                    decoration: const InputDecoration(
-                      labelText: 'Ширина на большом экране',
+                    decoration: InputDecoration(
+                      labelText: tr(context, 'Ширина на большом экране'),
                     ),
                     items: [
-                      const DropdownMenuItem(
+                      DropdownMenuItem(
                         value: 'full',
-                        child: Text('На всю ширину'),
+                        child: Text(tr(context, 'На всю ширину')),
                       ),
-                      const DropdownMenuItem(
+                      DropdownMenuItem(
                         value: 'half',
-                        child: Text('Половина'),
+                        child: Text(tr(context, 'Половина')),
                       ),
                       if (slot.id != 'kpi-group')
-                        const DropdownMenuItem(
+                        DropdownMenuItem(
                           value: 'third',
-                          child: Text('Треть'),
+                          child: Text(tr(context, 'Треть')),
                         ),
                     ],
                     onChanged: (value) => setState(() => size = value ?? size),
@@ -194,17 +199,17 @@ Future<void> showDashboardWidgetSettings(
                     const SizedBox(height: 16),
                     DashboardSelectorField<String>(
                       initialValue: mode,
-                      decoration: const InputDecoration(
-                        labelText: 'Группировка',
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'Группировка'),
                       ),
-                      items: const [
+                      items: [
                         DropdownMenuItem(
                           value: 'column',
-                          child: Text('По колонкам'),
+                          child: Text(tr(context, 'По колонкам')),
                         ),
                         DropdownMenuItem(
                           value: 'epic',
-                          child: Text('По эпикам'),
+                          child: Text(tr(context, 'По эпикам')),
                         ),
                       ],
                       onChanged: (value) =>
@@ -213,8 +218,8 @@ Future<void> showDashboardWidgetSettings(
                   ],
                   if (canFilter) ...[
                     const SizedBox(height: 24),
-                    const Text(
-                      'Проекты',
+                    Text(
+                      tr(context, 'Проекты'),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -222,8 +227,8 @@ Future<void> showDashboardWidgetSettings(
                     ),
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Все проекты',
+                      title: Text(
+                        tr(context, 'Все проекты'),
                         style: TextStyle(fontSize: 13),
                       ),
                       value: selected.isEmpty,
@@ -261,7 +266,7 @@ Future<void> showDashboardWidgetSettings(
               padding: const EdgeInsets.all(20),
               child: FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Применить'),
+                child: Text(tr(context, 'Применить')),
               ),
             ),
           ],
@@ -306,17 +311,17 @@ class DashboardEditActions extends StatelessWidget {
         index: index,
         enabled: !cubit.state.saving,
         key: ValueKey('dashboard_drag_${slot.instanceId}'),
-        child: const ColoredBox(
+        child: ColoredBox(
           color: Colors.transparent,
           child: SizedBox(
             width: 48,
             height: 48,
             child: Tooltip(
-              message: 'Перетащить виджет',
+              message: tr(context, 'Перетащить виджет'),
               child: Icon(
                 LucideIcons.gripVertical,
                 size: 16,
-                color: AppColors.muted,
+                color: AppColors.of(context).muted,
               ),
             ),
           ),
@@ -342,34 +347,34 @@ class DashboardEditActions extends StatelessWidget {
         enabled: !cubit.state.saving,
         groups: [
           [
-            const AppMenuAction(
+            AppMenuAction(
               value: 'settings',
-              label: 'Настройки',
+              label: tr(context, 'Настройки'),
               icon: LucideIcons.slidersHorizontal,
             ),
             if (slot.definition?.duplicable ?? false)
-              const AppMenuAction(
+              AppMenuAction(
                 value: 'duplicate',
-                label: 'Добавить ещё такой',
+                label: tr(context, 'Добавить ещё такой'),
                 icon: LucideIcons.copy,
               ),
             AppMenuAction(
               value: 'up',
-              label: 'Выше',
+              label: tr(context, 'Выше'),
               icon: LucideIcons.arrowUp,
               enabled: index > 0,
             ),
             AppMenuAction(
               value: 'down',
-              label: 'Ниже',
+              label: tr(context, 'Ниже'),
               icon: LucideIcons.arrowDown,
               enabled: index + 1 < count,
             ),
           ],
           [
-            const AppMenuAction(
+            AppMenuAction(
               value: 'hide',
-              label: 'Скрыть виджет',
+              label: tr(context, 'Скрыть виджет'),
               icon: LucideIcons.eyeOff,
             ),
           ],
@@ -399,8 +404,11 @@ Future<void> confirmDashboardReset(
 ) async {
   if (await showAppConfirmation(
         context,
-        'Сбросить виджеты?',
-        'Будет восстановлен стандартный набор. Изменения применятся после сохранения.',
+        tr(context, 'Сбросить виджеты?'),
+        tr(
+          context,
+          'Будет восстановлен стандартный набор. Изменения применятся после сохранения.',
+        ),
         confirmLabel: 'Сбросить',
       ) &&
       !cubit.isClosed) {

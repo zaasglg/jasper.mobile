@@ -1,3 +1,5 @@
+import 'package:jospar/features/profile/presentation/cubit/profile_cubit.dart';
+import 'package:jospar/features/profile/presentation/cubit/profile_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,6 +40,7 @@ void main() {
           providers: [
             BlocProvider<ChatCubit>.value(value: cubit),
             BlocProvider<WorkspaceCubit>(create: (_) => _Workspace()),
+            BlocProvider<ProfileCubit>(create: (_) => _Profile()),
           ],
           child: const ChatScreen(),
         ),
@@ -57,6 +60,8 @@ void main() {
     (t) async {
       final repo = _Repo();
       final cubit = await mount(t, repo);
+      await t.tap(find.byKey(const Key('messenger-compose')));
+      await t.pumpAndSettle();
       final add = find.text('Добавить канал');
       await t.ensureVisible(add);
       await t.tap(add);
@@ -77,6 +82,8 @@ void main() {
   testWidgets('cancel focused channel sheet safely', (t) async {
     final repo = _Repo();
     final cubit = await mount(t, repo);
+    await t.tap(find.byKey(const Key('messenger-compose')));
+    await t.pumpAndSettle();
     final add = find.text('Добавить канал');
     await t.ensureVisible(add);
     await t.tap(add);
@@ -154,6 +161,43 @@ void main() {
     await close(t, cubit);
   });
   testWidgets(
+    'delete personal chat requires confirmation, preserves it on error and removes it on success',
+    (t) async {
+      final repo = _Repo();
+      final cubit = await mount(t, repo);
+      Future<void> openDelete() async {
+        await t.tap(find.byTooltip('Действия: Данияр'));
+        await t.pumpAndSettle();
+        await t.tap(find.text('Удалить чат'));
+        await t.pumpAndSettle();
+      }
+
+      await openDelete();
+      expect(find.textContaining('только у вас'), findsOneWidget);
+      await t.tap(find.text('Отмена'));
+      await t.pumpAndSettle();
+      expect(repo.deletedChats, isEmpty);
+      repo.failDelete = true;
+      await openDelete();
+      await t.tap(find.text('Удалить'));
+      await t.pumpAndSettle();
+      expect(find.byTooltip('Действия: Данияр'), findsOneWidget);
+      expect(repo.deletedChats, isEmpty);
+      repo.failDelete = false;
+      await openDelete();
+      await t.tap(find.text('Удалить'));
+      await t.pumpAndSettle();
+      expect(repo.deletedChats, ['dm:me:p']);
+      expect(find.byTooltip('Действия: Данияр'), findsNothing);
+      await cubit.load(silent: true);
+      await t.pumpAndSettle();
+      expect(find.byTooltip('Действия: Данияр'), findsNothing);
+      expect(t.takeException(), isNull);
+      await close(t, cubit);
+    },
+  );
+
+  testWidgets(
     'cancelled delete leaves channel; confirmed delete refreshes list',
     (t) async {
       final repo = _Repo();
@@ -194,16 +238,19 @@ class _Repo
     threadId: 'dm:me:p',
     title: 'Данияр',
     isChannel: false,
+    hasThread: true,
     unreadCount: 2,
   );
   final created = <ChatConversationModel>[];
   bool deleted = false;
   List<String> selected = [];
   final cleared = <String>[];
+  final deletedChats = <String>[];
+  bool personDeleted = false, failDelete = false;
   @override
   Future<List<ChatConversationModel>> getConversations() async => [
     if (!deleted) channel,
-    person,
+    if (!personDeleted) person,
     ...created,
   ];
   @override
@@ -231,6 +278,13 @@ class _Repo
   @override
   Future<void> leaveChannel(String id) async {
     deleted = true;
+  }
+
+  @override
+  Future<void> deleteConversation(String id) async {
+    if (failDelete) throw const ChatException('Не удалось удалить чат.');
+    deletedChats.add(id);
+    personDeleted = true;
   }
 
   @override
@@ -272,4 +326,10 @@ class _Repo
     String? mention,
     int? duration,
   }) async => throw StateError('not used');
+}
+
+class _Profile extends Cubit<ProfileState> implements ProfileCubit {
+  _Profile() : super(const ProfileInitial());
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

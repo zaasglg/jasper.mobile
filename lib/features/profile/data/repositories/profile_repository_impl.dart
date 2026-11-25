@@ -4,7 +4,8 @@ import '../../domain/repositories/profile_repository.dart';
 import '../../domain/entities/user_profile.dart';
 import '../models/user_profile_dto.dart';
 
-class ProfileRepositoryImpl implements ProfileRepository {
+class ProfileRepositoryImpl
+    implements ProfileRepository, ProfileLocaleRepository {
   const ProfileRepositoryImpl(this._dio);
 
   final Dio _dio;
@@ -35,6 +36,32 @@ class ProfileRepositoryImpl implements ProfileRepository {
     } on DioException {
       throw const ProfileException(
         'Не удалось сохранить фото. Попробуйте ещё раз.',
+      );
+    }
+  }
+
+  @override
+  Future<UserProfile> updateLocale(String locale) async {
+    if (locale != 'ru' && locale != 'kk') {
+      throw const ProfileException('Неподдерживаемый язык.');
+    }
+    try {
+      final response = await _dio.patch<dynamic>(
+        'users/me/profile',
+        data: {'locale': locale},
+      );
+      final json = _unwrapPayload(response.data);
+      if (json['locale'] != locale) {
+        throw const ProfileException('Сервер не подтвердил язык профиля.');
+      }
+      final profile = UserProfileDto.fromJson(json).toEntity();
+      if (profile.id.isEmpty || profile.locale != locale) {
+        throw const ProfileException('Сервер не подтвердил язык профиля.');
+      }
+      return profile;
+    } on DioException {
+      throw const ProfileException(
+        'Не удалось сохранить язык. Попробуйте ещё раз.',
       );
     }
   }

@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -140,7 +141,7 @@ class _StorageFileScreenState extends State<StorageFileScreen> {
                   Text(StorageCubit.errorText(snapshot.error!)),
                   TextButton(
                     onPressed: () => setState(_load),
-                    child: const Text('Повторить'),
+                    child: Text(tr(context, 'Повторить')),
                   ),
                 ],
               ),
@@ -162,8 +163,9 @@ class _StorageFileScreenState extends State<StorageFileScreen> {
                         child: Center(
                           child: Image.memory(
                             bytes,
-                            errorBuilder: (_, _, _) =>
-                                const Text('Не удалось отобразить изображение'),
+                            errorBuilder: (_, _, _) => Text(
+                              tr(context, 'Не удалось отобразить изображение'),
+                            ),
                           ),
                         ),
                       )
@@ -189,7 +191,7 @@ class _StorageFileScreenState extends State<StorageFileScreen> {
                               const SizedBox(height: 24),
                               FilledButton(
                                 onPressed: _busy ? null : () => _open(bytes),
-                                child: const Text('Открыть файл'),
+                                child: Text(tr(context, 'Открыть файл')),
                               ),
                             ],
                           ),
@@ -204,7 +206,9 @@ class _StorageFileScreenState extends State<StorageFileScreen> {
                     onPressed: _busy ? null : () => _open(bytes, save: true),
                     icon: const Icon(LucideIcons.download, size: 16),
                     label: Text(
-                      _busy ? 'Подождите…' : 'Сохранить на устройство',
+                      _busy
+                          ? tr(context, 'Подождите…')
+                          : tr(context, 'Сохранить на устройство'),
                     ),
                   ),
                 ),
@@ -268,13 +272,13 @@ class _PdfPreviewState extends State<_PdfPreview> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Не удалось отобразить PDF',
+                    Text(
+                      tr(context, 'Не удалось отобразить PDF'),
                       textAlign: TextAlign.center,
                     ),
                     TextButton(
                       onPressed: widget.onOpenExternally,
-                      child: const Text('Открыть другим приложением'),
+                      child: Text(tr(context, 'Открыть другим приложением')),
                     ),
                   ],
                 ),

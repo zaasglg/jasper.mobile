@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -25,7 +26,7 @@ class DashboardWelcomeHeader extends StatelessWidget {
       ),
     ),
     child: ColoredBox(
-      color: Colors.white,
+      color: AppColors.of(context).canvas,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.md,
@@ -42,16 +43,16 @@ class DashboardWelcomeHeader extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Приветствую,',
+                    tr(context, 'Приветствую,'),
                     style: AppTypography.body(
                       context,
-                    )?.copyWith(color: AppColors.muted),
+                    )?.copyWith(color: AppColors.of(context).muted),
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     name,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppColors.ink,
+                      color: AppColors.of(context).ink,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -61,7 +62,7 @@ class DashboardWelcomeHeader extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             DecoratedBox(
               decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: AppColors.of(context).border),
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Row(
@@ -121,7 +122,7 @@ class _WelcomeAction extends StatelessWidget {
           child: Icon(
             icon,
             size: AppSpacing.md + AppSpacing.xs,
-            color: primary ? Colors.white : AppColors.ink,
+            color: primary ? Colors.white : AppColors.of(context).ink,
           ),
         ),
       ),

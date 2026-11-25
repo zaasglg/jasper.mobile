@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../domain/entities/space_member.dart';
@@ -81,9 +82,9 @@ class _WorkspaceParticipantsPanelState
                 ),
                 const SizedBox(height: 12),
                 TextField(
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     prefixIcon: Icon(Icons.search),
-                    hintText: 'Поиск по имени или почте',
+                    hintText: tr(context, 'Поиск по имени или почте'),
                   ),
                   onChanged: (value) =>
                       setState(() => _query = value.trim().toLowerCase()),
@@ -93,9 +94,12 @@ class _WorkspaceParticipantsPanelState
           ),
           const Divider(height: 1),
           if (members.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(24),
-              child: Text('Ничего не найдено', textAlign: TextAlign.center),
+              child: Text(
+                tr(context, 'Ничего не найдено'),
+                textAlign: TextAlign.center,
+              ),
             ),
           for (final member in members)
             Padding(
@@ -123,7 +127,7 @@ class _WorkspaceParticipantsPanelState
                         const SizedBox(height: 6),
                         Text(
                           member.isWorkspaceOwner
-                              ? 'Владелец'
+                              ? tr(context, 'Владелец')
                               : memberRoleLabel(member.role),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.primary,
@@ -131,14 +135,18 @@ class _WorkspaceParticipantsPanelState
                         ),
                         if (member.lastActiveAt != null)
                           Text(
-                            'Последняя активность: ${member.lastActiveAt}',
+                            tr(context, "Последняя активность: {p0}", {
+                              'p0': member.lastActiveAt,
+                            }),
                             style: theme.textTheme.bodySmall,
                           ),
                         if (member.projects.isNotEmpty)
                           ExpansionTile(
                             tilePadding: EdgeInsets.zero,
                             title: Text(
-                              'Проекты · ${member.projects.length}',
+                              tr(context, "Проекты · {p0}", {
+                                'p0': member.projects.length,
+                              }),
                               style: theme.textTheme.bodySmall,
                             ),
                             children: [
@@ -161,7 +169,7 @@ class _WorkspaceParticipantsPanelState
           Padding(
             padding: const EdgeInsets.all(14),
             child: Text(
-              'Всего: ${members.length}',
+              tr(context, "Всего: {p0}", {'p0': members.length}),
               style: theme.textTheme.bodySmall,
             ),
           ),

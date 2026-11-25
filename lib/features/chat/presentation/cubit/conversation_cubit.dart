@@ -95,6 +95,7 @@ class ConversationCubit extends Cubit<ConversationState> {
     return super.close();
   }
 
+  ChatRepository get repository => _repository;
   final ChatRepository _repository;
   final ChatConversationModel conversation;
 
@@ -191,6 +192,7 @@ class ConversationCubit extends Cubit<ConversationState> {
     final repository = _repository;
     if (_invalidated ||
         isClosed ||
+        !message.canForward ||
         state.isSending ||
         repository is! ChatInteractionRepository) {
       return false;
@@ -236,6 +238,12 @@ class ConversationCubit extends Cubit<ConversationState> {
       {for (final message in messages) message.id: message}.values.toList();
 
   Future<bool> messageAction(String id, String action, {String? text}) async {
+    if (action == 'edit' &&
+        !state.messages.any(
+          (message) => message.id == id && message.canEditText,
+        )) {
+      return false;
+    }
     final repository = _repository;
     if (_invalidated ||
         repository is! ChatActionsRepository ||
@@ -297,6 +305,18 @@ class ConversationCubit extends Cubit<ConversationState> {
     if (!silent) emit(state.copyWith(isLoading: true, clearError: true));
     try {
       final repository = _repository;
+      if (repository is ChatOutboxRepository) {
+        final pending = await (repository as ChatOutboxRepository)
+            .pendingMessages(conversation.threadId)
+            .catchError((Object _) => <ChatMessageModel>[]);
+        if (isClosed || revision != _revision) return;
+        emit(
+          state.copyWith(
+            messages: _unique([...state.messages, ...pending]),
+            isLoading: false,
+          ),
+        );
+      }
       final useWindow =
           silent &&
           repository is ChatRefreshRepository &&
@@ -312,8 +332,21 @@ class ConversationCubit extends Cubit<ConversationState> {
       );
       if (isClosed || revision != _revision) return;
       _boundedRefreshes = useWindow ? _boundedRefreshes + 1 : 0;
+      final serverClients = messages
+          .map((e) => e.clientId)
+          .whereType<String>()
+          .toSet();
       emit(
-        state.copyWith(messages: messages, isLoading: false, clearError: true),
+        state.copyWith(
+          messages: _unique([
+            ...messages,
+            ...state.messages.where(
+              (e) => e.isPending && !serverClients.contains(e.clientId),
+            ),
+          ]),
+          isLoading: false,
+          clearError: true,
+        ),
       );
       final last = messages.lastOrNull?.id;
       if (_allowRead &&
@@ -445,6 +478,27 @@ class ConversationCubit extends Cubit<ConversationState> {
     final payload = reply == null
         ? text.trim()
         : '↩ @${reply.authorName}: «$excerpt${reply.preview.runes.length > 80 ? '…' : ''}»\n\n${text.trim()}';
+    final repository = _repository;
+    if (repository is ChatOutboxRepository) {
+      try {
+        final message = await (repository as ChatOutboxRepository)
+            .enqueueMessage(conversation.threadId, payload);
+        if (isClosed || _invalidated) return false;
+        emit(
+          state.copyWith(
+            messages: _unique([...state.messages, message]),
+            clearReply: true,
+          ),
+        );
+        unawaited(retryMessage(message));
+        return true;
+      } catch (_) {
+        if (!isClosed) {
+          emit(state.copyWith(error: 'Не удалось сохранить сообщение.'));
+        }
+        return false;
+      }
+    }
     final revision = _revision;
     emit(state.copyWith(isSending: true, isLoading: false, clearError: true));
     try {
@@ -476,4 +530,42 @@ class ConversationCubit extends Cubit<ConversationState> {
       return false;
     }
   }
+
+  Future<void> retryMessage(ChatMessageModel message) async {
+    final repository = _repository;
+    if (_invalidated || isClosed || repository is! ChatOutboxRepository) return;
+    if (state.messages.any(
+          (e) => e.id == message.id && e.deliveryStatus == 'sending',
+        ) &&
+        _activeSends.contains(message.id)) {
+      return;
+    }
+    if (!_activeSends.add(message.id)) return;
+    void replace(ChatMessageModel next) {
+      if (!isClosed && !_invalidated) {
+        emit(
+          state.copyWith(
+            messages: _unique(
+              state.messages.map((e) => e.id == message.id ? next : e).toList(),
+            ),
+          ),
+        );
+      }
+    }
+
+    replace(message.copyWith(deliveryStatus: 'sending'));
+    try {
+      final sent = await (repository as ChatOutboxRepository).sendPending(
+        message,
+      );
+      replace(sent);
+      _changed();
+    } catch (_) {
+      replace(message.copyWith(deliveryStatus: 'failed'));
+    } finally {
+      _activeSends.remove(message.id);
+    }
+  }
+
+  final _activeSends = <String>{};
 }

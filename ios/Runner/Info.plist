@@ -63,7 +63,7 @@
 	<key>RTCAppGroupIdentifier</key>
 	<string>group.com.jospar.app</string>
 	<key>RTCScreenSharingExtension</key>
-	<string>com.jospar.app.ScreenBroadcast</string>
+	<string>com.josparbee.app.ScreenBroadcast</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>FirebaseAppDelegateProxyEnabled</key>

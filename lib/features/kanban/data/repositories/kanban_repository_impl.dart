@@ -12,7 +12,8 @@ import '../../../tasks/domain/entities/kanban_column_model.dart';
 import '../../domain/entities/kanban_board_data.dart';
 import '../../domain/repositories/kanban_repository.dart';
 
-class KanbanRepositoryImpl implements KanbanRepository {
+class KanbanRepositoryImpl
+    implements KanbanRepository, KanbanColumnCopyRepository {
   KanbanRepositoryImpl(this._dio);
 
   final Dio _dio;
@@ -390,6 +391,57 @@ class KanbanRepositoryImpl implements KanbanRepository {
       throw _exception(error, 'создать колонку');
     } on KanbanException {
       rethrow;
+    }
+  }
+
+  @override
+  Future<KanbanColumnModel> copyColumn({
+    required String columnId,
+    required String name,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw const KanbanColumnCopyException('Введите название новой колонки');
+    }
+    try {
+      final response = await _dio.post<dynamic>(
+        'kanban-columns/$columnId/copy',
+        data: {'name': trimmed, 'afterColumnId': columnId},
+      );
+      final column = KanbanColumnDto.fromJson(
+        _object(response.data),
+      ).toEntity();
+      if (column.id.isEmpty) throw const FormatException();
+      return column;
+    } on DioException catch (error) {
+      final code = error.response?.statusCode;
+      final uncertain = switch (error.type) {
+        DioExceptionType.connectionTimeout ||
+        DioExceptionType.sendTimeout ||
+        DioExceptionType.receiveTimeout ||
+        DioExceptionType.transformTimeout ||
+        DioExceptionType.connectionError ||
+        DioExceptionType.cancel => true,
+        _ => code == null || code >= 500,
+      };
+      throw KanbanColumnCopyException(
+        code == 403
+            ? 'Недостаточно прав для копирования колонки. Обновите доску.'
+            : {404, 409, 410, 412, 422}.contains(code)
+            ? 'Колонка удалена, архивирована или изменена. Обновите доску.'
+            : uncertain
+            ? 'Результат копирования неизвестен. Колонка могла быть создана. Обновите доску и проверьте её перед повторным копированием.'
+            : 'Не удалось скопировать колонку. Повторите попытку.',
+        statusCode: code,
+        uncertain: uncertain,
+      );
+    } catch (error) {
+      if (error is KanbanColumnCopyException) rethrow;
+      // A successful write with an unreadable response must not be repeated.
+      throw const KanbanColumnCopyException(
+        'Результат копирования неизвестен. Колонка могла быть создана. Обновите доску и проверьте её перед повторным копированием.',
+        uncertain: true,
+      );
     }
   }
 

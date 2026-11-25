@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -98,7 +99,7 @@ class _VideoNoteMessageState extends State<VideoNoteMessage> {
   Widget build(BuildContext context) {
     final player = _player;
     return Semantics(
-      label: 'Видеозаметка',
+      label: tr(context, 'Видеозаметка'),
       button: true,
       child: SizedBox(
         width: 210,

@@ -1,3 +1,4 @@
+import '../../../tasks/data/models/task_detail_model.dart';
 import '../../data/models/planner_item_model.dart';
 
 abstract interface class PlannerRepository {
@@ -15,6 +16,13 @@ abstract interface class PlannerRepository {
     DateTime? plannedDate,
     int? durationMinutes,
     bool? completed,
+    int? reminderMinutes,
+  });
+  Future<void> updateExtras(
+    String itemId, {
+    bool updateIcon = false,
+    String? icon,
+    List<TaskChecklistModel>? checklists,
   });
   Future<void> remove(String itemId);
   Future<void> addTask({

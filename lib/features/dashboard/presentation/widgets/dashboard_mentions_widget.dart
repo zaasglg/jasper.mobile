@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_selector.dart';
@@ -100,7 +101,9 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
           appSnackBar(
             context: context,
             tone: AppSnackBarTone.error,
-            content: Text('Не удалось сохранить отметку о прочтении'),
+            content: Text(
+              tr(context, 'Не удалось сохранить отметку о прочтении'),
+            ),
           ),
         );
       }
@@ -205,7 +208,7 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.body(
                       context,
-                    )?.copyWith(height: 1.4, color: AppColors.ink),
+                    )?.copyWith(height: 1.4, color: AppColors.of(context).ink),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Wrap(
@@ -217,28 +220,28 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
                         name,
                         style: AppTypography.caption(
                           context,
-                        )?.copyWith(color: AppColors.muted),
+                        )?.copyWith(color: AppColors.of(context).muted),
                       ),
                       if (date.isNotEmpty)
                         Text(
                           '· $date',
                           style: AppTypography.caption(
                             context,
-                          )?.copyWith(color: AppColors.muted),
+                          )?.copyWith(color: AppColors.of(context).muted),
                         ),
                       Icon(
                         source == 'task'
                             ? LucideIcons.squareCheck
                             : LucideIcons.messageCircle,
                         size: 11,
-                        color: AppColors.muted,
+                        color: AppColors.of(context).muted,
                       ),
                       if (contextLabel != null)
                         Text(
                           contextLabel,
                           style: AppTypography.caption(
                             context,
-                          )?.copyWith(color: AppColors.muted),
+                          )?.copyWith(color: AppColors.of(context).muted),
                         ),
                     ],
                   ),
@@ -258,16 +261,17 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!WidgetCollapseScope.hidesHeading(context)) ...[
+          AppWidgetHeading(
+            icon: LucideIcons.atSign,
+            title: tr(context, 'Упоминания'),
+          ),
+          const SizedBox(height: 8),
+        ],
         Row(
           children: [
-            const Expanded(
-              child: AppWidgetHeading(
-                icon: LucideIcons.atSign,
-                title: 'Упоминания',
-              ),
-            ),
             DashboardSelector<String>(
-              tooltip: 'Источник упоминаний',
+              tooltip: tr(context, 'Источник упоминаний'),
               onSelected: (source) => setState(() => _source = source),
               itemBuilder: (_) => [
                 for (final item in sources.entries)
@@ -284,9 +288,9 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
                   children: [
                     Text(
                       sources[_source]!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
-                        color: AppColors.muted,
+                        color: AppColors.of(context).muted,
                       ),
                     ),
                     if (unread.isNotEmpty && !_loading) ...[
@@ -300,49 +304,52 @@ class _DashboardMentionsWidgetState extends State<DashboardMentionsWidget> {
                       ),
                     ],
                     const SizedBox(width: 4),
-                    const Icon(
+                    Icon(
                       LucideIcons.chevronDown,
                       size: 13,
-                      color: AppColors.muted,
+                      color: AppColors.of(context).muted,
                     ),
                   ],
                 ),
               ),
             ),
             IconButton(
-              tooltip: 'Прочитать всё в выбранных фильтрах',
+              tooltip: tr(context, 'Прочитать всё в выбранных фильтрах'),
               onPressed: _loading || _saving || unread.isEmpty
                   ? null
                   : () => _mark(_filtered.map(_id).toSet()),
               style: IconButton.styleFrom(
                 minimumSize: const Size.square(AppSpacing.touchTarget),
               ),
-              icon: const Icon(
+              icon: Icon(
                 LucideIcons.checkCheck,
                 size: 15,
-                color: AppColors.muted,
+                color: AppColors.of(context).muted,
               ),
             ),
             ?widget.trailing,
           ],
         ),
-        const Divider(height: AppSpacing.xxs, color: AppColors.border),
+        Divider(height: AppSpacing.xxs, color: AppColors.of(context).border),
         if (_loading)
           const DashboardWidgetSkeleton(showHeading: false)
         else if (visible.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 30),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 30),
             child: Text(
-              'Нет упоминаний',
+              tr(context, 'Нет упоминаний'),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: AppColors.muted),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.of(context).muted,
+              ),
             ),
           )
         else
           for (var i = 0; i < visible.length; i++) ...[
             _entry(visible[i]),
             if (i + 1 < visible.length)
-              const Divider(height: 1, color: AppColors.border),
+              Divider(height: 1, color: AppColors.of(context).border),
           ],
       ],
     );

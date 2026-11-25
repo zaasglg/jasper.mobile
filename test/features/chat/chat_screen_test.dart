@@ -1,3 +1,6 @@
+import 'package:jospar/core/theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:jospar/features/chat/data/models/chat_message_preview_model.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_app_bar.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_state.dart';
@@ -14,7 +17,32 @@ import 'package:jospar/features/workspaces/presentation/cubit/workspace_cubit.da
 import 'package:jospar/features/workspaces/presentation/cubit/workspace_state.dart';
 
 void main() {
-  testWidgets('renders Slack-style messenger and filters conversations', (
+  testWidgets('dashboard header icons follow the dark palette', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: MultiBlocProvider(
+          providers: [
+            BlocProvider<WorkspaceCubit>(create: (_) => _Workspace()),
+            BlocProvider<ProfileCubit>(create: (_) => _Profile()),
+          ],
+          child: const Scaffold(appBar: DashboardAppBar()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final icon in [
+      LucideIcons.menu,
+      LucideIcons.search,
+      LucideIcons.bell,
+    ]) {
+      final widget = tester.widget<Icon>(find.byIcon(icon));
+      expect(widget.color, const AppPalette(true).ink);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders Telegram-style folders and filters conversations', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 568);
@@ -43,15 +71,67 @@ void main() {
     expect(find.text('Цифровизация'), findsOneWidget);
     expect(find.text('JOSPAR.ME'), findsNothing);
     expect(find.byKey(const Key('messenger-search')), findsOneWidget);
-    expect(find.text('Каналы'), findsOneWidget);
+    expect(find.text('Каналы'), findsNWidgets(2));
     expect(find.text('общий'), findsOneWidget);
-
+    expect(find.text('Дизайн продукта'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('channel-expand-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Дизайн продукта'), findsOneWidget);
+    final chatContext = tester.element(find.byType(ChatScreen));
+    await chatContext.read<ChatCubit>().load(silent: true);
+    await tester.pumpAndSettle();
+    expect(find.text('Дизайн продукта'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('channel-expand-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Дизайн продукта'), findsNothing);
+    // Searching must find a child even when its parent is collapsed.
+    await tester.enterText(find.byKey(const Key('messenger-search')), 'Дизайн');
+    await tester.pumpAndSettle();
+    expect(find.text('Дизайн продукта'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('messenger-search')), '');
+    await tester.pumpAndSettle();
+    expect(find.text('Дизайн продукта'), findsNothing);
+    expect(find.text('Анна: План на сегодня согласован'), findsOneWidget);
+    expect(find.byKey(const Key('messenger-section-channels')), findsOneWidget);
     await tester.tap(find.byKey(const Key('messenger-section-channels')));
     await tester.pumpAndSettle();
     expect(find.text('общий'), findsNothing);
+    expect(find.text('Личные сообщения'), findsOneWidget);
     await tester.tap(find.byKey(const Key('messenger-section-channels')));
     await tester.pumpAndSettle();
     expect(find.text('общий'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('messenger-folder-people')),
+    );
+    await tester.tap(find.byKey(const Key('messenger-folder-people')));
+    await tester.pumpAndSettle();
+    expect(find.text('общий'), findsNothing);
+    await tester.ensureVisible(
+      find.byKey(const Key('messenger-folder-channels')),
+    );
+    await tester.tap(find.byKey(const Key('messenger-folder-channels')));
+    await tester.pumpAndSettle();
+    expect(find.text('общий'), findsOneWidget);
+    expect(find.text('Анна Садыкова'), findsNothing);
+    expect(find.text('Подканал · общий'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('channel-expand-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Подканал · общий'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('messenger-folder-all')));
+    await tester.tap(find.byKey(const Key('messenger-folder-all')));
+    await tester.pumpAndSettle();
+    expect(find.text('Анна Садыкова'), findsOneWidget);
+    expect(find.byKey(const Key('forwarded-preview-anna')), findsOneWidget);
+    expect(find.text('Вы: translation'), findsOneWidget);
+    expect(find.text('Вы: ↪ translation'), findsNothing);
+    await tester.tap(find.byKey(const Key('messenger-tools')));
+    await tester.pumpAndSettle();
+    expect(find.text('Упоминания и реакции'), findsOneWidget);
+    expect(find.text('Сохранённое'), findsOneWidget);
+    expect(find.text('Кладовка'), findsOneWidget);
+    Navigator.of(tester.element(find.text('Сохранённое'))).pop();
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.byKey(const Key('messenger-search')),
@@ -97,6 +177,34 @@ class _FakeChatRepository implements ChatRepository {
       threadId: '1',
       title: 'общий',
       isChannel: true,
+    ),
+    ChatConversationModel(
+      id: 'design',
+      threadId: 'design',
+      title: 'Дизайн продукта',
+      isChannel: true,
+      parentId: '1',
+    ),
+    ChatConversationModel(
+      id: 'sales',
+      threadId: 'sales',
+      title: 'Команда продаж',
+      isChannel: true,
+      lastMessage: ChatMessagePreviewModel(
+        text: 'План на сегодня согласован',
+        authorName: 'Анна',
+      ),
+      unreadCount: 7,
+    ),
+    ChatConversationModel(
+      id: 'anna',
+      threadId: 'anna',
+      title: 'Анна Садыкова',
+      isChannel: false,
+      hasThread: true,
+      isOnline: true,
+      unreadCount: 2,
+      lastMessage: ChatMessagePreviewModel(text: '↪ translation', isOwn: true),
     ),
   ];
 

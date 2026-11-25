@@ -1,3 +1,8 @@
+import '../../domain/entities/assistant_request.dart';
+import 'assistant_cancel_token.dart';
+import '../../domain/entities/assistant_attachment.dart';
+import '../../domain/entities/assistant_message_model.dart';
+import 'assistant_api_errors.dart';
 import '../../domain/entities/assistant_draft.dart';
 import '../models/assistant_draft_dto.dart';
 import 'package:dio/dio.dart';
@@ -27,10 +32,87 @@ class AssistantActions {
     String workspaceId,
     String text,
     List<String> images,
-    String? projectId,
-  ) async {
-    final value = await extract(workspaceId, text, images, projectId);
+    String? projectId, {
+    AssistantRequest? request,
+  }) async {
+    final value = await extract(
+      workspaceId,
+      text,
+      images,
+      projectId,
+      request: request,
+    );
     return value == null ? null : AssistantDraftDto.fromJson(value).toEntity();
+  }
+
+  Future<AssistantMessageModel?> extractAttachmentMessage(
+    String workspaceId,
+    String text,
+    List<AssistantAttachment> attachments,
+    List<String> images,
+    String? projectId, {
+    AssistantRequest? request,
+  }) async {
+    await checkWorkspace(workspaceId);
+    try {
+      final result = body(
+        (await dio.post<dynamic>(
+          'ai/extract-task',
+          cancelToken: assistantCancelToken(request),
+          options: Options(
+            headers: {'X-Workspace-Id': workspaceId},
+            receiveTimeout: const Duration(minutes: 4),
+            sendTimeout: const Duration(minutes: 2),
+          ),
+          data: {
+            'workspaceId': workspaceId,
+            'messageText': text,
+            'projectId': ?projectId,
+            if (attachments.isNotEmpty)
+              'attachments': attachments.map((e) => e.toUploadJson()).toList(),
+            if (images.isNotEmpty) 'images': images,
+          },
+        )).data,
+      );
+      final reports = AssistantAttachment.parseList(result['attachments']);
+      if (reports.length != attachments.length + images.length) {
+        throw const AssistantException(
+          'Не удалось подтвердить чтение файлов. Повторите запрос позже.',
+        );
+      }
+      final warning = result['attachmentMessage'] is String
+          ? result['attachmentMessage'] as String
+          : '';
+      final task = result['suggestedTask'];
+      if (result['isTaskDetected'] == true &&
+          task is Map &&
+          task['title'] is String &&
+          (task['title'] as String).trim().isNotEmpty) {
+        return AssistantMessageModel(
+          role: 'assistant',
+          content: '',
+          attachmentMessage: warning.isEmpty ? null : warning,
+          attachments: reports,
+          draft: AssistantDraftDto.fromJson({
+            ...Map<String, dynamic>.from(task),
+            'resolvedAssigneeId': result['resolvedAssigneeId'],
+          }).toEntity(),
+        );
+      }
+      if (reports.isNotEmpty &&
+          reports.every((e) => e.status == 'unsupported')) {
+        return AssistantMessageModel(
+          role: 'assistant',
+          attachments: reports,
+          content: warning.isNotEmpty
+              ? warning
+              : 'Не удалось прочитать вложения. Посмотрите причины у файлов.',
+        );
+      }
+      return null;
+    } on DioException catch (error) {
+      throw AssistantException(assistantApiError(error));
+    }
   }
 
   static bool validDraftEdit(AssistantDraft draft, String workspaceId) =>
@@ -57,12 +139,14 @@ class AssistantActions {
     String workspaceId,
     String text,
     List<String> images,
-    String? projectId,
-  ) async {
+    String? projectId, {
+    AssistantRequest? request,
+  }) async {
     await checkWorkspace(workspaceId);
     final result = body(
       (await dio.post<dynamic>(
         'ai/extract-task',
+        cancelToken: assistantCancelToken(request),
         options: options(workspaceId),
         data: {
           'workspaceId': workspaceId,

@@ -1,3 +1,4 @@
+import '../../domain/repositories/channel_image_repository.dart';
 import 'dart:async';
 import 'package:equatable/equatable.dart';
 import '../../data/chat_list_changes.dart';
@@ -34,7 +35,26 @@ class ChatFailure extends ChatState {
 class ChatCubit extends Cubit<ChatState> {
   ChatCubit(this._repository) : super(const ChatLoading()) {
     chatListChanges.addListener(_changed);
+    final images = _repository;
+    if (images is ChannelImageRepository) {
+      _imageSubscription = (images as ChannelImageRepository)
+          .channelImageChanges
+          .listen((update) {
+            final current = state;
+            if (isClosed || current is! ChatLoaded) return;
+            emit(
+              ChatLoaded([
+                for (final item in current.conversations)
+                  if (item.isChannel && item.id == update.channelId)
+                    item.copyWith(imageUrl: update.imageUrl)
+                  else
+                    item,
+              ], isCreating: current.isCreating),
+            );
+          });
+    }
   }
+  StreamSubscription<ChannelImageUpdate>? _imageSubscription;
   Timer? _timer;
   bool _active = false, _loading = false, _pending = false;
   int _revision = 0;
@@ -64,6 +84,7 @@ class ChatCubit extends Cubit<ChatState> {
   @override
   Future<void> close() {
     _timer?.cancel();
+    _imageSubscription?.cancel();
     chatListChanges.removeListener(_changed);
     _revision++;
     return super.close();

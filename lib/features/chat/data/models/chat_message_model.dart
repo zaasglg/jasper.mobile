@@ -28,6 +28,8 @@ class ChatMessageModel extends Equatable {
     this.favorited = false,
     this.pinned = false,
     this.reactions = const [],
+    this.clientId,
+    this.deliveryStatus = 'sent',
   });
 
   factory ChatMessageModel.fromJson(Map<String, dynamic> json) {
@@ -49,6 +51,8 @@ class ChatMessageModel extends Equatable {
     // marker identifies notes whose bytes are loaded via /attachment.
     final kind = _parseKind(json['kind'] ?? json['type'], callPayload, rawText);
     return ChatMessageModel(
+      clientId: json['clientId'] as String?,
+      deliveryStatus: json['deliveryStatus'] as String? ?? 'sent',
       favorited: json['favorited'] == true,
       pinned: json['pinned'] == true,
       reactions: (json['reactions'] as List? ?? [])
@@ -131,14 +135,28 @@ class ChatMessageModel extends Equatable {
         : (author: match[1]!, excerpt: match[2]!, body: match[3]!);
   }
 
-  String get preview =>
-      fileName ??
-      (kind == ChatMessageKind.audio
-          ? 'Голосовое сообщение'
-          : kind == ChatMessageKind.videoMessage
-          ? 'Видеосообщение'
-          : quote?.body ?? text);
+  bool get canCopyText =>
+      kind == ChatMessageKind.text &&
+      attachmentDataUrl == null &&
+      text.trim().isNotEmpty;
+
+  bool get canEditText => canCopyText;
+
+  bool get canForward => !isCall && kind != ChatMessageKind.unknown;
+
+  String get preview => isCall
+      ? callHeading
+      : fileName ??
+            (kind == ChatMessageKind.audio
+                ? 'Голосовое сообщение'
+                : kind == ChatMessageKind.videoMessage
+                ? 'Видеосообщение'
+                : quote?.body ?? text);
   final String id;
+  final String? clientId;
+  final String deliveryStatus;
+  bool get isPending =>
+      deliveryStatus == 'sending' || deliveryStatus == 'failed';
   final String threadId;
   final String authorId;
   final String authorName;
@@ -215,6 +233,8 @@ class ChatMessageModel extends Equatable {
       .toUpperCase();
 
   Map<String, dynamic> toJson() => <String, dynamic>{
+    'clientId': clientId,
+    'deliveryStatus': deliveryStatus,
     'favorited': favorited,
     'pinned': pinned,
     'reactions': reactions.map((e) => e.toJson()).toList(),
@@ -236,12 +256,15 @@ class ChatMessageModel extends Equatable {
   };
 
   ChatMessageModel copyWith({
+    String? deliveryStatus,
     String? id,
     String? text,
     bool? favorited,
     bool? pinned,
     List<ChatReaction>? reactions,
   }) => ChatMessageModel(
+    clientId: clientId,
+    deliveryStatus: deliveryStatus ?? this.deliveryStatus,
     favorited: favorited ?? this.favorited,
     pinned: pinned ?? this.pinned,
     reactions: reactions ?? this.reactions,
@@ -325,6 +348,8 @@ class ChatMessageModel extends Equatable {
 
   @override
   List<Object?> get props => [
+    clientId,
+    deliveryStatus,
     favorited,
     pinned,
     reactions,

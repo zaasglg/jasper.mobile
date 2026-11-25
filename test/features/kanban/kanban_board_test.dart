@@ -1,3 +1,4 @@
+import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'package:jospar/features/projects/domain/entities/task_epic_model.dart';
@@ -29,6 +30,14 @@ const _capture = bool.fromEnvironment('CAPTURE_PLANNER_PREVIEWS');
 final _previewKey = GlobalKey();
 
 class _BoardPlanner implements PlannerRepository {
+  @override
+  Future<void> updateExtras(
+    String itemId, {
+    bool updateIcon = false,
+    String? icon,
+    List<TaskChecklistModel>? checklists,
+  }) async {}
+
   final added = <String>[];
 
   @override
@@ -67,6 +76,9 @@ Future<void> _captureDrag(WidgetTester tester, String name) async {
 }
 
 class _BoardCubit extends Cubit<KanbanState> implements KanbanCubit {
+  @override
+  bool get supportsColumnCopy => false;
+
   _BoardCubit()
     : super(
         const KanbanState(
@@ -796,17 +808,9 @@ void main() {
     expect(find.text('Задачи'), findsOneWidget);
     expect(find.text('Готово'), findsOneWidget);
     expect(tester.getTopLeft(find.text('Готово')).dx, lessThan(640));
-    await tester.tap(find.byKey(const Key('board-search-toggle')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('board-search-field')),
-      'Первая',
-    );
-    expect(cubit.state.search, 'Первая');
-    await tester.tap(find.byKey(const Key('board-search-toggle')));
-    await tester.pumpAndSettle();
-    expect(cubit.state.search, isEmpty);
-    expect(find.text('Доска'), findsOneWidget);
+    expect(find.byKey(const Key('board-search-toggle')), findsNothing);
+    expect(find.byKey(const Key('board-search-field')), findsNothing);
+    expect(find.text('Доска'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -1060,18 +1064,25 @@ void main() {
       expect(find.text('Личная метка'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('task-actions-a')));
       await tester.pumpAndSettle();
+      double? previousActionY;
       for (final label in [
-        'Обложка',
+        'Изменить обложку',
         'Редактировать',
+        'Эпики',
+        'Метки',
         'Дублировать',
         'Переместить',
         'Поделиться',
         'Копировать ссылку',
         'Перевести задачу',
+        'В ежедневник',
         'Архивировать',
         'Удалить задачу',
       ]) {
         expect(find.text(label), findsOneWidget);
+        final y = tester.getTopLeft(find.text(label)).dy;
+        if (previousActionY != null) expect(y, greaterThan(previousActionY));
+        previousActionY = y;
       }
       expect(find.text('Переместить задачу'), findsNothing);
       await tester.tap(find.text('Отмена'));
@@ -1156,7 +1167,10 @@ void main() {
         tester.getCenter(find.byKey(const ValueKey('a'))),
       );
       await tester.pump(const Duration(milliseconds: 600));
-      await archiveDrag.moveTo(tester.getCenter(find.text('Архивировать')));
+      final archiveBounds = tester.getRect(find.text('Архивировать'));
+      await archiveDrag.moveTo(
+        Offset(archiveBounds.center.dx, archiveBounds.top - 24),
+      );
       await tester.pump(const Duration(milliseconds: 200));
       await archiveDrag.up();
       await tester.pump(const Duration(milliseconds: 350));

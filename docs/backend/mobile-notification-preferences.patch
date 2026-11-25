@@ -1,0 +1,291 @@
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -1344,6 +1344,7 @@
+ }
+ 
+ model MobilePushDevice {
++  preferences Json @default("{}")
+   id String @id @default(cuid())
+   token String @unique
+   platform String @default("android")
+--- a/src/push/mobile-push.dto.ts
++++ b/src/push/mobile-push.dto.ts
+@@ -4,3 +4,21 @@
+   token!: string;
+   @IsIn(['android', 'ios']) platform!: 'android' | 'ios';
+ }
++
++import { IsDefined, IsBoolean, IsInt, Min, Max, ValidateNested } from 'class-validator';
++import { Type } from 'class-transformer';
++export class MobileNotificationPreferencesDto {
++  @IsBoolean() messages!: boolean;
++  @IsBoolean() mentions!: boolean;
++  @IsBoolean() deadlines!: boolean;
++  @IsBoolean() quietEnabled!: boolean;
++  @IsInt() @Min(0) @Max(1439) quietStart!: number;
++  @IsInt() @Min(0) @Max(1439) quietEnd!: number;
++  @IsInt() @Min(-840) @Max(840) utcOffsetMinutes!: number;
++  @IsString() @Length(1, 100) timeZone!: string;
++}
++export class UpdateMobilePreferencesDto {
++  @IsString() @Length(20, 2048) @Matches(/^[A-Za-z0-9_:.-]+$/) token!: string;
++  @IsDefined() @ValidateNested() @Type(() => MobileNotificationPreferencesDto)
++  preferences!: MobileNotificationPreferencesDto;
++}
+--- a/src/push/mobile-push.controller.ts
++++ b/src/push/mobile-push.controller.ts
+@@ -1,7 +1,7 @@
+-import { Body, Controller, Delete, Get, Post, Req, UseGuards } from '@nestjs/common';
++import { Body, Put, Controller, Delete, Get, Post, Req, UseGuards } from '@nestjs/common';
+ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+ import { AuthenticatedRequest } from '../auth/authenticated-request';
+-import { RegisterMobilePushDto } from './mobile-push.dto';
++import { RegisterMobilePushDto, UpdateMobilePreferencesDto } from './mobile-push.dto';
+ import { MobilePushService } from './mobile-push.service';
+ @UseGuards(JwtAuthGuard)
+ @Controller('push/mobile')
+@@ -9,5 +9,6 @@
+   constructor(private readonly push: MobilePushService) {}
+   @Get('status') status() { return this.push.status(); }
+   @Post('devices') register(@Req() request: AuthenticatedRequest, @Body() dto: RegisterMobilePushDto) { return this.push.register(request.user, dto); }
++  @Put('preferences') preferences(@Req() request: AuthenticatedRequest, @Body() dto: UpdateMobilePreferencesDto) { return this.push.updatePreferences(request.user, dto); }
+   @Delete('devices') unregister(@Req() request: AuthenticatedRequest) { return this.push.unregister(request.user); }
+ }
+--- a/src/push/mobile-push.service.ts
++++ b/src/push/mobile-push.service.ts
+@@ -1,4 +1,4 @@
+-import { ForbiddenException, Injectable, Logger, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
++import { BadRequestException, ForbiddenException, Injectable, Logger, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+ import { OnEvent } from '@nestjs/event-emitter';
+ import { Prisma } from '@prisma/client';
+ import { createHash, randomUUID } from 'node:crypto';
+@@ -6,7 +6,8 @@
+ import { PrismaService } from '../prisma/prisma.service';
+ import { ProjectAccessService } from '../project-access/project-access.service';
+ import { FcmClient, object } from './fcm-client';
+-import { RegisterMobilePushDto } from './mobile-push.dto';
++import { RegisterMobilePushDto, UpdateMobilePreferencesDto } from './mobile-push.dto';
++import { allowsMobileNotice } from './mobile-notification-preferences';
+ import { MOBILE_ACTIVITY_CREATED, MOBILE_MESSAGE_CREATED, MobileActivity } from './mobile-push.events';
+ 
+ interface Notice { title: string; body: string; data: Record<string, string> }
+@@ -31,12 +32,23 @@
+     if (!this.fcm.configured) throw new ServiceUnavailableException('Mobile push is not configured');
+     const session = await this.session(actor);
+     await this.prisma.$transaction(async tx => {
+-      const existing = await tx.mobilePushDevice.findUnique({ where: { token: dto.token }, select: { id: true } });
++      const existing = await tx.mobilePushDevice.findUnique({ where: { token: dto.token }, select: { id: true, sessionId: true } });
+       if (!existing && await tx.mobilePushDevice.count({ where: { sessionId: session.id } }) >= 20) throw new ForbiddenException('Too many mobile devices');
+-      const device = await tx.mobilePushDevice.upsert({ where: { token: dto.token }, create: { token: dto.token, platform: dto.platform, sessionId: session.id }, update: { sessionId: session.id, platform: dto.platform } });
++      const device = await tx.mobilePushDevice.upsert({ where: { token: dto.token }, create: { token: dto.token, platform: dto.platform, sessionId: session.id }, update: { sessionId: session.id, platform: dto.platform, ...(existing && existing.sessionId !== session.id ? { preferences: {} } : {}) } });
+       await tx.mobilePushDelivery.deleteMany({ where: { deviceId: device.id, sessionId: { not: session.id } } });
+     });
+     return { registered: true };
++  }
++  async updatePreferences(actor: AuthenticatedRequest['user'], dto: UpdateMobilePreferencesDto) {
++    const session = await this.session(actor);
++    try { new Intl.DateTimeFormat('en', { timeZone: dto.preferences.timeZone }).format(new Date()); }
++    catch { throw new BadRequestException('Invalid time zone'); }
++    const result = await this.prisma.mobilePushDevice.updateMany({
++      where: { token: dto.token, sessionId: session.id },
++      data: { preferences: { ...dto.preferences } },
++    });
++    if (!result.count) throw new ForbiddenException('Device is not registered to this session');
++    return { saved: true };
+   }
+   async unregister(actor: AuthenticatedRequest['user']) {
+     const session = await this.session(actor);
+@@ -117,6 +129,18 @@
+   }
+   private async permitted(data: Record<string, unknown>, user: { id: string; role: Parameters<ProjectAccessService['assertProjectAccess']>[1]['role'] }, threads: Map<string, Promise<Array<{ userId: string; name: string }>>>): Promise<boolean> {
+     const workspace = typeof data.workspaceId === 'string' ? data.workspaceId : '';
++    if (typeof data.plannerItemId === 'string') {
++      const item = await this.prisma.projectPlannerItem.findUnique({ where: { id: data.plannerItemId }, include: { task: { select: { projectId: true, archived: true } }, inboxTask: { select: { userId: true, archived: true } } } });
++      if (!item || item.createdById !== user.id || item.archived || item.completed || !item.hasTime || !item.scheduledAt || item.scheduledAt <= new Date() || item.scheduledAt.toISOString() !== data.scheduledAt || String(item.reminderMinutes) !== data.reminderMinutes) return false;
++      if (item.taskId && (!item.task || item.task.archived)) return false;
++      if (item.inboxTaskId && (!item.inboxTask || item.inboxTask.archived || item.inboxTask.userId !== user.id)) return false;
++      const projectId = item.task?.projectId ?? item.projectId;
++      try {
++        if (projectId) await this.access.assertProjectAccess(projectId, user);
++        else if (item.workspaceId) await this.access.assertWorkspaceAccess(item.workspaceId, user);
++        return true;
++      } catch { return false; }
++    }
+     if (typeof data.callId === 'string') {
+       if (!await this.prisma.userWorkspace.findFirst({ where: { workspaceId: workspace, userId: user.id, restricted: false }, select: { userId: true } })) return false;
+       return Boolean(await this.prisma.videoRoom.findFirst({ where: { id: data.callId, workspaceId: workspace, status: 'active', invites: { some: { userId: user.id, status: 'pending' } } }, select: { id: true } }));
+@@ -149,6 +173,7 @@
+           const session = job.device.session;
+           const done = () => this.prisma.mobilePushDelivery.updateMany({ where: { id: job.id, completedAt: null }, data: { completedAt: new Date() } });
+           if (job.expiresAt <= now || session.id !== job.sessionId || session.expiresAt <= now || !session.user.isActive || data.recipientId !== session.userId) { await done(); continue; }
++          if (!allowsMobileNotice(job.device.preferences, String(data.type ?? ''), now)) { await done(); continue; }
+           const permissionKey = JSON.stringify([session.userId, data.workspaceId, data.threadId, data.taskId, data.callId]);
+           if (!permissions.has(permissionKey)) permissions.set(permissionKey, this.permitted(data, session.user, threads));
+           if (!await permissions.get(permissionKey)) { await done(); continue; }
+--- a/src/push/push.service.ts
++++ b/src/push/push.service.ts
+@@ -1,4 +1,5 @@
+-import { BadRequestException, ForbiddenException, Injectable, Logger, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
++import { MobilePushService } from './mobile-push.service';
++import { BadRequestException, ForbiddenException, Injectable, Logger, Optional, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+ import { ConfigService } from '@nestjs/config';
+ import { Prisma, PushSubscription } from '@prisma/client';
+ import * as webPush from 'web-push';
+@@ -25,7 +26,7 @@
+   private timer?: ReturnType<typeof setInterval>;
+   private busy = false;
+   private stopped = false;
+-  constructor(private readonly prisma: PrismaService, private readonly config: ConfigService, private readonly access: ProjectAccessService) {}
++  constructor(private readonly prisma: PrismaService, private readonly config: ConfigService, private readonly access: ProjectAccessService, @Optional() private readonly mobile?: MobilePushService) {}
+ 
+   private vapid() {
+     const publicKey = this.config.get<string>('VAPID_PUBLIC_KEY');
+@@ -34,7 +35,7 @@
+     return publicKey && privateKey && subject ? { publicKey, privateKey, subject } : null;
+   }
+   onModuleInit() {
+-    if (!this.vapid()) { this.logger.warn('Web Push disabled: configure VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT'); return; }
++    if (!this.vapid() && !this.mobile?.status().configured) { this.logger.warn('Web Push disabled: configure VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT'); return; }
+     this.timer = setInterval(() => void this.tick(), 30000);
+     this.timer.unref();
+     void this.tick();
+@@ -71,7 +72,7 @@
+   }
+ 
+   async tick() {
+-    if (this.busy || this.stopped || !this.vapid()) return;
++    if (this.busy || this.stopped || (!this.vapid() && !this.mobile?.status().configured)) return;
+     this.busy = true;
+     try {
+       const now = new Date();
+@@ -120,6 +121,11 @@
+           const permissionKey = `${actor.id}:${projectId ? 'project' : 'workspace'}:${scope}`;
+           if (!permissions.has(permissionKey)) permissions.set(permissionKey, (projectId ? this.access.assertProjectAccess(projectId, actor) : this.access.assertWorkspaceAccess(scope, actor)).then(() => true).catch(() => false));
+           if (!await permissions.get(permissionKey)) continue;
++          await this.mobile?.enqueue([actor.id], `planner:${item.id}:${item.scheduledAt.toISOString()}:${item.reminderMinutes}`, {
++            title: 'Напоминание о сроке',
++            body: item.inboxTask?.title ?? item.task?.title ?? item.title ?? 'Задача',
++            data: { type: 'reminder', plannerItemId: item.id, scheduledAt: item.scheduledAt.toISOString(), reminderMinutes: String(item.reminderMinutes), ...(projectId ? { projectId } : {}), ...(item.workspaceId ? { workspaceId: item.workspaceId } : {}) },
++          }, Math.max(1, Math.floor((start - Date.now()) / 1000)));
+             for (const subscription of subscriptionsByUser.get(actor.id) ?? []) {
+               await this.deliver(subscription, {
+                 id: item.id, userId: actor.id, workspaceId: item.task?.project?.workspaceId ?? item.project?.workspaceId ?? item.workspaceId,
+--- a/src/push/mobile-push.service.spec.ts
++++ b/src/push/mobile-push.service.spec.ts
+@@ -9,7 +9,7 @@
+ function setup() {
+   const db = {
+     userSession: { findFirst: jest.fn().mockResolvedValue({ id: 'session' }) },
+-    mobilePushDevice: { findUnique: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0), upsert: jest.fn().mockResolvedValue({ id: 'device' }), deleteMany: jest.fn().mockResolvedValue({ count: 1 }), findMany: jest.fn().mockResolvedValue([]) },
++    mobilePushDevice: { updateMany: jest.fn().mockResolvedValue({count:1}), findUnique: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0), upsert: jest.fn().mockResolvedValue({ id: 'device' }), deleteMany: jest.fn().mockResolvedValue({ count: 1 }), findMany: jest.fn().mockResolvedValue([]) },
+     mobilePushDelivery: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }), createMany: jest.fn().mockResolvedValue({ count: 1 }), findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+     userWorkspace: { findMany: jest.fn().mockResolvedValue([{ userId: 'u', user: { name: 'Member' } }]) },
+     channel: { findFirst: jest.fn() },
+@@ -23,13 +23,28 @@
+   const service = new MobilePushService(db as unknown as PrismaService, fcm as unknown as FcmClient, access as unknown as ProjectAccessService);
+   const job = {
+     id: 'job', deviceId: 'device', sessionId: 'session', attempts: 0, expiresAt: new Date(Date.now() + 60000),
+-    payload: { title: 'Message', body: 'Body', data: { recipientId: 'u', workspaceId: 'w', threadId: 'dm:u:v', eventId: 'message:1' } },
++    payload: { title: 'Message', body: 'Body', data: { type: 'message', recipientId: 'u', workspaceId: 'w', threadId: 'dm:u:v', eventId: 'message:1' } },
+     device: { id: 'device', token: 'device-token', sessionId: 'session', session: { id: 'session', userId: 'u', expiresAt: new Date(Date.now() + 60000), user: { id: 'u', role: UserRole.EXECUTOR, isActive: true } } },
+   };
+   return { db, fcm, access, service, job };
+ }
+ 
+ describe('mobile push session registration and delivery', () => {
++  it('saves preferences only for the authenticated device session', async () => {
++    const {db,service} = setup();
++    const preferences = {messages:false,mentions:true,deadlines:true,quietEnabled:true,quietStart:1320,quietEnd:480,utcOffsetMinutes:300,timeZone:'Asia/Almaty'};
++    expect(await service.updatePreferences(actor,{token:'device-token',preferences})).toEqual({saved:true});
++    expect(db.mobilePushDevice.updateMany).toHaveBeenCalledWith({where:{token:'device-token',sessionId:'session'},data:{preferences}});
++    db.mobilePushDevice.updateMany.mockResolvedValue({count:0});
++    await expect(service.updatePreferences(actor,{token:'device-token',preferences})).rejects.toThrow(ForbiddenException);
++  });
++  it('consumes disabled notifications before claiming or contacting FCM', async () => {
++    const {db,service,fcm,job} = setup();
++    db.mobilePushDelivery.findMany.mockResolvedValueOnce([{...job, device:{...job.device,preferences:{messages:false}}}]);
++    await service.drain();
++    expect(fcm.send).not.toHaveBeenCalled();
++    expect(db.mobilePushDelivery.updateMany).toHaveBeenCalledWith(expect.objectContaining({data:{completedAt:expect.any(Date)}}));
++  });
+   it('requires a live server session and binds token without a client userId', async () => {
+     const { db, service } = setup();
+     await expect(service.register({ ...actor, jti: undefined }, { token: 'opaque-device-token', platform: 'android' })).rejects.toBeInstanceOf(ForbiddenException);
+--- a/src/push/push.service.spec.ts
++++ b/src/push/push.service.spec.ts
+@@ -1,3 +1,4 @@
++import { MobilePushService } from './mobile-push.service';
+ import { BadRequestException, ForbiddenException } from '@nestjs/common';
+ import { ConfigService } from '@nestjs/config';
+ import { UserRole } from '@prisma/client';
+@@ -31,6 +32,15 @@
+ 
+ describe('Web Push reminders', () => {
+   beforeEach(() => { jest.clearAllMocks(); send.mockResolvedValue({ statusCode: 201, body: '', headers: {} }); });
++  it('enqueues mobile planner reminders even without Web Push configuration', async () => {
++    const {prisma,access,item} = setup();
++    const mobile = {status:()=>({configured:true}),enqueue:jest.fn().mockResolvedValue(undefined)};
++    const service = new PushService(prisma as unknown as PrismaService,{get:()=>undefined} as unknown as ConfigService,access as unknown as ProjectAccessService,mobile as unknown as MobilePushService);
++    prisma.$queryRaw.mockResolvedValueOnce([{id:'item'}]).mockResolvedValue([]);
++    prisma.projectPlannerItem.findMany.mockResolvedValue([{...item,createdById:'user',taskId:'task',task:{title:'Task',projectId:'project',archived:false,progress:0}}]);
++    await service.tick();
++    expect(mobile.enqueue).toHaveBeenCalledWith(['user'],expect.stringContaining('planner:item:'),expect.objectContaining({data:expect.objectContaining({type:'reminder',plannerItemId:'item'})}),expect.any(Number));
++  });
+   it.each(['http://fcm.googleapis.com/x', 'https://localhost/x', 'https://127.0.0.1/x', 'https://fcm.googleapis.com.evil.org/x', 'https://user:pass@fcm.googleapis.com/x', 'https://fcm.googleapis.com:444/x'])('rejects SSRF endpoint %s', endpoint => expect(allowedPushEndpoint(endpoint)).toBe(false));
+   it.each(['https://fcm.googleapis.com/x', 'https://updates.push.services.mozilla.com/x', 'https://web.push.apple.com/x'])('accepts push provider %s', endpoint => expect(allowedPushEndpoint(endpoint)).toBe(true));
+   it('accepts native PushSubscription JSON including expirationTime, rejects missing keys', async () => {
+--- /dev/null
++++ b/src/push/mobile-notification-preferences.ts
+@@ -0,0 +1,16 @@
++import { object } from './fcm-client';
++/** Suppressed notices are consumed, never replayed as a morning burst. */
++export function allowsMobileNotice(raw: unknown, type: string, now: Date): boolean {
++  if (type === 'call') return true;
++  const p = object(raw);
++  if (p.quietEnabled === true) {
++    let minute: number;
++    try {
++      const parts = new Intl.DateTimeFormat('en-GB', { timeZone: String(p.timeZone), hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
++      minute = Number(parts.find(p => p.type === 'hour')?.value) * 60 + Number(parts.find(p => p.type === 'minute')?.value);
++    } catch { const local = new Date(now.getTime() + Number(p.utcOffsetMinutes ?? 0) * 60000); minute = local.getUTCHours() * 60 + local.getUTCMinutes(); }
++    const start = Number(p.quietStart ?? 1320), end = Number(p.quietEnd ?? 480);
++    if (start === end || (start < end ? minute >= start && minute < end : minute >= start || minute < end)) return false;
++  }
++  return !(type === 'message' && p.messages === false || type === 'mention' && p.mentions === false || ['deadline', 'reminder', 'planner'].includes(type) && p.deadlines === false);
++}
+--- /dev/null
++++ b/src/push/mobile-notification-preferences.spec.ts
+@@ -0,0 +1,29 @@
++import { allowsMobileNotice as allows } from './mobile-notification-preferences';
++import { validate } from 'class-validator';
++import { plainToInstance } from 'class-transformer';
++import { UpdateMobilePreferencesDto } from './mobile-push.dto';
++const quiet = { quietEnabled: true, quietStart: 1320, quietEnd: 480, timeZone: 'Asia/Almaty' };
++describe('mobile notification preferences', () => {
++  it('keeps categories independent and calls available', () => {
++    const p = { messages: false, deadlines: false };
++    expect(allows(p, 'message', new Date())).toBe(false);
++    expect(allows(p, 'mention', new Date())).toBe(true);
++    expect(allows(p, 'reminder', new Date())).toBe(false);
++    expect(allows({ ...quiet }, 'call', new Date())).toBe(true);
++  });
++  it('handles midnight, exact boundaries and a full day', () => {
++    expect(allows(quiet, 'message', new Date('2026-11-24T17:00:00Z'))).toBe(false);
++    expect(allows(quiet, 'message', new Date('2026-11-25T02:59:00Z'))).toBe(false);
++    expect(allows(quiet, 'message', new Date('2026-11-25T03:00:00Z'))).toBe(true);
++    expect(allows({ ...quiet, quietEnd:1320 }, 'mention', new Date())).toBe(false);
++  });
++  it('uses the timezone DST rules instead of a frozen offset', () => {
++    const p = {...quiet, timeZone:'Europe/Berlin'};
++    expect(allows(p,'message',new Date('2026-07-01T20:00:00Z'))).toBe(false);
++    expect(allows(p,'message',new Date('2026-01-01T20:00:00Z'))).toBe(true);
++  });
++  it('requires nested preferences and rejects invalid times', async () => {
++    expect((await validate(plainToInstance(UpdateMobilePreferencesDto,{token:'x'.repeat(30)}))).length).toBeGreaterThan(0);
++    expect((await validate(plainToInstance(UpdateMobilePreferencesDto,{token:'x'.repeat(30),preferences:{...quiet,quietStart:1440}}))).length).toBeGreaterThan(0);
++  });
++});
+--- /dev/null
++++ b/prisma/migrations/20261124103500_mobile_notification_preferences/migration.sql
+@@ -0,0 +1 @@
++ALTER TABLE "mobile_push_devices" ADD COLUMN "preferences" JSONB NOT NULL DEFAULT '{}';

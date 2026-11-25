@@ -1,3 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../../core/auth/auth_session.dart';
+import '../models/channel_info_model.dart';
+import '../../domain/repositories/channel_image_repository.dart';
 import '../../../collaboration/data/models/space_member_dto.dart';
 import '../../../collaboration/domain/entities/space_member.dart';
 import 'package:dio/dio.dart';
@@ -11,13 +18,275 @@ import '../models/chat_interaction_models.dart';
 class ChatRepositoryImpl
     implements
         ChatRepository,
+        ChatOutboxRepository,
+        ChannelImageRepository,
+        ChannelMembersRepository,
         ChatActionsRepository,
         ChatInteractionRepository,
         ChatRefreshRepository,
         ChatThreadActionsRepository {
-  const ChatRepositoryImpl(this._dio, this._workspaceStorage);
+  ChatRepositoryImpl(this._dio, this._workspaceStorage);
   final Dio _dio;
   final WorkspaceSelectionStorage _workspaceStorage;
+  final _outboxStorage = const FlutterSecureStorage();
+  Future<void> _outboxWrites = Future.value();
+  final _sendingClients = <String>{};
+
+  Future<String> _outboxKey() async {
+    final token = await _outboxStorage.read(key: 'access_token');
+    if (token == null) throw const ChatException('Требуется авторизация.');
+    final claims =
+        jsonDecode(
+              utf8.decode(
+                base64Url.decode(base64Url.normalize(token.split('.')[1])),
+              ),
+            )
+            as Map;
+    final owner = claims['sub'] ?? claims['id'];
+    if (owner == null) throw const ChatException('Требуется авторизация.');
+    return 'chat_outbox.v1.$owner.${await _workspaceId()}';
+  }
+
+  Future<List<ChatMessageModel>> _readOutbox(String key) async {
+    final raw = await _outboxStorage.read(key: key);
+    if (raw == null) return [];
+    return (jsonDecode(raw) as List)
+        .map(
+          (e) => ChatMessageModel.fromJson(Map<String, dynamic>.from(e as Map)),
+        )
+        .toList();
+  }
+
+  Future<void> _savePending(
+    String key,
+    ChatMessageModel message, {
+    bool remove = false,
+  }) {
+    final operation = _outboxWrites.then((_) async {
+      final messages = await _readOutbox(key);
+      messages.removeWhere((e) => e.clientId == message.clientId);
+      if (!remove) messages.add(message);
+      await _outboxStorage.write(
+        key: key,
+        value: jsonEncode(messages.map((e) => e.toJson()).toList()),
+      );
+    });
+    _outboxWrites = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return operation;
+  }
+
+  @override
+  Future<List<ChatMessageModel>> pendingMessages(String threadId) async {
+    final key = await _outboxKey();
+    await _outboxWrites;
+    return (await _readOutbox(key))
+        .where((e) => e.threadId == threadId)
+        .map(
+          (e) => e.copyWith(
+            deliveryStatus: _sendingClients.contains(e.clientId)
+                ? 'sending'
+                : 'failed',
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<ChatMessageModel> enqueueMessage(String threadId, String text) async {
+    final key = await _outboxKey();
+    final bytes = List<int>.generate(16, (_) => Random.secure().nextInt(256));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    final hex = bytes.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
+    final id =
+        '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+    final message = ChatMessageModel(
+      id: 'local:$id',
+      clientId: id,
+      threadId: threadId,
+      authorId: '',
+      authorName: '',
+      text: text,
+      createdAt: DateTime.now(),
+      deliveryStatus: 'sending',
+    );
+    await _savePending(key, message);
+    return message;
+  }
+
+  @override
+  Future<ChatMessageModel> sendPending(ChatMessageModel message) async {
+    final key = await _outboxKey();
+    if (!_sendingClients.add(message.clientId!)) {
+      throw const ChatException('Отправка уже выполняется.');
+    }
+    try {
+      final user = await _dio.get<dynamic>('users/me');
+      final userId = _object(user.data, const [
+        'data',
+        'user',
+      ])['id']?.toString();
+      if (userId == null || userId.trim().isEmpty) {
+        throw const ChatException('Не удалось определить отправителя.');
+      }
+      final payload = <String, dynamic>{
+        'clientId': message.clientId,
+        'userId': userId,
+        'threadId': message.threadId,
+        'workspaceId': await _workspaceId(),
+        'kind': 'TEXT',
+        'text': message.text,
+      };
+      Future<Response<dynamic>> post() => _dio
+          .post<dynamic>(
+            'messages',
+            options: Options(
+              sendTimeout: const Duration(seconds: 20),
+              receiveTimeout: const Duration(seconds: 20),
+            ),
+            data: Map<String, dynamic>.of(payload),
+          )
+          .timeout(const Duration(seconds: 25));
+      Response<dynamic> response;
+      try {
+        response = await post();
+      } on DioException catch (error) {
+        final data = error.response?.data;
+        final errors = data is Map ? data['message'] : null;
+        final messages = errors is List ? errors : [errors];
+        // A validation rejection happens before creation. Never retry an
+        // ambiguous failure without the server's deduplication identifier.
+        if (error.response?.statusCode != 400 ||
+            !messages.contains('property clientId should not exist')) {
+          rethrow;
+        }
+        payload.remove('clientId');
+        response = await post();
+      }
+      final result = ChatMessageModel.fromJson(
+        _object(response.data, const ['data', 'message']),
+      );
+      if (result.id.isEmpty) {
+        throw const ChatException('Некорректный ответ сервера.');
+      }
+      await _savePending(key, message, remove: true);
+      return result;
+    } catch (_) {
+      await _savePending(key, message.copyWith(deliveryStatus: 'failed'));
+      rethrow;
+    } finally {
+      _sendingClients.remove(message.clientId);
+    }
+  }
+
+  final _images = <String, ChannelImageUpdate>{};
+  final _imageWrites = <String, int>{};
+  final _imageChanges = StreamController<ChannelImageUpdate>.broadcast(
+    sync: true,
+  );
+  int _writeRevision = 0;
+  int _imageRevision = DateTime.now().microsecondsSinceEpoch;
+  int _imageSession = authSession.generation;
+  void _checkImageSession() {
+    if (_imageSession == authSession.generation) return;
+    _imageSession = authSession.generation;
+    _images.clear();
+    _imageWrites.clear();
+  }
+
+  Future<void> dispose() => _imageChanges.close();
+  @override
+  Stream<ChannelImageUpdate> get channelImageChanges => _imageChanges.stream;
+  @override
+  ChannelImageUpdate? channelImageSnapshot(String channelId) {
+    _checkImageSession();
+    return _images[channelId];
+  }
+
+  String? _rememberImage(
+    String id,
+    String? url,
+    int readRevision,
+    int session, {
+    bool saved = false,
+  }) {
+    _checkImageSession();
+    if (session != _imageSession) return url;
+    if (!saved && (_imageWrites[id] ?? 0) > readRevision) {
+      return _images[id]?.imageUrl;
+    }
+    if (saved) _imageWrites[id] = ++_writeRevision;
+    if (saved || !_images.containsKey(id) || _images[id]!.imageUrl != url) {
+      final update = ChannelImageUpdate(id, url, ++_imageRevision);
+      _images[id] = update;
+      if (!_imageChanges.isClosed) _imageChanges.add(update);
+    }
+    return url;
+  }
+
+  @override
+  Future<ChannelInfoModel> channelInfo(String channelId) async {
+    _checkImageSession();
+    final revision = _writeRevision, session = _imageSession;
+    try {
+      final response = await _dio.get<dynamic>(
+        'channels/${Uri.encodeComponent(channelId)}/members',
+      );
+      final json = _object(response.data, const ['data']);
+      if (json['members'] is! List) {
+        throw const ChannelPhotoException(ChannelPhotoError.invalidResponse);
+      }
+      final info = ChannelInfoModel.fromJson(json);
+      return info.copyWith(
+        imageUrl: _rememberImage(channelId, info.imageUrl, revision, session),
+      );
+    } on DioException catch (e) {
+      throw ChannelPhotoException(
+        e.response?.statusCode == 403
+            ? ChannelPhotoError.forbidden
+            : ChannelPhotoError.load,
+      );
+    }
+  }
+
+  @override
+  Future<String?> setChannelImage(String channelId, String? dataUrl) async {
+    if (dataUrl != null &&
+        (dataUrl.length > 100000 ||
+            !RegExp(
+              r'^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$',
+            ).hasMatch(dataUrl))) {
+      throw const ChannelPhotoException(ChannelPhotoError.format);
+    }
+    _checkImageSession();
+    final session = _imageSession;
+    try {
+      final response = await _dio.patch<dynamic>(
+        'channels/${Uri.encodeComponent(channelId)}',
+        data: {'imageUrl': dataUrl},
+      );
+      final json = response.data is Map
+          ? _object(response.data, const ['data', 'channel'])
+          : <String, dynamic>{};
+      final value = json.containsKey('imageUrl') ? json['imageUrl'] : dataUrl;
+      if (value != null && value is! String) {
+        throw const ChannelPhotoException(ChannelPhotoError.invalidResponse);
+      }
+      final url = value as String?;
+      _rememberImage(channelId, url, _writeRevision, session, saved: true);
+      return url;
+    } on DioException catch (e) {
+      throw ChannelPhotoException(
+        e.response?.statusCode == 403
+            ? ChannelPhotoError.forbidden
+            : ChannelPhotoError.save,
+      );
+    }
+  }
+
   @override
   Future<void> clearConversation(String threadId) async {
     final workspaceId = await _workspaceId();
@@ -28,6 +297,22 @@ class ChatRepositoryImpl
         'threadId': threadId,
         'workspaceId': workspaceId,
         'keepVisible': true,
+      },
+    );
+  }
+
+  @override
+  Future<void> deleteConversation(String threadId) async {
+    if (!threadId.startsWith('dm:')) {
+      throw const ChatException('Удалять можно только личные чаты.');
+    }
+    await _action(
+      'POST',
+      'messages/threads/clear',
+      data: {
+        'threadId': threadId,
+        'workspaceId': await _workspaceId(),
+        'keepVisible': false,
       },
     );
   }
@@ -209,6 +494,34 @@ class ChatRepositoryImpl
   }
 
   @override
+  Future<List<SpaceMember>> workspaceChannelCandidates() async {
+    final workspaceId = await _workspaceId();
+    try {
+      final response = await _dio.get<dynamic>(
+        'workspaces/${Uri.encodeComponent(workspaceId)}/members',
+      );
+      if (response.data is! List && response.data is! Map) {
+        throw const ChatException(
+          'Не удалось загрузить участников воркспейса.',
+        );
+      }
+      return _items(response.data)
+          .whereType<Map>()
+          .map(
+            (json) => SpaceMemberDto.fromJson(
+              Map<String, dynamic>.from(json),
+            ).toEntity(),
+          )
+          .where((member) => member.userId.isNotEmpty)
+          .toList();
+    } on DioException catch (error) {
+      throw ChatException(
+        _errorMessage(error, 'Не удалось загрузить участников воркспейса.'),
+      );
+    }
+  }
+
+  @override
   Future<void> setChannelMembers(String channelId, List<String> userIds) =>
       _action(
         'PUT',
@@ -218,6 +531,8 @@ class ChatRepositoryImpl
 
   @override
   Future<List<ChatConversationModel>> getConversations() async {
+    _checkImageSession();
+    final imageRevision = _writeRevision, imageSession = _imageSession;
     final workspaceId = await _workspaceId();
     try {
       final responses = await Future.wait([
@@ -277,13 +592,25 @@ class ChatRepositoryImpl
       final result = <ChatConversationModel>[
         ...channels.whereType<Map>().map((item) {
           final json = Map<String, dynamic>.from(item);
-          final channel = ChatConversationModel.fromChannelJson(json);
+          final parsed = ChatConversationModel.fromChannelJson(json);
+          final channel = parsed.copyWith(
+            imageUrl: _rememberImage(
+              parsed.id,
+              parsed.imageUrl,
+              imageRevision,
+              imageSession,
+            ),
+          );
           final thread = _threadFor(threads, channel.id, true);
           return thread == null
               ? channel
               : channel.copyWith(
                   threadId: _threadId(thread) ?? channel.threadId,
                   unreadCount: _unread(thread),
+                  lastMessage: ChatConversationModel.previewFromThread(
+                    thread,
+                    currentUserId: currentUserId,
+                  ),
                 );
         }),
         ...users
@@ -541,24 +868,32 @@ class ChatRepositoryImpl
     bool channel, [
     String? currentUserId,
   ]) {
+    final expected = channel
+        ? targetId
+        : currentUserId == null
+        ? null
+        : ChatConversationModel.directThreadId(currentUserId, targetId);
+    // A thread summary's `user` is its last author, not the DM recipient.
+    // Match canonical IDs before considering older participant-based shapes.
+    if (expected != null) {
+      for (final item in threads.whereType<Map>()) {
+        final map = Map<String, dynamic>.from(item);
+        if (_threadId(map) == expected) return map;
+      }
+    }
     for (final item in threads.whereType<Map>()) {
       final map = Map<String, dynamic>.from(item);
-      if (!channel &&
-          currentUserId != null &&
-          _threadId(map) ==
-              ChatConversationModel.directThreadId(currentUserId, targetId)) {
-        return map;
-      }
+      final isHead = map.containsKey('text') || map.containsKey('lastMessage');
       final candidateIds = channel
           ? [
               map['channelId'],
               (map['channel'] is Map ? (map['channel'] as Map)['id'] : null),
             ]
           : [
-              map['userId'],
               map['recipientId'],
               map['otherUserId'],
-              (map['user'] is Map ? (map['user'] as Map)['id'] : null),
+              if (!isHead) map['userId'],
+              if (!isHead && map['user'] is Map) (map['user'] as Map)['id'],
             ];
       if (candidateIds.any((id) => id?.toString() == targetId)) return map;
     }

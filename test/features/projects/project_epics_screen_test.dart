@@ -60,6 +60,7 @@ class _Repository
       id: '2',
       projectId: 'p',
       status: 'DONE',
+      progress: 100,
       title: 'Готово',
       epics: [_done],
     ),
@@ -197,6 +198,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Запуск'), findsOneWidget);
     expect(find.text('Идеи'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('epics-filter-empty')),
+    );
     await tester.tap(find.byKey(const ValueKey('epics-filter-empty')));
     await tester.pumpAndSettle();
     expect(find.text('Идеи'), findsOneWidget);
@@ -209,7 +213,14 @@ void main() {
     expect(find.text('Идеи'), findsNothing);
     await tester.tap(find.text('Релиз'));
     await tester.pumpAndSettle();
-    expect(find.text('Готово'), findsOneWidget);
+    expect(find.text('Готово'), findsNothing);
+    expect(find.byType(ExpansionTile), findsNothing);
+    expect(
+      tester
+          .widget<Checkbox>(find.byKey(const ValueKey('epic-filter-done')))
+          .value,
+      isTrue,
+    );
     await tester.enterText(
       find.byKey(const Key('epics-search')),
       'нет совпадений',

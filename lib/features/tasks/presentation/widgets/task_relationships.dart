@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/material.dart';
@@ -106,14 +107,14 @@ class _TaskRelationshipsState extends State<TaskRelationships> {
           children: [
             const Icon(LucideIcons.link, size: AppIconSizes.standard),
             const SizedBox(width: 9),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Зависимости',
+                tr(context, 'Зависимости'),
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
             ),
             IconButton(
-              tooltip: 'Изменить зависимости',
+              tooltip: tr(context, 'Изменить зависимости'),
               onPressed: widget.enabled && !_loading && _error == null
                   ? _edit
                   : null,
@@ -123,10 +124,13 @@ class _TaskRelationshipsState extends State<TaskRelationships> {
         ),
         if (_loading) const LinearProgressIndicator(minHeight: 2),
         if (_error != null)
-          TextButton(onPressed: _load, child: Text('$_error Повторить')),
+          TextButton(
+            onPressed: _load,
+            child: Text(tr(context, "{p0} Повторить", {'p0': _error})),
+          ),
         if (widget.task.deps.isEmpty && outgoing.isEmpty)
-          const Text(
-            'Нет зависимостей',
+          Text(
+            tr(context, 'Нет зависимостей'),
             style: TextStyle(fontSize: 13, color: Colors.grey),
           ),
         for (final id in widget.task.deps) _link(id, 'Зависит от'),
@@ -190,16 +194,16 @@ class _DependencyEditorState extends State<_DependencyEditor> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Задача зависит от',
+            Text(
+              tr(context, 'Задача зависит от'),
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
             TextField(
               onChanged: (value) =>
                   setState(() => _query = value.toLowerCase()),
-              decoration: const InputDecoration(
-                hintText: 'Поиск задач',
+              decoration: InputDecoration(
+                hintText: tr(context, 'Поиск задач'),
                 prefixIcon: Icon(Icons.search, size: 16),
               ),
             ),
@@ -235,7 +239,10 @@ class _DependencyEditorState extends State<_DependencyEditor> {
                               context: context,
                               tone: AppSnackBarTone.error,
                               content: Text(
-                                'Эта связь создаст циклическую зависимость.',
+                                tr(
+                                  context,
+                                  'Эта связь создаст циклическую зависимость.',
+                                ),
                               ),
                             ),
                           );
@@ -266,7 +273,7 @@ class _DependencyEditorState extends State<_DependencyEditor> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, _selected.toList()),
-              child: const Text('Сохранить'),
+              child: Text(tr(context, 'Сохранить')),
             ),
           ],
         ),

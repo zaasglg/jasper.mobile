@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 
 Future<T?> _select<T>(
@@ -60,7 +61,7 @@ Future<T?> _select<T>(
                       onPressed: selected == null
                           ? null
                           : () => Navigator.pop(context, selected),
-                      child: const Text('Готово'),
+                      child: Text(tr(context, 'Готово')),
                     ),
                   ),
                 ],

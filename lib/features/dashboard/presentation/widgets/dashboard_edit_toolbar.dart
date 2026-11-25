@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -29,13 +30,13 @@ class DashboardEditToolbar extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Редактирование виджетов',
+                    tr(context, 'Редактирование виджетов'),
                     style: AppTypography.title(context),
                   ),
                 ),
                 IconButton(
                   key: const Key('dashboard_edit_cancel'),
-                  tooltip: 'Отмена',
+                  tooltip: tr(context, 'Отмена'),
                   onPressed: saving ? null : onCancel,
                   constraints: const BoxConstraints(
                     minWidth: AppSpacing.touchTarget,
@@ -46,7 +47,7 @@ class DashboardEditToolbar extends StatelessWidget {
               ],
             ),
             Text(
-              'Перетаскивайте виджеты, чтобы изменить порядок',
+              tr(context, 'Перетаскивайте виджеты, чтобы изменить порядок'),
               style: AppTypography.caption(
                 context,
               )?.copyWith(color: colors.onSurfaceVariant),
@@ -59,7 +60,7 @@ class DashboardEditToolbar extends StatelessWidget {
                     key: const Key('dashboard_edit_add'),
                     onPressed: saving ? null : onAdd,
                     icon: const Icon(LucideIcons.plus),
-                    label: const Text('Добавить виджет'),
+                    label: Text(tr(context, 'Добавить виджет')),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, AppSpacing.touchTarget),
                     ),
@@ -68,7 +69,7 @@ class DashboardEditToolbar extends StatelessWidget {
                 const SizedBox(width: AppSpacing.sm),
                 IconButton(
                   key: const Key('dashboard_edit_reset'),
-                  tooltip: 'Сбросить виджеты',
+                  tooltip: tr(context, 'Сбросить виджеты'),
                   onPressed: saving ? null : onReset,
                   icon: const Icon(LucideIcons.rotateCcw),
                 ),
@@ -82,7 +83,9 @@ class DashboardEditToolbar extends StatelessWidget {
                 minimumSize: const Size(0, AppSpacing.touchTarget),
               ),
               icon: const Icon(LucideIcons.check),
-              label: Text(saving ? 'Сохранение…' : 'Сохранить'),
+              label: Text(
+                saving ? tr(context, 'Сохранение…') : tr(context, 'Сохранить'),
+              ),
             ),
           ],
         ),

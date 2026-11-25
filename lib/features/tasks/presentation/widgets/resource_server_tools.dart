@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../data/models/task_detail_model.dart';
@@ -78,13 +79,13 @@ class _CalculatorState extends State<_Calculator> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy,
     child: AlertDialog(
-      title: const Text('Калькулятор'),
+      title: Text(tr(context, 'Калькулятор')),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Текущее значение: ${widget.current}'),
+            Text(tr(context, "Текущее значение: {p0}", {'p0': widget.current})),
             const SizedBox(height: 16),
             SegmentedButton<String>(
               showSelectedIcon: false,
@@ -109,8 +110,8 @@ class _CalculatorState extends State<_Calculator> {
                 signed: true,
               ),
               decoration: InputDecoration(
-                hintText: 'Введите число',
-                errorText: _error,
+                hintText: tr(context, 'Введите число'),
+                errorText: trn(context, _error),
                 errorMaxLines: 3,
               ),
             ),
@@ -120,11 +121,13 @@ class _CalculatorState extends State<_Calculator> {
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.pop(context),
-          child: const Text('Отмена'),
+          child: Text(tr(context, 'Отмена')),
         ),
         FilledButton(
           onPressed: _busy ? null : _apply,
-          child: Text(_busy ? 'Сохранение…' : 'Применить'),
+          child: Text(
+            _busy ? tr(context, 'Сохранение…') : tr(context, 'Применить'),
+          ),
         ),
       ],
     ),
@@ -287,12 +290,12 @@ class _PairHistoryBodyState extends State<_PairHistoryBody> {
                 children: [
                   Expanded(
                     child: Text(
-                      'История ресурсов',
+                      tr(context, 'История ресурсов'),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Закрыть историю',
+                    tooltip: tr(context, 'Закрыть историю'),
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close),
                   ),
@@ -350,15 +353,19 @@ class _PairHistoryBodyState extends State<_PairHistoryBody> {
             ),
             if (_busy) const LinearProgressIndicator(),
             if (!_busy && rows.isEmpty && _error == null)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(16),
-                child: Text('История пока пуста'),
+                child: Text(tr(context, 'История пока пуста')),
               ),
-            if (_error != null) Text(_error!),
+            if (_error != null) Text(tr(context, _error!)),
             if (!_busy && (_error != null || _cursors.any((v) => v != null)))
               TextButton(
                 onPressed: _load,
-                child: Text(_error != null ? 'Повторить' : 'Загрузить ещё'),
+                child: Text(
+                  _error != null
+                      ? tr(context, 'Повторить')
+                      : tr(context, 'Загрузить ещё'),
+                ),
               ),
           ],
         ),
@@ -449,7 +456,7 @@ class _ResourceHistoryTable extends StatelessWidget {
                     child: Tooltip(
                       message: item['user'] is Map
                           ? (item['user'] as Map)['name']?.toString() ?? 'Автор'
-                          : 'Автор',
+                          : tr(context, 'Автор'),
                       child: UserAvatar(
                         size: 28,
                         name: item['user'] is Map
@@ -545,7 +552,7 @@ class _HistoryState extends State<_History> {
         children: [
           if (widget.showTitle)
             Text(
-              'История ресурса',
+              tr(context, 'История ресурса'),
               style: Theme.of(context).textTheme.titleLarge,
             ),
           if (widget.table) _ResourceHistoryTable(items: _items),
@@ -567,12 +574,16 @@ class _HistoryState extends State<_History> {
               ),
           if (_busy) const Center(child: CircularProgressIndicator()),
           if (!_busy && _error == null && _items.isEmpty)
-            const Text('История пока пуста'),
-          if (_error != null) Text(_error!),
+            Text(tr(context, 'История пока пуста')),
+          if (_error != null) Text(tr(context, _error!)),
           if (!_busy && (_cursor != null || _error != null))
             TextButton(
               onPressed: _load,
-              child: Text(_error != null ? 'Повторить' : 'Загрузить ещё'),
+              child: Text(
+                _error != null
+                    ? tr(context, 'Повторить')
+                    : tr(context, 'Загрузить ещё'),
+              ),
             ),
         ],
       ),

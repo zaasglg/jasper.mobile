@@ -1,9 +1,12 @@
+import '../../domain/daily_quote_repository.dart';
+import '../widgets/dashboard_daily_quote.dart';
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../assistant/data/services/assistant_task_changes.dart';
 import '../widgets/dashboard_expandable_content.dart';
 import '../widgets/dashboard_widget_skeleton.dart';
-import '../../../../core/theme/dashboard_surface.dart';
 import 'package:go_router/go_router.dart';
 import '../../../tasks/data/models/task_creation_models.dart';
 import '../../../tasks/presentation/cubit/my_tasks_state.dart';
@@ -163,7 +166,7 @@ class _DashboardView extends StatelessWidget {
           appSnackBar(
             context: context,
             tone: AppSnackBarTone.error,
-            content: Text(state.error!),
+            content: Text(tr(context, state.error!)),
           ),
         );
       }
@@ -187,7 +190,7 @@ class _DashboardView extends StatelessWidget {
           if (!didPop && state.editing) cubit.cancelEdit();
         },
         child: Scaffold(
-          backgroundColor: DashboardSurface.background,
+          backgroundColor: AppColors.of(context).canvas,
           appBar: const DashboardAppBar(),
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -225,8 +228,11 @@ class _DashboardView extends StatelessWidget {
                                   : AppSnackBarTone.success,
                               content: Text(
                                 created.orderWarning
-                                    ? 'Задача создана. Не удалось обновить её порядок в колонке'
-                                    : 'Задача создана',
+                                    ? tr(
+                                        context,
+                                        'Задача создана. Не удалось обновить её порядок в колонке',
+                                      )
+                                    : tr(context, 'Задача создана'),
                               ),
                             ),
                           );
@@ -238,6 +244,13 @@ class _DashboardView extends StatelessWidget {
                       : 'Пользователь',
                 ),
               ),
+              if (state.workspaceId.isNotEmpty &&
+                  sl.isRegistered<DailyQuoteRepository>())
+                DashboardDailyQuote(
+                  key: ValueKey('quote-${state.userId}-${state.workspaceId}'),
+                  repository: sl<DailyQuoteRepository>(),
+                  workspaceId: state.workspaceId,
+                ),
               if (state.editing)
                 DashboardEditToolbar(
                   saving: state.saving,
@@ -250,11 +263,8 @@ class _DashboardView extends StatelessWidget {
                 const LinearProgressIndicator(minHeight: 2),
               Expanded(
                 child: Container(
-                  decoration: const BoxDecoration(
-                    color: DashboardSurface.background,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
+                  decoration: BoxDecoration(
+                    color: AppColors.of(context).canvas,
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: state.layout == null && state.error != null
@@ -265,23 +275,23 @@ class _DashboardView extends StatelessWidget {
                               state.workspaceId,
                               refresh: true,
                             ),
-                            child: const Text('Повторить загрузку дашборда'),
+                            child: Text(
+                              tr(context, 'Повторить загрузку дашборда'),
+                            ),
                           ),
                         )
                       : state.layout == null
                       ? ListView(
-                          padding: const EdgeInsets.all(16),
+                          padding: EdgeInsets.zero,
                           children: [
-                            for (var i = 0; i < 3; i++)
-                              Container(
-                                margin: const EdgeInsets.only(bottom: 20),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: DashboardSurface.shadows,
+                            for (var i = 0; i < 3; i++) ...[
+                              if (i > 0)
+                                Divider(
+                                  height: 1,
+                                  color: Theme.of(context).dividerColor,
                                 ),
-                                child: const DashboardWidgetSkeleton(),
-                              ),
+                              const DashboardWidgetSkeleton(),
+                            ],
                           ],
                         )
                       : state.editing
@@ -291,16 +301,18 @@ class _DashboardView extends StatelessWidget {
                           onReorderItem: cubit.reorder,
                           itemCount: slots.length,
                           footer: slots.isEmpty
-                              ? const Padding(
+                              ? Padding(
                                   padding: EdgeInsets.all(30),
-                                  child: Text('Добавьте первый виджет'),
+                                  child: Text(
+                                    tr(context, 'Добавьте первый виджет'),
+                                  ),
                                 )
                               : null,
                           itemBuilder: (context, index) => Padding(
                             key: ValueKey(slots[index].instanceId),
                             padding: const EdgeInsets.only(bottom: 14),
                             child: Material(
-                              color: Theme.of(context).colorScheme.surface,
+                              color: AppColors.of(context).canvas,
                               borderRadius: BorderRadius.circular(16),
                               child: Padding(
                                 padding: const EdgeInsets.all(8),
@@ -331,36 +343,58 @@ class _DashboardView extends StatelessWidget {
                             }
                           },
                           child: ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+                            padding: const EdgeInsets.only(top: 18, bottom: 28),
                             itemCount: slots.isEmpty ? 2 : slots.length + 1,
                             itemBuilder: (context, index) {
                               if (index == 0) {
                                 return const Padding(
-                                  padding: EdgeInsets.only(bottom: 20),
+                                  padding: EdgeInsets.fromLTRB(16, 0, 16, 20),
                                   child: DashboardInboxComposer(),
                                 );
                               }
                               if (slots.isEmpty) {
-                                return const Padding(
+                                return Padding(
                                   padding: EdgeInsets.all(24),
                                   child: Text(
-                                    'Добавьте виджеты через кнопку редактирования',
+                                    tr(
+                                      context,
+                                      'Добавьте виджеты через кнопку редактирования',
+                                    ),
                                     textAlign: TextAlign.center,
                                   ),
                                 );
                               }
                               final slot = slots[index - 1];
-                              return Padding(
+                              return Container(
                                 key: ValueKey(
                                   '${state.userId}:${state.workspaceId}:${slot.instanceId}',
                                 ),
-                                padding: const EdgeInsets.only(bottom: 20),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    top: BorderSide(
+                                      color: Theme.of(context).dividerColor,
+                                    ),
+                                    bottom: index == slots.length
+                                        ? BorderSide(
+                                            color: Theme.of(
+                                              context,
+                                            ).dividerColor,
+                                          )
+                                        : BorderSide.none,
+                                  ),
+                                ),
                                 child: DashboardCollapsibleWidget(
                                   key: ValueKey('collapse-${slot.instanceId}'),
                                   title: switch (slot.id) {
-                                    'kpi-group' => 'Общие данные',
-                                    'daily-motivation' => 'AI рекомендации',
-                                    'activity' => 'Последняя активность',
+                                    'kpi-group' => tr(context, 'Общие данные'),
+                                    'daily-motivation' => tr(
+                                      context,
+                                      'AI рекомендации',
+                                    ),
+                                    'activity' => tr(
+                                      context,
+                                      'Последняя активность',
+                                    ),
                                     _ => slot.definition?.title ?? slot.id,
                                   },
                                   icon: dashboardWidgetIcon(slot.id),
@@ -409,23 +443,11 @@ class _DashboardView extends StatelessWidget {
         userId: state.userId,
       );
     }
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: DashboardSurface.shadows,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: expandContent
-            ? DashboardExpandableContent(
-                key: ValueKey(
-                  '${state.workspaceId}:${slot.instanceId}:preview',
-                ),
-                child: content,
-              )
-            : content,
-      ),
-    );
+    return expandContent
+        ? DashboardExpandableContent(
+            key: ValueKey('${state.workspaceId}:${slot.instanceId}:preview'),
+            child: content,
+          )
+        : content;
   }
 }

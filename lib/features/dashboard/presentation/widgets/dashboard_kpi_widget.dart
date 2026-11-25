@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_selector.dart';
@@ -68,12 +69,14 @@ class _DashboardKpiWidgetState extends State<DashboardKpiWidget> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.of(context).canvas,
       builder: (context) => DashboardTaskListSheet(
         title: title,
         tasks: tasks,
         projects: widget.projects,
-        allocationFilters: title == 'Не распределено',
+        allocationFilters:
+            title == 'Не распределено' ||
+            title == tr(context, 'Не распределено'),
       ),
     );
     if (id != null && mounted) await widget.onOpenTask(id);
@@ -91,7 +94,10 @@ class _DashboardKpiWidgetState extends State<DashboardKpiWidget> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.of(context).muted,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -105,7 +111,10 @@ class _DashboardKpiWidgetState extends State<DashboardKpiWidget> {
                 const SizedBox(height: 8),
                 Text(
                   caption,
-                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.of(context).muted,
+                  ),
                 ),
               ],
             ),
@@ -137,7 +146,9 @@ class _DashboardKpiWidgetState extends State<DashboardKpiWidget> {
               Icon(
                 icon,
                 size: 15,
-                color: danger ? const Color(0xFFBE2A1D) : AppColors.muted,
+                color: danger
+                    ? const Color(0xFFBE2A1D)
+                    : AppColors.of(context).muted,
               ),
               const SizedBox(width: 9),
               Expanded(
@@ -145,22 +156,29 @@ class _DashboardKpiWidgetState extends State<DashboardKpiWidget> {
                   title,
                   style: TextStyle(
                     fontSize: 12,
-                    color: danger ? const Color(0xFFBE2A1D) : AppColors.muted,
+                    color: danger
+                        ? const Color(0xFFBE2A1D)
+                        : AppColors.of(context).muted,
                   ),
                 ),
               ),
               Text(
                 '${tasks.length}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
+                  color: danger
+                      ? const Color(0xFFBE2A1D)
+                      : AppColors.of(context).ink,
                 ),
               ),
               const SizedBox(width: 10),
               Icon(
                 LucideIcons.chevronRight,
                 size: 14,
-                color: danger ? const Color(0xFFBE2A1D) : AppColors.muted,
+                color: danger
+                    ? const Color(0xFFBE2A1D)
+                    : AppColors.of(context).muted,
               ),
             ],
           ),
@@ -182,48 +200,59 @@ class _DashboardKpiWidgetState extends State<DashboardKpiWidget> {
     final totals = Row(
       children: [
         _total(
-          'Проекты',
-          _scope.length,
-          'всего проектов',
+          tr(context, 'Проекты'),
+          _selected.isEmpty ? widget.projects.length : _scope.length,
+          tr(context, 'всего проектов'),
           () => context.go('/projects'),
         ),
         const SizedBox(width: 20),
         _total(
-          'Задачи',
+          tr(context, 'Задачи'),
           tasks.length,
-          'всего задач',
-          () => _showTasks('Все задачи', tasks),
+          tr(context, 'всего задач'),
+          () => _showTasks(tr(context, 'Все задачи'), tasks),
         ),
       ],
     );
     final statuses = Column(
       children: [
-        _status('Не распределено', LucideIcons.circleDot, unallocated),
-        _status('В работе', LucideIcons.listChecks, active),
-        _status('Завершено', LucideIcons.circleCheck, done),
-        _status('Просрочено', LucideIcons.triangleAlert, overdue, danger: true),
+        _status(
+          tr(context, 'Не распределено'),
+          LucideIcons.circleDot,
+          unallocated,
+        ),
+        _status(tr(context, 'В работе'), LucideIcons.listChecks, active),
+        _status(tr(context, 'Завершено'), LucideIcons.circleCheck, done),
+        _status(
+          tr(context, 'Просрочено'),
+          LucideIcons.triangleAlert,
+          overdue,
+          danger: true,
+        ),
       ],
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!WidgetCollapseScope.hidesHeading(context)) ...[
+          AppWidgetHeading(
+            icon: LucideIcons.layout,
+            title: tr(context, 'Общие данные'),
+          ),
+          const SizedBox(height: 8),
+        ],
         Row(
           children: [
-            const AppWidgetHeading(
-              icon: LucideIcons.layoutDashboard,
-              title: 'Общие данные',
-            ),
-            const SizedBox(width: 12),
             Expanded(
               child: DashboardSelector<String>(
-                tooltip: 'Фильтр проектов',
+                tooltip: tr(context, 'Фильтр проектов'),
                 onSelected: (id) =>
                     setState(() => _selected = id.isEmpty ? {} : {id}),
                 itemBuilder: (_) => [
                   CheckedPopupMenuItem(
                     value: '',
                     checked: _selected.isEmpty,
-                    child: const Text('Все проекты'),
+                    child: Text(tr(context, 'Все проекты')),
                   ),
                   for (final p in flattenDashboardProjects(widget.projects))
                     CheckedPopupMenuItem(
@@ -239,26 +268,28 @@ class _DashboardKpiWidgetState extends State<DashboardKpiWidget> {
                       Flexible(
                         child: Text(
                           _selected.isEmpty
-                              ? 'Все проекты'
+                              ? tr(context, 'Все проекты')
                               : _selected.length == 1
                               ? flattenDashboardProjects(widget.projects)
                                         .where((p) => _selected.contains(p.id))
                                         .map((p) => p.name)
                                         .firstOrNull ??
                                     'Все проекты'
-                              : 'Проектов: ${_selected.length}',
+                              : tr(context, "Проектов: {p0}", {
+                                  'p0': _selected.length,
+                                }),
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.muted,
+                            color: AppColors.of(context).muted,
                           ),
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(
+                      Icon(
                         LucideIcons.chevronDown,
                         size: 14,
-                        color: AppColors.muted,
+                        color: AppColors.of(context).muted,
                       ),
                     ],
                   ),
@@ -278,7 +309,7 @@ class _DashboardKpiWidgetState extends State<DashboardKpiWidget> {
                     Container(
                       height: 180,
                       width: 1,
-                      color: AppColors.border,
+                      color: AppColors.of(context).border,
                       margin: const EdgeInsets.symmetric(horizontal: 20),
                     ),
                     Expanded(child: statuses),
@@ -369,9 +400,9 @@ class _DashboardKpiWidgetState extends State<DashboardKpiWidget> {
                                 const SizedBox(width: 8),
                                 Text(
                                   '${(progress * 100).round()}%',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: AppColors.muted,
+                                    color: AppColors.of(context).muted,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -384,7 +415,13 @@ class _DashboardKpiWidgetState extends State<DashboardKpiWidget> {
                                 value: progress,
                                 minHeight: 3,
                                 color: AppColors.accent,
-                                backgroundColor: const Color(0xFFF5F5F4),
+                                backgroundColor:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainerLow
+                                    : const Color(0xFFF5F5F4),
                               ),
                             ),
                           ],

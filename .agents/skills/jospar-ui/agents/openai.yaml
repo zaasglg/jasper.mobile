@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jospar UI Agent"
+  short_description: "Builds and polishes Jospar Flutter interfaces"
+  default_prompt: "Implement or improve this Jospar interface and validate the result."

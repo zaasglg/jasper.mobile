@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -283,14 +284,14 @@ class _TaskRichDescriptionEditorState extends State<TaskRichDescriptionEditor> {
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Описание',
+                    tr(context, 'Описание'),
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Отмена',
+                  tooltip: tr(context, 'Отмена'),
                   onPressed: _saving ? null : () => Navigator.pop(context),
                   icon: const Icon(Icons.close, size: 16),
                 ),
@@ -306,8 +307,8 @@ class _TaskRichDescriptionEditorState extends State<TaskRichDescriptionEditor> {
                         expands: true,
                         minLines: null,
                         maxLines: null,
-                        decoration: const InputDecoration(
-                          hintText: 'Добавьте описание…',
+                        decoration: InputDecoration(
+                          hintText: tr(context, 'Добавьте описание…'),
                         ),
                       )
                     : _web == null
@@ -319,7 +320,7 @@ class _TaskRichDescriptionEditorState extends State<TaskRichDescriptionEditor> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  _error!,
+                  tr(context, _error!),
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.error,
@@ -329,7 +330,7 @@ class _TaskRichDescriptionEditorState extends State<TaskRichDescriptionEditor> {
             const SizedBox(height: 12),
             FilledButton(
               onPressed: !_saving && (_ready || _fallback) ? _save : null,
-              child: const Text('Сохранить'),
+              child: Text(tr(context, 'Сохранить')),
             ),
           ],
         ),

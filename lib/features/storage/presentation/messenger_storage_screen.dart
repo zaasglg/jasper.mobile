@@ -1,3 +1,5 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../core/widgets/app_back_button.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -52,7 +54,9 @@ class _MessengerStorageScreenState extends State<MessengerStorageScreen> {
           appSnackBar(
             context: context,
             tone: AppSnackBarTone.error,
-            content: Text('Не удалось открыть кладовку. Повторите попытку.'),
+            content: Text(
+              tr(context, 'Не удалось открыть кладовку. Повторите попытку.'),
+            ),
           ),
         );
       }
@@ -64,12 +68,8 @@ class _MessengerStorageScreenState extends State<MessengerStorageScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Кладовка мессенджера'),
-      leading: IconButton(
-        tooltip: 'Назад',
-        onPressed: context.pop,
-        icon: const Icon(LucideIcons.arrowLeft, size: 18),
-      ),
+      title: Text(tr(context, 'Кладовка мессенджера')),
+      leading: AppBackButton(onPressed: context.pop),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       surfaceTintColor: Colors.transparent,
     ),
@@ -77,19 +77,22 @@ class _MessengerStorageScreenState extends State<MessengerStorageScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
             child: Text(
-              'Выберите переписку или канал',
-              style: TextStyle(fontSize: 13, color: AppColors.muted),
+              tr(context, 'Выберите переписку или канал'),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.of(context).muted,
+              ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               style: const TextStyle(fontSize: 13),
-              decoration: const InputDecoration(
-                hintText: 'Поиск переписки',
+              decoration: InputDecoration(
+                hintText: tr(context, 'Поиск переписки'),
                 prefixIcon: Icon(LucideIcons.search, size: 16),
               ),
               onChanged: (value) =>
@@ -109,7 +112,7 @@ class _MessengerStorageScreenState extends State<MessengerStorageScreen> {
                   return Center(
                     child: TextButton(
                       onPressed: context.read<ChatCubit>().load,
-                      child: const Text('Повторить загрузку'),
+                      child: Text(tr(context, 'Повторить загрузку')),
                     ),
                   );
                 }
@@ -117,7 +120,9 @@ class _MessengerStorageScreenState extends State<MessengerStorageScreen> {
                     .where((e) => e.title.toLowerCase().contains(_query))
                     .toList();
                 if (items.isEmpty) {
-                  return const Center(child: Text('Переписки не найдены'));
+                  return Center(
+                    child: Text(tr(context, 'Переписки не найдены')),
+                  );
                 }
                 return RefreshIndicator(
                   onRefresh: context.read<ChatCubit>().load,
@@ -129,12 +134,14 @@ class _MessengerStorageScreenState extends State<MessengerStorageScreen> {
                           Padding(
                             padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
                             child: Text(
-                              isChannel ? 'КАНАЛЫ' : 'ЛИЧНЫЕ СООБЩЕНИЯ',
-                              style: const TextStyle(
+                              isChannel
+                                  ? tr(context, 'КАНАЛЫ')
+                                  : tr(context, 'ЛИЧНЫЕ СООБЩЕНИЯ'),
+                              style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: .7,
-                                color: AppColors.muted,
+                                color: AppColors.of(context).muted,
                               ),
                             ),
                           ),
@@ -170,17 +177,17 @@ class _MessengerStorageScreenState extends State<MessengerStorageScreen> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            subtitle: const Text(
-                              'Файлы, ссылки и резюме встреч',
+                            subtitle: Text(
+                              tr(context, 'Файлы, ссылки и резюме встреч'),
                               style: TextStyle(
                                 fontSize: 11,
-                                color: AppColors.muted,
+                                color: AppColors.of(context).muted,
                               ),
                             ),
-                            trailing: const Icon(
+                            trailing: Icon(
                               LucideIcons.chevronRight,
                               size: 16,
-                              color: AppColors.muted,
+                              color: AppColors.of(context).muted,
                             ),
                             onTap: () => _open(chat),
                           ),

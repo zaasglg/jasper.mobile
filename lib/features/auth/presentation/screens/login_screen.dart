@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -22,11 +23,23 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const Color _ink = Color(0xFF20212B);
-  static const Color _muted = Color(0xFF737587);
+  static Color _ink(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? AppColors.of(context).ink
+      : const Color(0xFF20212B);
+  static Color _muted(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? AppColors.of(context).muted
+      : const Color(0xFF737587);
   static const Color _accent = AppColors.accent;
-  static const Color _fieldFill = Color(0xFFFAFAFC);
-  static const Color _canvas = Colors.white;
+  static Color _fieldFill(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? AppColors.of(context).subtleSurface
+      : const Color(0xFFFAFAFC);
+  static Color _canvas(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? AppColors.of(context).canvas
+      : Colors.white;
 
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -91,13 +104,17 @@ class _LoginScreenState extends State<LoginScreen> {
         return FTheme(
           data: FThemeData(
             touch: true,
-            colors: FTheme.neutral.light.touch.colors.copyWith(
-              primary: AppColors.accent,
-              primaryForeground: Colors.white,
-            ),
+            colors:
+                (Theme.of(context).brightness == Brightness.dark
+                        ? FTheme.neutral.dark.touch.colors
+                        : FTheme.neutral.light.touch.colors)
+                    .copyWith(
+                      primary: AppColors.accent,
+                      primaryForeground: Colors.white,
+                    ),
           ),
           child: Scaffold(
-            backgroundColor: _canvas,
+            backgroundColor: _canvas(context),
             body: SafeArea(
               child: AutofillGroup(
                 child: LayoutBuilder(
@@ -174,9 +191,9 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: AppSpacing.lg * 2),
             ],
             Text(
-              'Войти в JosparBee',
-              style: GoogleFonts.manrope(
-                color: _ink,
+              tr(context, 'Войти в JosparBee'),
+              style: GoogleFonts.inter(
+                color: _ink(context),
                 fontSize: 26,
                 height: 1.15,
                 letterSpacing: -0.9,
@@ -185,9 +202,9 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Ваши задачи, проекты и команда — рядом.',
-              style: GoogleFonts.manrope(
-                color: _muted,
+              tr(context, 'Ваши задачи, проекты и команда — рядом.'),
+              style: GoogleFonts.inter(
+                color: _muted(context),
                 fontSize: 14,
                 height: 1.5,
                 fontWeight: FontWeight.w400,
@@ -202,11 +219,11 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 22),
             const _LoginDivider(),
             const SizedBox(height: 22),
-            _buildLabel('Рабочая почта'),
+            _buildLabel(tr(context, 'Рабочая почта')),
             const SizedBox(height: 8),
             _buildEmailField(isLoading),
             const SizedBox(height: 20),
-            _buildLabel('Пароль'),
+            _buildLabel(tr(context, 'Пароль')),
             const SizedBox(height: 8),
             _buildPasswordField(isLoading),
             const SizedBox(height: 8),
@@ -217,17 +234,17 @@ class _LoginScreenState extends State<LoginScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
+                Icon(
                   LucideIcons.lockKeyhole,
                   size: AppIconSizes.standard,
-                  color: _muted,
+                  color: _muted(context),
                 ),
                 const SizedBox(width: 7),
                 Flexible(
                   child: Text(
-                    'Ваши данные защищены',
-                    style: GoogleFonts.manrope(
-                      color: _muted,
+                    tr(context, 'Ваши данные защищены'),
+                    style: GoogleFonts.inter(
+                      color: _muted(context),
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -243,8 +260,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildLabel(String text) => Text(
     text,
-    style: GoogleFonts.manrope(
-      color: _ink,
+    style: GoogleFonts.inter(
+      color: _ink(context),
       fontSize: 13,
       height: 1.3,
       fontWeight: FontWeight.w700,
@@ -269,7 +286,7 @@ class _LoginScreenState extends State<LoginScreen> {
               semanticsLabel: 'Google',
             ),
             const SizedBox(width: 11),
-            const Text('Войти через Google'),
+            Text(tr(context, 'Войти через Google')),
           ],
         ),
       ),
@@ -283,13 +300,13 @@ class _LoginScreenState extends State<LoginScreen> {
         key: const Key('apple_login_button'),
         variant: FButtonVariant.outline,
         onPress: isLoading ? null : _signInWithApple,
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.apple, size: 22, color: Colors.black),
             SizedBox(width: 11),
-            Text('Войти через Apple'),
+            Text(tr(context, 'Войти через Apple')),
           ],
         ),
       ),
@@ -314,9 +331,9 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       validator: (value) {
         final email = value?.trim() ?? '';
-        if (email.isEmpty) return 'Введите email';
+        if (email.isEmpty) return tr(context, 'Введите email');
         if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-          return 'Введите корректный email';
+          return tr(context, 'Введите корректный email');
         }
         return null;
       },
@@ -341,23 +358,26 @@ class _LoginScreenState extends State<LoginScreen> {
           onPressed: isLoading
               ? null
               : () => setState(() => _obscurePassword = !_obscurePassword),
-          tooltip: _obscurePassword ? 'Показать пароль' : 'Скрыть пароль',
+          tooltip: _obscurePassword
+              ? tr(context, 'Показать пароль')
+              : tr(context, 'Скрыть пароль'),
           icon: Icon(
             _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
             size: AppIconSizes.standard,
           ),
         ),
       ),
-      validator: (value) =>
-          (value == null || value.isEmpty) ? 'Введите пароль' : null,
+      validator: (value) => (value == null || value.isEmpty)
+          ? tr(context, 'Введите пароль')
+          : null,
       onFieldSubmitted: (_) {
         if (!isLoading) _submit();
       },
     );
   }
 
-  TextStyle get _fieldTextStyle => GoogleFonts.manrope(
-    color: _ink,
+  TextStyle get _fieldTextStyle => GoogleFonts.inter(
+    color: _ink(context),
     fontSize: 14,
     height: 1.3,
     fontWeight: FontWeight.w600,
@@ -377,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return InputDecoration(
       hintText: hintText,
-      hintStyle: GoogleFonts.manrope(
+      hintStyle: GoogleFonts.inter(
         color: const Color(0xFF9A9CAB),
         fontSize: 14,
         fontWeight: FontWeight.w400,
@@ -387,15 +407,15 @@ class _LoginScreenState extends State<LoginScreen> {
       suffixIcon: suffixIcon,
       suffixIconColor: const Color(0xFF686A78),
       filled: true,
-      fillColor: _fieldFill,
+      fillColor: _fieldFill(context),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: border(AppColors.border),
-      enabledBorder: border(AppColors.border),
+      border: border(AppColors.of(context).border),
+      enabledBorder: border(AppColors.of(context).border),
       disabledBorder: border(Colors.transparent),
       focusedBorder: border(_accent),
       errorBorder: border(const Color(0xFFD14B4B)),
       focusedErrorBorder: border(const Color(0xFFD14B4B)),
-      errorStyle: GoogleFonts.manrope(
+      errorStyle: GoogleFonts.inter(
         color: const Color(0xFFB33A3A),
         fontSize: 12,
         height: 1.35,
@@ -425,7 +445,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: Text(
                   error,
-                  style: GoogleFonts.manrope(
+                  style: GoogleFonts.inter(
                     color: const Color(0xFFA53C35),
                     fontSize: 13,
                     height: 1.4,
@@ -451,11 +471,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: Colors.white,
                 ),
               )
-            : const Row(
+            : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Войти'),
+                  Text(tr(context, 'Войти')),
                   SizedBox(width: 9),
                   Icon(LucideIcons.arrowRight, size: AppIconSizes.standard),
                 ],
@@ -477,9 +497,9 @@ class _LoginDivider extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
-            'или по рабочей почте',
-            style: GoogleFonts.manrope(
-              color: _LoginScreenState._muted,
+            tr(context, 'или по рабочей почте'),
+            style: GoogleFonts.inter(
+              color: _LoginScreenState._muted(context),
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
@@ -511,8 +531,8 @@ class _BrandStory extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
-              'ВСЯ РАБОТА — В ОДНОМ МЕСТЕ',
-              style: GoogleFonts.manrope(
+              tr(context, 'ВСЯ РАБОТА — В ОДНОМ МЕСТЕ'),
+              style: GoogleFonts.inter(
                 color: AppColors.accent,
                 fontSize: 11,
                 letterSpacing: 0.8,
@@ -522,9 +542,9 @@ class _BrandStory extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           Text(
-            'Планы становятся\nрезультатами.',
-            style: GoogleFonts.manrope(
-              color: _LoginScreenState._ink,
+            tr(context, 'Планы становятся\nрезультатами.'),
+            style: GoogleFonts.inter(
+              color: _LoginScreenState._ink(context),
               fontSize: 48,
               height: 1.08,
               letterSpacing: -2,
@@ -533,9 +553,12 @@ class _BrandStory extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            'Управляйте задачами, командой и проектами\nв едином рабочем пространстве JosparBee.',
-            style: GoogleFonts.manrope(
-              color: _LoginScreenState._muted,
+            tr(
+              context,
+              'Управляйте задачами, командой и проектами\nв едином рабочем пространстве JosparBee.',
+            ),
+            style: GoogleFonts.inter(
+              color: _LoginScreenState._muted(context),
               fontSize: 16,
               height: 1.6,
               fontWeight: FontWeight.w400,
@@ -572,8 +595,8 @@ class _Feature extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           text,
-          style: GoogleFonts.manrope(
-            color: _LoginScreenState._ink,
+          style: GoogleFonts.inter(
+            color: _LoginScreenState._ink(context),
             fontSize: 13,
             fontWeight: FontWeight.w700,
           ),

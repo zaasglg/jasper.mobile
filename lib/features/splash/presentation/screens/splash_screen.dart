@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
@@ -102,7 +103,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.of(context).canvas,
       body: Center(
         child: AnimatedBuilder(
           animation: _controller,
@@ -122,7 +123,7 @@ class _SplashScreenState extends State<SplashScreen>
               const SizedBox(height: 12),
               Text(
                 'Work, organized.',
-                style: GoogleFonts.manrope(
+                style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w400,
                   color: const Color(0xFF9AA0A6),

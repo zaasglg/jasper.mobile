@@ -1,3 +1,4 @@
+import 'package:jospar/features/dashboard/presentation/widgets/dashboard_team_widget.dart';
 import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:jospar/features/dashboard/domain/entities/dashboard_widget_options.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -5,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:jospar/core/widgets/app_widget_heading.dart';
 import 'package:jospar/features/dashboard/domain/entities/dashboard_widget_slot.dart';
 import 'package:jospar/features/dashboard/presentation/cubit/dashboard_layout_cubit.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_widget_panel.dart';
@@ -22,6 +25,163 @@ void main() {
     start: null,
     end: null,
   );
+  testWidgets('team count stays beside its title when collapsed', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DashboardCollapsibleWidget(
+            title: 'Команда',
+            icon: Icons.people,
+            child: DashboardTeamWidget(
+              people: const [
+                {'id': 'a', 'name': 'Алия'},
+                {'id': 'b', 'name': 'Иван'},
+              ],
+              tasks: const [],
+              projects: const [],
+              onOpenTask: (_) async {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final badge = find.byKey(const Key('team-member-count'));
+    expect(find.text('2 чел.'), findsOneWidget);
+    expect(
+      tester.getCenter(badge).dy,
+      closeTo(tester.getCenter(find.text('Команда')).dy, 1),
+    );
+    expect(
+      tester.getTopLeft(badge).dx,
+      greaterThan(tester.getTopRight(find.text('Команда')).dx),
+    );
+    await tester.tap(find.text('Команда'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 чел.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('regular widget toggles from the full heading', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: DashboardCollapsibleWidget(
+            title: 'Команда',
+            icon: Icons.people,
+            child: Column(
+              children: [
+                AppWidgetHeading(icon: Icons.people, title: 'Команда'),
+                Text('Содержимое команды'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    final heading = find.byKey(const Key('dashboard_widget_collapse'));
+    final bounds = tester.getRect(heading);
+    await tester.tapAt(Offset(bounds.center.dx, bounds.center.dy));
+    await tester.pumpAndSettle();
+    expect(find.text('Содержимое команды'), findsNothing);
+    await tester.tap(find.text('Команда'));
+    await tester.pumpAndSettle();
+    expect(find.text('Содержимое команды'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('AI recommendations toggle by tapping the full heading', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: DashboardCollapsibleWidget(
+            title: 'AI рекомендации',
+            icon: Icons.auto_awesome,
+            child: Column(
+              children: [
+                AppWidgetHeading(
+                  icon: Icons.auto_awesome,
+                  iconAsset: 'assets/images/JBee.svg',
+                  title: 'AI рекомендации',
+                  titleFontWeight: FontWeight.w600,
+                  fullWidthToggle: true,
+                ),
+                SizedBox(height: 200),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Скрыть'), findsNothing);
+    expect(find.text('Показать'), findsNothing);
+    expect(find.byIcon(Icons.keyboard_arrow_up_rounded), findsOneWidget);
+    expect(find.byType(SvgPicture), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('AI рекомендации')).style?.fontWeight,
+      FontWeight.w600,
+    );
+    expect(
+      tester
+          .widget<Material>(
+            find.byKey(const Key('dashboard_widget_heading_surface')),
+          )
+          .color,
+      Colors.transparent,
+    );
+    final expandedHeaderHeight = tester
+        .getSize(find.byKey(const Key('dashboard_widget_heading_surface')))
+        .height;
+    final expandedTitleOffset =
+        tester.getTopLeft(find.text('AI рекомендации')) -
+        tester.getTopLeft(
+          find.byKey(const Key('dashboard_widget_heading_surface')),
+        );
+    final expandedWidgetHeight = tester
+        .getSize(find.byKey(const Key('dashboard_widget_size_animation')))
+        .height;
+
+    await tester.tap(find.byKey(const Key('dashboard_widget_collapse')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+
+    final animatingHeight = tester
+        .getSize(find.byKey(const Key('dashboard_widget_size_animation')))
+        .height;
+    expect(animatingHeight, lessThan(expandedWidgetHeight));
+    expect(animatingHeight, greaterThan(expandedHeaderHeight));
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Скрыть'), findsNothing);
+    expect(find.text('Показать'), findsNothing);
+    expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
+    expect(find.byType(SvgPicture), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('AI рекомендации')).style?.fontWeight,
+      FontWeight.w600,
+    );
+    expect(
+      tester
+          .getSize(find.byKey(const Key('dashboard_widget_heading_surface')))
+          .height,
+      expandedHeaderHeight,
+    );
+    expect(
+      tester.getTopLeft(find.text('AI рекомендации')) -
+          tester.getTopLeft(
+            find.byKey(const Key('dashboard_widget_heading_surface')),
+          ),
+      expandedTitleOffset,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
     testWidgets('scrolling back preserves loaded cards on ${platform.name}', (
       tester,

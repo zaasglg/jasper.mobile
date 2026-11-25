@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
@@ -47,7 +48,7 @@ class AppDialog extends StatelessWidget {
                 namesRoute: true,
                 header: true,
                 child: DefaultTextStyle(
-                  style: GoogleFonts.manrope(
+                  style: GoogleFonts.inter(
                     fontSize: 18,
                     height: 1.35,
                     fontWeight: FontWeight.w700,
@@ -59,7 +60,7 @@ class AppDialog extends StatelessWidget {
               if (content != null) ...[
                 const SizedBox(height: 12),
                 DefaultTextStyle(
-                  style: GoogleFonts.manrope(
+                  style: GoogleFonts.inter(
                     fontSize: 13,
                     height: 1.5,
                     color: dark
@@ -128,7 +129,7 @@ class AppDialog extends StatelessWidget {
       minimumSize: const Size(48, 46),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      textStyle: GoogleFonts.manrope(
+      textStyle: GoogleFonts.inter(
         fontSize: 13,
         height: 1.25,
         fontWeight: FontWeight.w600,
@@ -189,11 +190,11 @@ Future<bool> showAppConfirmation(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+            child: Text(tr(context, 'Отмена')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(confirmLabel),
+            child: Text(tr(context, confirmLabel)),
           ),
         ],
       ),

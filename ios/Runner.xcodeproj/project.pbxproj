@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        CC0000000000000000000001 = {isa = PBXBuildFile; fileRef = CC0000000000000000000003; };
+        CC0000000000000000000002 = {isa = PBXBuildFile; fileRef = CC0000000000000000000003; };
+        CC0000000000000000000004 = {isa = PBXBuildFile; productRef = CC0000000000000000000005; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		327C558BB79CD8BE40CF5834 /* SampleUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A041BECF698220308221E05F /* SampleUploader.swift */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
@@ -85,6 +88,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+        CC0000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxHomeWidget/CompleteInboxIntent.swift; sourceTree = SOURCE_ROOT; };
 		0A83D6D6CFCECFAB5D08602D /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0FB0177E86C843B282B3C2B1 /* JosparAssistantShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JosparAssistantShortcuts.swift; sourceTree = "<group>"; };
 		1007429E8DE0BB58CE13134C /* InboxHomeWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = InboxHomeWidget.entitlements; sourceTree = "<group>"; };
@@ -140,6 +144,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+                CC0000000000000000000004,
 				428BA5E4436763C7D773B7D2 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -359,6 +364,7 @@
 			dependencies = (
 			);
 			name = InboxHomeWidget;
+            packageProductDependencies = (CC0000000000000000000005,);
 			productName = InboxHomeWidget;
 			productReference = 761DF6FFA6A9FBEFBBABCA11 /* InboxHomeWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -604,6 +610,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+                CC0000000000000000000001,
 				BCA20EDF9D8C718B270A4DBF /* InboxHomeWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -613,6 +620,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
+                CC0000000000000000000002,
 				D378906FE4924A0BA050CC91 /* JosparAssistantShortcuts.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				D359113B76F2534D46803652 /* SystemIncomingCall.swift in Sources */,
@@ -749,7 +757,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -767,7 +775,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -785,7 +793,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
@@ -801,7 +809,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app.RunnerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
@@ -821,7 +829,7 @@
 				INFOPLIST_FILE = InboxHomeWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app.InboxHomeWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app.InboxHomeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -849,7 +857,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app.ScreenBroadcast;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app.ScreenBroadcast;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -872,7 +880,7 @@
 				INFOPLIST_FILE = InboxHomeWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app.InboxHomeWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app.InboxHomeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -1009,7 +1017,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -1036,7 +1044,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -1058,7 +1066,7 @@
 				INFOPLIST_FILE = InboxHomeWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app.InboxHomeWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app.InboxHomeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -1086,7 +1094,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app.ScreenBroadcast;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app.ScreenBroadcast;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -1114,7 +1122,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jospar.app.ScreenBroadcast;
+				PRODUCT_BUNDLE_IDENTIFIER = com.josparbee.app.ScreenBroadcast;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -1186,6 +1194,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+        CC0000000000000000000005 = {isa = XCSwiftPackageProductDependency; productName = "home-widget"; };
 		78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FlutterGeneratedPluginSwiftPackage;

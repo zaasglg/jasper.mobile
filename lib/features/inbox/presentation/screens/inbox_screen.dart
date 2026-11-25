@@ -1,3 +1,5 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../../core/widgets/task_completion_indicator.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -54,7 +56,7 @@ class _InboxScreenState extends State<InboxScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.canvas,
+      backgroundColor: AppColors.of(context).canvas,
       appBar: widget.showAppBar ? const DashboardAppBar() : null,
       body: SafeArea(
         top: false,
@@ -136,10 +138,10 @@ class InboxContent extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 sliver: SliverList.separated(
                   itemCount: state.tasks.length,
-                  separatorBuilder: (context, index) => const Divider(
+                  separatorBuilder: (context, index) => Divider(
                     height: AppSpacing.xxs,
                     thickness: AppSpacing.xxs / 2,
-                    color: AppColors.border,
+                    color: AppColors.of(context).border,
                   ),
                   itemBuilder: (context, index) {
                     final task = state.tasks[index];
@@ -202,7 +204,7 @@ class InboxHeader extends StatelessWidget {
                   'Inbox',
                   style: AppTypography.pageTitle(
                     context,
-                  )?.copyWith(color: AppColors.ink),
+                  )?.copyWith(color: AppColors.of(context).ink),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -211,10 +213,13 @@ class InboxHeader extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Задачи из инбокса — распределите их по проектам.',
+            tr(
+              context,
+              'Свайп вправо — в ежедневник, влево — в проект или удалить.',
+            ),
             style: AppTypography.body(
               context,
-            )?.copyWith(color: AppColors.muted, height: 1.4),
+            )?.copyWith(color: AppColors.of(context).muted, height: 1.4),
           ),
         ],
       ),
@@ -236,49 +241,103 @@ class InboxTaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: 'Задача: ${task.title}',
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.smMd),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            CompletionButton(
-              task: task,
-              isCompleting: isCompleting,
-              onToggle: onToggle,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.xs),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      task.title,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.taskTitle(context)?.copyWith(
-                        color: task.completed ? AppColors.muted : AppColors.ink,
-                        decoration: task.completed
-                            ? TextDecoration.lineThrough
-                            : TextDecoration.none,
-                      ),
+    return Dismissible(
+      key: ValueKey('inbox-swipe-${task.id}'),
+      direction: isCompleting
+          ? DismissDirection.none
+          : task.isLocalOnly
+          ? DismissDirection.endToStart
+          : DismissDirection.horizontal,
+      resizeDuration: null,
+      confirmDismiss: (direction) async {
+        await sortInboxTask(
+          context,
+          task,
+          schedule: direction == DismissDirection.startToEnd,
+        );
+        return false;
+      },
+      background: const _InboxSwipeHint(schedule: true),
+      secondaryBackground: const _InboxSwipeHint(schedule: false),
+      child: Semantics(
+        container: true,
+        label: tr(context, "Задача: {p0}", {'p0': task.title}),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.smMd),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              CompletionButton(
+                task: task,
+                isCompleting: isCompleting,
+                onToggle: onToggle,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: InkWell(
+                  onTap: isCompleting
+                      ? null
+                      : () => showInboxTaskCard(context, task),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          task.title,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.taskTitle(context)?.copyWith(
+                            color: task.completed
+                                ? AppColors.of(context).muted
+                                : AppColors.of(context).ink,
+                            decoration: task.completed
+                                ? TextDecoration.lineThrough
+                                : TextDecoration.none,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        const TaskMetadata(),
+                      ],
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    const TaskMetadata(),
-                  ],
+                  ),
                 ),
               ),
-            ),
-            InboxTaskMenu(task: task, busy: isCompleting),
-          ],
+              InboxTaskMenu(task: task, busy: isCompleting),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _InboxSwipeHint extends StatelessWidget {
+  const _InboxSwipeHint({required this.schedule});
+  final bool schedule;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    alignment: schedule
+        ? AlignmentDirectional.centerStart
+        : AlignmentDirectional.centerEnd,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    color: AppColors.accent.withValues(alpha: 0.1),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          schedule ? Icons.event_outlined : Icons.drive_file_move_outline,
+          color: AppColors.accent,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          tr(context, schedule ? 'В ежедневник' : 'В проект'),
+          style: TextStyle(color: AppColors.accent),
+        ),
+      ],
+    ),
+  );
 }
 
 class CompletionButton extends StatelessWidget {
@@ -309,34 +368,10 @@ class CompletionButton extends StatelessWidget {
           child: SizedBox.square(
             dimension: AppSpacing.touchTarget,
             child: Center(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                width: AppSpacing.lg,
-                height: AppSpacing.lg,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: task.completed ? AppColors.accent : AppColors.canvas,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: task.completed ? AppColors.accent : AppColors.muted,
-                    width: AppSpacing.xxs,
-                  ),
-                ),
-                child: isCompleting
-                    ? const SizedBox.square(
-                        dimension: AppSpacing.md,
-                        child: CircularProgressIndicator(
-                          strokeWidth: AppSpacing.xxs,
-                          color: AppColors.accent,
-                        ),
-                      )
-                    : task.completed
-                    ? const Icon(
-                        Icons.check_rounded,
-                        size: AppIconSizes.standard,
-                        color: AppColors.onAccent,
-                      )
-                    : null,
+              child: TaskCompletionIndicator(
+                completed: task.completed,
+                busy: isCompleting,
+                size: 24,
               ),
             ),
           ),
@@ -351,9 +386,10 @@ class TaskMetadata extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final metadataStyle = AppTypography.caption(
-      context,
-    )?.copyWith(color: AppColors.muted, fontWeight: FontWeight.w500);
+    final metadataStyle = AppTypography.caption(context)?.copyWith(
+      color: AppColors.of(context).muted,
+      fontWeight: FontWeight.w500,
+    );
     return LayoutBuilder(
       builder: (context, constraints) {
         final project = ProjectMetadata(style: metadataStyle);
@@ -390,15 +426,15 @@ class ProjectMetadata extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        const Icon(
+        Icon(
           Icons.folder_outlined,
           size: AppIconSizes.standard,
-          color: AppColors.muted,
+          color: AppColors.of(context).muted,
         ),
         const SizedBox(width: AppSpacing.xs),
         Flexible(
           child: Text(
-            'Не распределена',
+            tr(context, 'Не распределена'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: style,
@@ -424,7 +460,7 @@ class InboxBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text(
-        'ИНБОКС',
+        tr(context, 'ИНБОКС'),
         style: AppTypography.caption(context)?.copyWith(
           color: AppColors.accent,
           fontWeight: FontWeight.w700,
@@ -455,9 +491,9 @@ class QuickTaskComposer extends StatelessWidget {
   Widget build(BuildContext context) {
     final canAdd = controller.text.trim().isNotEmpty && !isSubmitting;
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: AppColors.canvas,
-        border: Border(top: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: AppColors.of(context).canvas,
+        border: Border(top: BorderSide(color: AppColors.of(context).border)),
       ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -475,16 +511,16 @@ class QuickTaskComposer extends StatelessWidget {
             right: AppSpacing.xs,
           ),
           decoration: BoxDecoration(
-            color: AppColors.quietSurface,
+            color: AppColors.of(context).quietSurface,
             borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: AppColors.of(context).border),
           ),
           child: Row(
             children: <Widget>[
-              const Icon(
+              Icon(
                 Icons.add_task_rounded,
                 size: AppIconSizes.standard,
-                color: AppColors.muted,
+                color: AppColors.of(context).muted,
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
@@ -499,12 +535,13 @@ class QuickTaskComposer extends StatelessWidget {
                   textInputAction: TextInputAction.done,
                   style: AppTypography.body(
                     context,
-                  )?.copyWith(color: AppColors.ink),
+                  )?.copyWith(color: AppColors.of(context).ink),
                   decoration: InputDecoration(
-                    hintText: 'Добавить быструю задачу',
+                    hintText: tr(context, 'Добавить быструю задачу'),
                     hintStyle: AppTypography.body(
                       context,
-                    )?.copyWith(color: AppColors.muted),
+                    )?.copyWith(color: AppColors.of(context).muted),
+                    filled: false,
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -515,14 +552,14 @@ class QuickTaskComposer extends StatelessWidget {
                 duration: const Duration(milliseconds: 140),
                 child: IconButton.filled(
                   key: const Key('inbox-add-task'),
-                  tooltip: 'Добавить задачу',
+                  tooltip: tr(context, 'Добавить задачу'),
                   onPressed: canAdd ? onAdd : null,
                   style: IconButton.styleFrom(
                     minimumSize: const Size.square(AppSpacing.touchTarget),
                     backgroundColor: AppColors.accent,
-                    disabledBackgroundColor: AppColors.skeleton,
+                    disabledBackgroundColor: AppColors.of(context).skeleton,
                     foregroundColor: AppColors.onAccent,
-                    disabledForegroundColor: AppColors.muted,
+                    disabledForegroundColor: AppColors.of(context).muted,
                   ),
                   icon: isSubmitting
                       ? const SizedBox.square(
@@ -587,8 +624,10 @@ class InboxLoading extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           sliver: SliverList.separated(
             itemCount: 3,
-            separatorBuilder: (context, index) =>
-                const Divider(height: AppSpacing.xxs, color: AppColors.border),
+            separatorBuilder: (context, index) => Divider(
+              height: AppSpacing.xxs,
+              color: AppColors.of(context).border,
+            ),
             itemBuilder: (context, index) => const InboxTaskSkeleton(),
           ),
         ),
@@ -606,9 +645,9 @@ class InboxTaskSkeleton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Row(
         children: <Widget>[
-          const CircleAvatar(
+          CircleAvatar(
             radius: AppSpacing.smMd,
-            backgroundColor: AppColors.skeleton,
+            backgroundColor: AppColors.of(context).skeleton,
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -620,7 +659,7 @@ class InboxTaskSkeleton extends StatelessWidget {
                   child: Container(
                     height: AppSpacing.md,
                     decoration: BoxDecoration(
-                      color: AppColors.skeleton,
+                      color: AppColors.of(context).skeleton,
                       borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
                   ),
@@ -631,7 +670,7 @@ class InboxTaskSkeleton extends StatelessWidget {
                   child: Container(
                     height: AppSpacing.smMd,
                     decoration: BoxDecoration(
-                      color: AppColors.skeletonTrack,
+                      color: AppColors.of(context).skeletonTrack,
                       borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
                   ),
@@ -659,10 +698,10 @@ class InboxFailure extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Icon(
+            Icon(
               Icons.cloud_off_rounded,
               size: AppSpacing.touchTarget,
-              color: AppColors.muted,
+              color: AppColors.of(context).muted,
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
@@ -670,13 +709,13 @@ class InboxFailure extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.body(
                 context,
-              )?.copyWith(color: AppColors.muted, height: 1.45),
+              )?.copyWith(color: AppColors.of(context).muted, height: 1.45),
             ),
             const SizedBox(height: AppSpacing.md),
             OutlinedButton(
               key: const Key('inbox-retry'),
               onPressed: onRetry,
-              child: const Text('Повторить'),
+              child: Text(tr(context, 'Повторить')),
             ),
           ],
         ),
@@ -718,53 +757,57 @@ class InboxEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl,
-          AppSpacing.lg,
-          AppSpacing.xl,
-          AppSpacing.xl,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              width: AppSpacing.touchTarget,
-              height: AppSpacing.touchTarget,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-              ),
-              child: const Icon(
-                Icons.inbox_outlined,
-                size: AppSpacing.lg,
-                color: AppColors.accent,
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final illustrationSize = constraints.maxHeight < 320 ? 112.0 : 200.0;
+        final colors = Theme.of(context).colorScheme;
+        return Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.lg,
+              AppSpacing.xl,
+              AppSpacing.xl,
             ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Инбокс разобран',
-              textAlign: TextAlign.center,
-              style: AppTypography.title(
-                context,
-              )?.copyWith(color: AppColors.ink),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/inbox_empty.png',
+                  key: const Key('inbox-empty-illustration'),
+                  width: illustrationSize,
+                  height: illustrationSize,
+                  cacheWidth: 640,
+                  fit: BoxFit.contain,
+                  excludeFromSemantics: true,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  tr(context, 'Инбокс разобран'),
+                  textAlign: TextAlign.center,
+                  style: AppTypography.title(
+                    context,
+                  )?.copyWith(color: colors.onSurface),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 300),
+                  child: Text(
+                    tr(
+                      context,
+                      'Быстро добавляйте сюда новые задачи, а позже распределяйте их по проектам.',
+                    ),
+                    textAlign: TextAlign.center,
+                    style: AppTypography.body(
+                      context,
+                    )?.copyWith(color: colors.onSurfaceVariant, height: 1.45),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.sm),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: Text(
-                'Быстро добавляйте сюда новые задачи, а позже распределяйте их по проектам.',
-                textAlign: TextAlign.center,
-                style: AppTypography.body(
-                  context,
-                )?.copyWith(color: AppColors.muted, height: 1.45),
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

@@ -3,6 +3,54 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/dashboard/presentation/widgets/dashboard_activity_widget.dart';
 
 void main() {
+  testWidgets('login activity is compact and fits enlarged text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(1.5)),
+          child: child!,
+        ),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: DashboardActivityWidget(
+                entries: const [
+                  {
+                    'id': 'login',
+                    'type': 'USER_LOGIN',
+                    'user': {'id': 'u', 'name': 'СуперАдмин Тест'},
+                    'description':
+                        'СуперАдмин Тест вошёл(ла) в систему в 00:56',
+                    'createdAt': '2026-11-21T00:56:00Z',
+                  },
+                ],
+                onOpenTask: (_) async {},
+                loadCategory: (_) async => [],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('СуперАдмин Тест', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.text('Вход в систему'), findsOneWidget);
+    expect(find.textContaining('вошёл', findRichText: true), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'activity renders event details, opens tasks and switches server categories',
     (tester) async {

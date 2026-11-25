@@ -165,6 +165,20 @@ class _Profile implements ProfileRepository {
 
 class _Projects implements ProjectRepository {
   @override
+  Future<void> setPinned(String id, bool pinned) async {}
+  @override
+  Future<void> archiveProject(String id) async {}
+
+  @override
+  Future<void> moveProject(
+    String id, {
+    required String workspaceId,
+    String? parentId,
+    String? anchorId,
+    required String placement,
+  }) async {}
+
+  @override
   Future<List<ProjectModel>> getProjects() async => const [
     ProjectModel(
       id: 'p',

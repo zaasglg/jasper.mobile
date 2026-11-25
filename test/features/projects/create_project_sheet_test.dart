@@ -1,6 +1,7 @@
 import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:jospar/features/projects/domain/entities/create_project_request.dart';
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jospar/features/projects/domain/repositories/project_repository.dart';
@@ -20,13 +21,23 @@ void main() {
     await _pumpSheet(tester, cubit, const <WorkspaceModel>[sales, support]);
 
     expect(find.text('Новый проект'), findsOneWidget);
+    expect(
+      tester.widget(find.byKey(const Key('submit_project_button'))),
+      isA<FButton>(),
+    );
+    expect(
+      tester
+          .widget<FButton>(find.byKey(const Key('cancel_project_button')))
+          .variant,
+      FButtonVariant.outline,
+    );
+
     expect(find.text('Продажи'), findsOneWidget);
     await tester.ensureVisible(find.byKey(const Key('submit_project_button')));
     await tester.tap(find.byKey(const Key('submit_project_button')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Укажите название'), findsOneWidget);
-    expect(find.text('Выберите дату'), findsNWidgets(2));
     expect(repository.createCalls, 0);
     await cubit.close();
   });
@@ -51,12 +62,9 @@ void main() {
     await tester.tap(find.text('Поддержка').last);
     await tester.pumpAndSettle();
 
-    await _chooseInitialDate(tester, const Key('project_start_field'));
-    await _chooseInitialDate(tester, const Key('project_end_field'));
-
     await tester.ensureVisible(find.byKey(const Key('submit_project_button')));
     await tester.tap(find.byKey(const Key('submit_project_button')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(repository.createCalls, 1);
     expect(repository.lastRequest?.workspaceId, support.id);
@@ -65,13 +73,44 @@ void main() {
     expect(repository.lastRequest?.isPinned, isFalse);
     await cubit.close();
   });
+  testWidgets('subproject creation passes parent and locks workspace', (
+    tester,
+  ) async {
+    final repository = _RecordingProjectRepository();
+    final cubit = ProjectsCubit(repository);
+    await cubit.loadForWorkspace(sales.id);
+    const parent = ProjectModel(
+      id: 'parent',
+      code: 'PR',
+      name: 'Основной',
+      workspaceId: 'w1',
+      start: null,
+      end: null,
+    );
+    await _pumpSheet(tester, cubit, [sales, support], parent: parent);
+    expect(find.text('Подпроект: Основной'), findsOneWidget);
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const Key('project_name_field')),
+        matching: find.byType(TextFormField),
+      ),
+      'Подпроект',
+    );
+    await tester.ensureVisible(find.byKey(const Key('submit_project_button')));
+    await tester.tap(find.byKey(const Key('submit_project_button')));
+    await tester.pumpAndSettle();
+    expect(repository.lastRequest?.parentId, 'parent');
+    expect(repository.lastRequest?.workspaceId, 'w1');
+    await cubit.close();
+  });
 }
 
 Future<void> _pumpSheet(
   WidgetTester tester,
   ProjectsCubit cubit,
-  List<WorkspaceModel> workspaces,
-) async {
+  List<WorkspaceModel> workspaces, {
+  ProjectModel? parent,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
@@ -80,6 +119,7 @@ Future<void> _pumpSheet(
           child: CreateProjectSheet(
             workspaces: workspaces,
             initialWorkspace: workspaces.first,
+            parent: parent,
           ),
         ),
       ),
@@ -87,17 +127,21 @@ Future<void> _pumpSheet(
   );
 }
 
-Future<void> _chooseInitialDate(WidgetTester tester, Key fieldKey) async {
-  await tester.ensureVisible(find.byKey(fieldKey));
-  await tester.tap(
-    find.descendant(of: find.byKey(fieldKey), matching: find.byType(InkWell)),
-  );
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Выбрать'));
-  await tester.pumpAndSettle();
-}
-
 class _RecordingProjectRepository implements ProjectRepository {
+  @override
+  Future<void> setPinned(String id, bool pinned) async {}
+  @override
+  Future<void> archiveProject(String id) async {}
+
+  @override
+  Future<void> moveProject(
+    String id, {
+    required String workspaceId,
+    String? parentId,
+    String? anchorId,
+    required String placement,
+  }) async {}
+
   int createCalls = 0;
   CreateProjectRequest? lastRequest;
 

@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:jospar/features/profile/presentation/cubit/profile_state.dart';
@@ -44,6 +45,33 @@ class _Projects extends Cubit<ProjectsState> implements ProjectsCubit {
           projectTaskProgress: {'2': 100},
         ),
       );
+  int archiveCalls = 0;
+  @override
+  Future<void> loadForWorkspace(
+    String workspaceId, {
+    bool refresh = false,
+  }) async {}
+  @override
+  Future<String?> setPinned(String id, bool pinned) async {
+    emit(
+      state.copyWith(
+        projects: [
+          for (final p in state.projects)
+            p.id == id ? p.copyWith(isPinned: pinned) : p,
+        ],
+      ),
+    );
+    return null;
+  }
+
+  @override
+  Future<String?> archiveProject(String id) async {
+    archiveCalls++;
+    return null;
+  }
+
+  @override
+  void selectProject(String id) => emit(state.copyWith(selectedProjectId: id));
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -67,6 +95,149 @@ class _Workspace extends Cubit<WorkspaceState> implements WorkspaceCubit {
 }
 
 void main() {
+  testWidgets('subprojects appear inside parent and remain searchable', (
+    tester,
+  ) async {
+    GoogleFonts.config.allowRuntimeFetching = false;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final profile = _Profile();
+    final projects = _Projects();
+    final workspace = _Workspace();
+    addTearDown(profile.close);
+    addTearDown(projects.close);
+    addTearDown(workspace.close);
+    projects.emit(
+      ProjectsState(
+        projects: [
+          projects.state.projects.first,
+          projects.state.projects.last.copyWith(parentId: '1'),
+        ],
+      ),
+    );
+    final router = GoRouter(
+      routes: [
+        GoRoute(path: '/', builder: (_, _) => const ProjectsScreen()),
+        GoRoute(
+          path: '/manage/projects/:id',
+          builder: (_, state) =>
+              Scaffold(body: Text('Editing ${state.pathParameters['id']}')),
+        ),
+        GoRoute(
+          path: '/projects/:id',
+          builder: (_, state) =>
+              Scaffold(body: Text('Opened ${state.pathParameters['id']}')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<ProfileCubit>.value(value: profile),
+          BlocProvider<ProjectsCubit>.value(value: projects),
+          BlocProvider<WorkspaceCubit>.value(value: workspace),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Подпроекты'), findsOneWidget);
+    expect(find.byKey(const Key('project-row-2')), findsNothing);
+    expect(find.byKey(const Key('subproject-2')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('subproject-2')), findsNothing);
+    await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('subproject-2')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('projects-card-view')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('subproject-2')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    final group = find.byKey(const ValueKey('group-1-w'));
+    final expandedHeight = tester.getSize(group).height;
+    await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(group).height, lessThan(expandedHeight));
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
+    await tester.pumpAndSettle();
+    // Moving a child out of its parent must keep the active drag alive,
+    // including when the card changes columns in the grid.
+    for (final view in ['projects-list-view', 'projects-card-view']) {
+      await tester.tap(find.byKey(Key(view)));
+      await tester.pumpAndSettle();
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('subproject-2'))),
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+      final parent = tester.getRect(find.byKey(const Key('project-row-1')));
+      await gesture.moveTo(Offset(parent.center.dx, parent.top + 5));
+      await tester.pump();
+      expect(find.byKey(const Key('project-row-2')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await gesture.moveTo(const Offset(380, 800));
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('subproject-2')), findsOneWidget);
+      expect(find.byKey(const Key('project-row-2')), findsNothing);
+      expect(tester.takeException(), isNull);
+    }
+    await tester.tap(find.byKey(const Key('project-edit-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Editing 1'), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('project-pin-1')));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Открепить проект'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('project-pin-1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('project-edit-1')), findsOneWidget);
+    expect(find.byKey(const Key('project-pin-1')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('project-archive-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Архивировать проект?'), findsOneWidget);
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    expect(find.text('Архивировать проект?'), findsNothing);
+    expect(projects.archiveCalls, 0);
+    await tester.tap(find.byKey(const Key('project-archive-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Архивировать').last);
+    await tester.pumpAndSettle();
+    expect(projects.archiveCalls, 1);
+    await tester.enterText(find.byType(TextField).first, 'Ботаника');
+    await tester.pumpAndSettle();
+    expect(find.text('Орбита'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('subproject-2')),
+        matching: find.text('Ботаника'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('projects-list-view')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('project-edit-1')), findsOneWidget);
+    expect(find.byKey(const Key('project-archive-1')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('project-pin-1')));
+    await tester.pumpAndSettle();
+    expect(projects.state.projects.first.isPinned, isTrue);
+    expect(find.byKey(const Key('subproject-2')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('subproject-2')));
+    await tester.pumpAndSettle();
+    expect(find.text('Opened 2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('search works without status filters on a narrow mobile screen', (
     tester,
   ) async {
@@ -133,11 +304,13 @@ void main() {
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpAndSettle();
-    expect(tester.getTopLeft(first).dx, tester.getTopLeft(second).dx);
-    expect(
-      tester.getTopLeft(second).dy,
-      greaterThan(tester.getTopLeft(first).dy),
+    final firstX = tester.getTopLeft(first).dx;
+    await tester.scrollUntilVisible(
+      second,
+      150,
+      scrollable: find.byType(Scrollable).last,
     );
+    expect(tester.getTopLeft(second).dx, firstX);
     expect(tester.takeException(), isNull);
     tester.platformDispatcher.clearTextScaleFactorTestValue();
     tester.view.physicalSize = const Size(1024, 800);

@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
-// Siri launches can arrive before splash/authentication completes. Preserve the
-// request and navigate only once the authenticated shell is ready.
+// Preserve Siri and widget requests through splash/authentication, then open
+// the assistant once the authenticated shell is ready.
 class AssistantLaunchService {
   AssistantLaunchService(
     this._router, {
@@ -14,9 +14,13 @@ class AssistantLaunchService {
   final MethodChannel _channel;
   final _repeatedLaunches = StreamController<void>.broadcast();
   Stream<void> get repeatedLaunches => _repeatedLaunches.stream;
+  final _textLaunches = StreamController<void>.broadcast();
+  Stream<void> get textLaunches => _textLaunches.stream;
+  bool _voice = true;
   bool _pending = false;
   bool _scheduled = false;
-  void requestLaunch() {
+  void requestLaunch({bool voice = true}) {
+    _voice = voice;
     _pending = true;
     _tryOpen();
   }
@@ -25,11 +29,13 @@ class AssistantLaunchService {
     _router.routerDelegate.removeListener(_tryOpen);
     _channel.setMethodCallHandler(null);
     _repeatedLaunches.close();
+    _textLaunches.close();
   }
 
   Future<void> initialize() async {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'openAssistant') {
+        _voice = true;
         _pending = true;
         try {
           await _channel.invokeMethod<bool>('consumePendingLaunch');
@@ -43,6 +49,7 @@ class AssistantLaunchService {
     try {
       final initial =
           await _channel.invokeMethod<bool>('consumePendingLaunch') ?? false;
+      if (!_pending && initial) _voice = true;
       _pending = _pending || initial;
     } on MissingPluginException {
       return;
@@ -61,7 +68,9 @@ class AssistantLaunchService {
             .lastOrNull
             ?.matchedLocation ??
         '';
-    if (path == '/login' || path == '/splash' || path.isEmpty) return;
+    if (path == '/' || path == '/login' || path == '/splash' || path.isEmpty) {
+      return;
+    }
     _scheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scheduled = false;
@@ -72,14 +81,21 @@ class AssistantLaunchService {
               .lastOrNull
               ?.matchedLocation ??
           '';
-      if (current == '/login' || current == '/splash' || current.isEmpty) {
+      if (current == '/' ||
+          current == '/login' ||
+          current == '/splash' ||
+          current.isEmpty) {
         return;
       }
       _pending = false;
       if (current == '/assistant') {
-        _repeatedLaunches.add(null);
+        (_voice ? _repeatedLaunches : _textLaunches).add(null);
       } else {
-        unawaited(_router.push('/assistant?voice=true'));
+        unawaited(
+          _router.push(
+            _voice ? '/assistant?voice=true' : '/assistant?keyboard=true',
+          ),
+        );
       }
     });
     WidgetsBinding.instance.ensureVisualUpdate();

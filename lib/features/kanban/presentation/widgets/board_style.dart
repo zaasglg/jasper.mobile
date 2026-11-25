@@ -10,11 +10,11 @@ abstract final class BoardStyle {
   static const ink = Color(0xFF20212C);
   static const metadata = Color(0xFF626675);
   static const columnWidth = 320.0;
-  static const toolbarHeight = 64.0;
+  static const toolbarHeight = 48.0;
   static const projectHeaderHeight = 104.0;
-  static const cardTitleSize = 16.0;
-  static const columnTitleSize = 16.0;
-  static const iconSize = 22.0;
+  static const cardTitleSize = 15.0;
+  static const columnTitleSize = 15.0;
+  static const iconSize = 20.0;
 
   static Color background(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark

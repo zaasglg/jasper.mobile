@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_selector.dart';
@@ -7,6 +8,43 @@ import '../../../../core/theme/app_theme.dart';
 import 'dashboard_task_list_sheet.dart';
 import 'dashboard_widget_panel.dart'
     show dashboardObject, dashboardDone, flattenDashboardProjects;
+
+abstract final class _ScrumTypography {
+  static const detail = TextStyle(
+    fontSize: 12,
+    height: 1.4,
+    color: Color(0xFF71717A),
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+  static const filter = TextStyle(
+    fontSize: 12,
+    height: 1.4,
+    fontWeight: FontWeight.w500,
+    color: Color(0xFF71717A),
+  );
+  static TextStyle label(BuildContext context) => TextStyle(
+    fontSize: 14,
+    height: 1.35,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.2,
+    color: AppColors.of(context).ink,
+  );
+  static TextStyle number(BuildContext context) => TextStyle(
+    fontSize: 13,
+    height: 1.3,
+    fontWeight: FontWeight.w600,
+    color: AppColors.of(context).ink,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
+  static TextStyle percentage(BuildContext context) => TextStyle(
+    fontSize: 26,
+    height: 1.1,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.8,
+    color: AppColors.of(context).ink,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
+}
 
 class DashboardScrumWidget extends StatefulWidget {
   const DashboardScrumWidget({
@@ -81,7 +119,7 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.of(context).canvas,
       builder: (_) => DashboardTaskListSheet(
         title: title,
         tasks: tasks,
@@ -94,9 +132,7 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
   @override
   Widget build(BuildContext context) {
     final tasks = _tasks;
-    final done = tasks
-        .where((t) => t['status']?.toString().toUpperCase() == 'DONE')
-        .length;
+    final done = tasks.where(dashboardDone).length;
     final progress = tasks.isEmpty ? 0.0 : done / tasks.length;
     final overdue = tasks
         .where(
@@ -175,22 +211,24 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!WidgetCollapseScope.hidesHeading(context)) ...[
+          AppWidgetHeading(
+            icon: LucideIcons.listChecks,
+            title: tr(context, 'Скрам'),
+          ),
+          const SizedBox(height: 8),
+        ],
         Row(
           children: [
-            const AppWidgetHeading(
-              icon: LucideIcons.listChecks,
-              title: 'Скрам',
-            ),
-            const SizedBox(width: 12),
             Expanded(
               child: DashboardSelector<String>(
-                tooltip: 'Проект скрама',
+                tooltip: tr(context, 'Проект скрама'),
                 onSelected: (id) => setState(() => _selected = {id}),
                 itemBuilder: (_) => [
                   CheckedPopupMenuItem(
                     value: 'all',
                     checked: _selected.contains('all'),
-                    child: const Text('Все проекты'),
+                    child: Text(tr(context, 'Все проекты')),
                   ),
                   for (final p in flat)
                     CheckedPopupMenuItem(
@@ -206,18 +244,16 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
                       Flexible(
                         child: Text(
                           label,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.muted,
-                          ),
+                          style: _ScrumTypography.filter,
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(
+                      Icon(
                         LucideIcons.chevronDown,
                         size: 14,
-                        color: AppColors.muted,
+                        color: AppColors.of(context).muted,
                       ),
                     ],
                   ),
@@ -225,18 +261,18 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
               ),
             ),
             DashboardSelector<String>(
-              tooltip: 'Группировка скрама',
+              tooltip: tr(context, 'Группировка скрама'),
               onSelected: (mode) => setState(() => _mode = mode),
               itemBuilder: (_) => [
                 CheckedPopupMenuItem(
                   value: 'column',
                   checked: _mode == 'column',
-                  child: const Text('Колонка'),
+                  child: Text(tr(context, 'Колонка')),
                 ),
                 CheckedPopupMenuItem(
                   value: 'epic',
                   checked: _mode == 'epic',
-                  child: const Text('Эпик'),
+                  child: Text(tr(context, 'Эпик')),
                 ),
               ],
               child: Padding(
@@ -244,17 +280,16 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
                 child: Row(
                   children: [
                     Text(
-                      _mode == 'epic' ? 'Эпик' : 'Колонка',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.muted,
-                      ),
+                      _mode == 'epic'
+                          ? tr(context, 'Эпик')
+                          : tr(context, 'Колонка'),
+                      style: _ScrumTypography.filter,
                     ),
                     const SizedBox(width: 4),
-                    const Icon(
+                    Icon(
                       LucideIcons.chevronDown,
                       size: 14,
-                      color: AppColors.muted,
+                      color: AppColors.of(context).muted,
                     ),
                   ],
                 ),
@@ -287,9 +322,11 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'Только мои задачи',
-                  style: TextStyle(fontSize: 11, color: AppColors.muted),
+                Flexible(
+                  child: Text(
+                    tr(context, 'Только мои задачи'),
+                    style: _ScrumTypography.filter,
+                  ),
                 ),
               ],
             ),
@@ -301,16 +338,18 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
           children: [
             Text(
               '${(progress * 100).round()}%',
-              style: const TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                height: 1.1,
-              ),
+              style: _ScrumTypography.percentage(context),
             ),
-            const Spacer(),
-            Text(
-              '$done из ${tasks.length} выполнено',
-              style: const TextStyle(fontSize: 11, color: AppColors.muted),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                tr(context, "{p0} из {p1} выполнено", {
+                  'p0': done,
+                  'p1': tasks.length,
+                }),
+                textAlign: TextAlign.end,
+                style: _ScrumTypography.detail,
+              ),
             ),
           ],
         ),
@@ -321,22 +360,29 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
             value: progress,
             minHeight: 6,
             color: AppColors.accent,
-            backgroundColor: const Color(0xFFF5F5F4),
+            backgroundColor: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.surfaceContainerLow
+                : const Color(0xFFF5F5F4),
           ),
         ),
         const SizedBox(height: 14),
         if (widget.projects.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.all(16),
-            child: Text('Нет проектов', textAlign: TextAlign.center),
+            child: Text(
+              tr(context, 'Нет проектов'),
+              textAlign: TextAlign.center,
+            ),
           ),
         if (groups.isEmpty && widget.projects.isNotEmpty)
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              _mode == 'epic' ? 'Нет эпиков' : 'Нет колонок',
+              _mode == 'epic'
+                  ? tr(context, 'Нет эпиков')
+                  : tr(context, 'Нет колонок'),
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+              style: _ScrumTypography.detail,
             ),
           ),
         for (final group in groups.values)
@@ -359,18 +405,15 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
                   Expanded(
                     child: Text(
                       group.label,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF606079),
-                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: _ScrumTypography.label(context),
                     ),
                   ),
+                  const SizedBox(width: 12),
                   Text(
                     '${group.tasks.length}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: _ScrumTypography.number(context),
                   ),
                 ],
               ),
@@ -400,9 +443,14 @@ class _DashboardScrumWidgetState extends State<DashboardScrumWidget> {
                       const SizedBox(width: 9),
                       Expanded(
                         child: Text(
-                          '${overdue.length} задач просрочено',
+                          tr(context, "{p0} задач просрочено", {
+                            'p0': overdue.length,
+                          }),
                           style: const TextStyle(
                             fontSize: 12,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                            fontFeatures: [FontFeature.tabularFigures()],
                             color: Color(0xFFBE2A1D),
                           ),
                         ),

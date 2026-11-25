@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 
@@ -12,18 +13,18 @@ class DashboardWidgetSkeleton extends StatelessWidget {
   final bool showHeading;
   final String kind;
 
-  Widget _bar(double width, double height) => Container(
+  Widget _bar(BuildContext context, double width, double height) => Container(
     width: width,
     height: height,
     decoration: BoxDecoration(
-      color: AppColors.skeleton,
+      color: AppColors.of(context).skeleton,
       borderRadius: BorderRadius.circular(6),
     ),
   );
 
   @override
   Widget build(BuildContext context) => Semantics(
-    label: 'Загрузка виджета',
+    label: tr(context, 'Загрузка виджета'),
     child: ExcludeSemantics(
       child: SingleChildScrollView(
         primary: false,
@@ -37,9 +38,9 @@ class DashboardWidgetSkeleton extends StatelessWidget {
               if (showHeading) ...[
                 Row(
                   children: [
-                    _bar(22, 22),
+                    _bar(context, 22, 22),
                     const SizedBox(width: 12),
-                    _bar(128, 14),
+                    _bar(context, 128, 14),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -58,7 +59,7 @@ class DashboardWidgetSkeleton extends StatelessWidget {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: AppColors.skeleton,
+                                  color: AppColors.of(context).skeleton,
                                   width: 10,
                                 ),
                               ),
@@ -73,7 +74,7 @@ class DashboardWidgetSkeleton extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 18),
                   child: Row(
                     children: [
-                      ClipOval(child: _bar(32, 32)),
+                      ClipOval(child: _bar(context, 32, 32)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -81,12 +82,12 @@ class DashboardWidgetSkeleton extends StatelessWidget {
                           children: [
                             FractionallySizedBox(
                               widthFactor: i == 1 ? .65 : .8,
-                              child: _bar(double.infinity, 12),
+                              child: _bar(context, double.infinity, 12),
                             ),
                             const SizedBox(height: 9),
                             FractionallySizedBox(
                               widthFactor: .45,
-                              child: _bar(double.infinity, 9),
+                              child: _bar(context, double.infinity, 9),
                             ),
                           ],
                         ),

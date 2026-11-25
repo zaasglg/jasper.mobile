@@ -1,0 +1,7 @@
+<resources>
+    <color name="assistant_widget_surface">#18191F</color>
+    <color name="assistant_widget_ink">#F0F0F5</color>
+    <color name="assistant_widget_muted">#A4A6BA</color>
+    <color name="assistant_widget_accent">#B3A7FF</color>
+    <color name="assistant_widget_border">#363842</color>
+</resources>

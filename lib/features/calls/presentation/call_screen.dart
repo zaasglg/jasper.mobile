@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -127,19 +128,21 @@ class _CallScreenState extends State<CallScreen> {
             backgroundColor: pictureInPicture || groupGrid
                 ? Colors.transparent
                 : null,
-            title: const Row(
+            title: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.lock_outline, size: 12, color: _CallStyle.secondary),
                 SizedBox(width: 6),
                 Text(
-                  'Звонок',
+                  tr(context, 'Звонок'),
                   style: TextStyle(fontSize: 13, color: _CallStyle.secondary),
                 ),
               ],
             ),
             leading: IconButton(
-              tooltip: state.busy ? 'Свернуть звонок' : 'Закрыть',
+              tooltip: state.busy
+                  ? tr(context, 'Свернуть звонок')
+                  : tr(context, 'Закрыть'),
               onPressed: () =>
                   context.canPop() ? context.pop() : context.go('/messenger'),
               icon: Icon(
@@ -179,7 +182,7 @@ class _CallScreenState extends State<CallScreen> {
                               children: [
                                 if (state.error != null)
                                   Text(
-                                    state.error!,
+                                    tr(context, state.error!),
                                     textAlign: TextAlign.center,
                                   ),
                                 Row(
@@ -187,7 +190,7 @@ class _CallScreenState extends State<CallScreen> {
                                       MainAxisAlignment.spaceEvenly,
                                   children: [
                                     IconButton(
-                                      tooltip: 'Развернуть камеру',
+                                      tooltip: tr(context, 'Развернуть камеру'),
                                       icon: const Icon(
                                         Icons.cameraswitch_outlined,
                                       ),
@@ -198,8 +201,8 @@ class _CallScreenState extends State<CallScreen> {
                                     ),
                                     IconButton(
                                       tooltip: media.camera
-                                          ? 'Выключить камеру'
-                                          : 'Включить камеру',
+                                          ? tr(context, 'Выключить камеру')
+                                          : tr(context, 'Включить камеру'),
                                       icon: Icon(
                                         media.camera
                                             ? Icons.videocam_outlined
@@ -210,7 +213,7 @@ class _CallScreenState extends State<CallScreen> {
                                           : () => cubit.control('camera'),
                                     ),
                                     IconButton.filled(
-                                      tooltip: 'Отключиться',
+                                      tooltip: tr(context, 'Отключиться'),
                                       style: IconButton.styleFrom(
                                         backgroundColor: _CallStyle.danger,
                                         foregroundColor: Colors.white,
@@ -224,8 +227,8 @@ class _CallScreenState extends State<CallScreen> {
                                     ),
                                     IconButton(
                                       tooltip: media.microphone
-                                          ? 'Выключить микрофон'
-                                          : 'Включить микрофон',
+                                          ? tr(context, 'Выключить микрофон')
+                                          : tr(context, 'Включить микрофон'),
                                       icon: Icon(
                                         media.microphone
                                             ? Icons.mic_none
@@ -236,7 +239,7 @@ class _CallScreenState extends State<CallScreen> {
                                           : () => cubit.control('microphone'),
                                     ),
                                     IconButton(
-                                      tooltip: 'Показать экран',
+                                      tooltip: tr(context, 'Показать экран'),
                                       icon: const Icon(
                                         Icons.screen_share_outlined,
                                       ),
@@ -392,10 +395,10 @@ class _CallScreenState extends State<CallScreen> {
                             Padding(
                               padding: const EdgeInsets.all(16),
                               child: Text(
-                                state.error!,
+                                tr(context, state.error!),
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppColors.error,
+                                style: TextStyle(
+                                  color: AppColors.of(context).error,
                                   fontSize: 13,
                                 ),
                               ),
@@ -406,8 +409,8 @@ class _CallScreenState extends State<CallScreen> {
                               (state.creator || state.room!.endOnHangup))
                             TextButton(
                               onPressed: () => cubit.finish(endForAll: true),
-                              child: const Text(
-                                'Повторить завершение на сервере',
+                              child: Text(
+                                tr(context, 'Повторить завершение на сервере'),
                               ),
                             ),
                           if (state.phase == CallPhase.active)
@@ -483,8 +486,8 @@ class _CallScreenState extends State<CallScreen> {
                             child: state.busy
                                 ? IconButton.filled(
                                     tooltip: state.creator
-                                        ? 'Завершить звонок'
-                                        : 'Отключиться',
+                                        ? tr(context, 'Завершить звонок')
+                                        : tr(context, 'Отключиться'),
                                     style: FilledButton.styleFrom(
                                       backgroundColor: _CallStyle.danger,
                                       foregroundColor: Colors.white,
@@ -501,7 +504,7 @@ class _CallScreenState extends State<CallScreen> {
                                     onPressed: () => context.canPop()
                                         ? context.pop()
                                         : context.go('/messenger'),
-                                    child: const Text('Закрыть'),
+                                    child: Text(tr(context, 'Закрыть')),
                                   ),
                           ),
                         ],
@@ -592,7 +595,10 @@ class _CallPictureInPictureState extends State<CallPictureInPicture> {
                       );
                     }),
                     child: Semantics(
-                      label: 'Ваше видео. Можно перемещать по экрану',
+                      label: tr(
+                        context,
+                        'Ваше видео. Можно перемещать по экрану',
+                      ),
                       child: widget.local,
                     ),
                   ),
@@ -752,12 +758,12 @@ class _Peer extends StatelessWidget {
               child: Row(
                 children: [
                   if (!participant.isMicrophoneEnabled())
-                    const Padding(
-                      padding: EdgeInsets.only(right: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
                       child: Icon(
                         Icons.mic_off_outlined,
                         size: 16,
-                        color: AppColors.error,
+                        color: AppColors.of(context).error,
                       ),
                     ),
                   Expanded(
@@ -821,8 +827,10 @@ class CallScreenShareView extends StatelessWidget {
                   Expanded(
                     child: Text(
                       local
-                          ? 'Вы демонстрируете экран'
-                          : 'Экран · ${name.isEmpty ? 'Участник' : name}',
+                          ? tr(context, 'Вы демонстрируете экран')
+                          : tr(context, "Экран · {p0}", {
+                              'p0': name.isEmpty ? 'Участник' : name,
+                            }),
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -832,9 +840,12 @@ class CallScreenShareView extends StatelessWidget {
             ),
             Expanded(
               child: local
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        'Перейдите в приложение, которое хотите показать.\nОстановить трансляцию можно кнопкой ниже.',
+                        tr(
+                          context,
+                          'Перейдите в приложение, которое хотите показать.\nОстановить трансляцию можно кнопкой ниже.',
+                        ),
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),

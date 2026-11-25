@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:async';
 import 'dart:io';
@@ -242,7 +243,7 @@ class _VideoNoteCaptureState extends State<VideoNoteCapture>
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
-          title: const Text('Видеозаметка'),
+          title: Text(tr(context, 'Видеозаметка')),
           leading: IconButton(
             onPressed: _sending ? null : () => Navigator.pop(context),
             icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
@@ -323,15 +324,15 @@ class _VideoNoteCaptureState extends State<VideoNoteCapture>
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'До 60 секунд',
+                Text(
+                  tr(context, 'До 60 секунд'),
                   style: TextStyle(color: Colors.white60),
                 ),
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: Text(
-                      _error!,
+                      tr(context, _error!),
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.redAccent),
                     ),
@@ -349,7 +350,7 @@ class _VideoNoteCaptureState extends State<VideoNoteCapture>
                           LucideIcons.rotateCcw,
                           size: AppIconSizes.standard,
                         ),
-                        label: const Text('Перезаписать'),
+                        label: Text(tr(context, 'Перезаписать')),
                       ),
                       FilledButton.icon(
                         onPressed: _send,
@@ -357,7 +358,7 @@ class _VideoNoteCaptureState extends State<VideoNoteCapture>
                           LucideIcons.sendHorizontal,
                           size: AppIconSizes.standard,
                         ),
-                        label: const Text('Отправить'),
+                        label: Text(tr(context, 'Отправить')),
                       ),
                     ],
                   )

@@ -1,3 +1,20 @@
+import '../../features/dashboard/domain/daily_quote_repository.dart';
+import '../../features/dashboard/data/daily_quote_repository_impl.dart';
+import '../../features/planner/domain/repositories/ai_day_plan_repository.dart';
+import '../../features/planner/data/repositories/ai_day_plan_repository_impl.dart';
+import '../../features/notifications/domain/notification_preferences_repository.dart';
+import '../../features/notifications/data/notification_preferences_repository_impl.dart';
+import '../../features/notifications/presentation/notification_preferences_cubit.dart';
+import '../localization/locale_cubit.dart';
+import '../localization/app_translations.dart';
+import '../../features/assistant/domain/repositories/assistant_history_repository.dart';
+import '../../features/assistant/data/repositories/assistant_history_repository_impl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/theme_cubit.dart';
+import '../../features/chat/data/services/channel_photo_picker.dart';
+import '../../features/chat/domain/repositories/channel_image_repository.dart';
+import '../../features/planner/domain/repositories/task_icon_repository.dart';
+import '../../features/planner/data/repositories/task_icon_repository_impl.dart';
 import '../../features/notifications/data/native_push_gateway.dart';
 import '../../features/notifications/domain/push_gateway.dart';
 import '../../features/notifications/presentation/push_cubit.dart';
@@ -80,6 +97,12 @@ import '../../features/qr_login/presentation/cubit/qr_sessions_cubit.dart';
 final sl = GetIt.instance;
 
 Future<void> initServiceLocator() async {
+  final preferences = await SharedPreferences.getInstance();
+  await AppTranslations.load();
+  sl.registerSingleton<ThemeCubit>(
+    ThemeCubit(preferences),
+    dispose: (cubit) => cubit.close(),
+  );
   // Core
   sl.registerLazySingleton<FlutterSecureStorage>(FlutterSecureStorage.new);
   sl.registerLazySingleton<MentionsReadStorage>(
@@ -105,6 +128,10 @@ Future<void> initServiceLocator() async {
 
   sl.registerLazySingleton<StorageRepository>(
     () => StorageRepositoryImpl(sl(), sl()),
+  );
+
+  sl.registerLazySingleton<DailyQuoteRepository>(
+    () => DailyQuoteRepositoryImpl(sl()),
   );
 
   sl.registerLazySingleton<DashboardRepository>(
@@ -147,12 +174,23 @@ Future<void> initServiceLocator() async {
   // Messenger
   sl.registerLazySingleton<ChatRepository>(
     () => ChatRepositoryImpl(sl(), sl()),
+    dispose: (repository) => (repository as ChatRepositoryImpl).dispose(),
+  );
+  sl.registerLazySingleton<ChannelPhotoPicker>(
+    () => GalleryChannelPhotoPicker(),
   );
   sl.registerFactory<ChatCubit>(() => ChatCubit(sl()));
 
   // Profile
   sl.registerLazySingleton<ProfileRepository>(
     () => ProfileRepositoryImpl(sl()),
+  );
+  sl.registerLazySingleton<ProfileLocaleRepository>(
+    () => sl<ProfileRepository>() as ProfileLocaleRepository,
+  );
+  sl.registerSingleton<LocaleCubit>(
+    LocaleCubit(sl(), sl(), preferences, sl()),
+    dispose: (cubit) => cubit.close(),
   );
   sl.registerFactory<ProfileCubit>(() => ProfileCubit(sl()));
 
@@ -194,6 +232,9 @@ Future<void> initServiceLocator() async {
   sl.registerLazySingleton<TaskDetailsRepository>(
     () => TaskDetailsRepositoryImpl(sl()),
   );
+  sl.registerLazySingleton<TaskResourceReadRepository>(
+    () => sl<TaskDetailsRepository>() as TaskResourceReadRepository,
+  );
   sl.registerFactory<TaskDetailsCubit>(() => TaskDetailsCubit(sl(), sl()));
 
   sl.registerLazySingleton<CallRepository>(() => CallRepositoryImpl(sl()));
@@ -214,24 +255,45 @@ Future<void> initServiceLocator() async {
   sl.registerLazySingleton<AssistantRepository>(
     () => AssistantRepositoryImpl(sl()),
   );
+  sl.registerLazySingleton<AssistantHistoryRepository>(
+    () => AssistantHistoryRepositoryImpl(sl(), sl()),
+  );
   sl.registerLazySingleton<AssistantVoice>(DeviceAssistantVoice.new);
   sl.registerFactory<AssistantCubit>(
-    () =>
-        AssistantCubit(sl(), sl(), sl(), actions: AssistantActions(sl(), sl())),
+    () => AssistantCubit(
+      sl(),
+      sl(),
+      sl(),
+      actions: AssistantActions(sl(), sl()),
+      history: sl(),
+    ),
   );
 
   sl.registerLazySingleton<GoogleCalendarRepository>(
     () => GoogleCalendarRepositoryImpl(sl()),
   );
 
+  sl.registerLazySingleton<NotificationPreferencesRepository>(
+    () => NotificationPreferencesRepositoryImpl(preferences, sl()),
+  );
+  sl.registerLazySingleton<NotificationPreferencesCubit>(
+    () => NotificationPreferencesCubit(sl(), sl(), sl()),
+    dispose: (cubit) => cubit.close(),
+  );
   sl.registerLazySingleton<PushGateway>(NativePushGateway.new);
   sl.registerLazySingleton<PushCubit>(() => PushCubit(sl()));
 
   // Planner
+  sl.registerLazySingleton<AiDayPlanRepository>(
+    () => AiDayPlanRepositoryImpl(sl()),
+  );
   sl.registerLazySingleton<PlannerRepository>(
     () => PlannerRepositoryImpl(sl()),
   );
-  sl.registerFactory<PlannerCubit>(() => PlannerCubit(sl()));
+  sl.registerFactory<TaskIconRepository>(() => TaskIconRepositoryImpl(sl()));
+  sl.registerFactory<PlannerCubit>(
+    () => PlannerCubit(sl(), iconRepository: sl()),
+  );
 
   // Workspaces
   sl.registerLazySingleton<WorkspaceRepository>(

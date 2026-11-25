@@ -31,8 +31,8 @@ class AppBottomNavigation extends StatelessWidget {
               key: ValueKey('navigation-tab-$index'),
               semanticsLabel: destination.label,
               icon: SizedBox(
-                height: AppSpacing.touchTarget,
-                width: AppSpacing.touchTarget,
+                height: 32,
+                width: AppSpacing.lg,
                 child: Center(
                   child: IconTheme(
                     data: IconThemeData(
@@ -53,18 +53,59 @@ class AppBottomNavigation extends StatelessWidget {
                   ),
                 ),
               ),
-              label: Text(
-                destination.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: index == selectedIndex
-                      ? colors.primary
-                      : colors.onSurfaceVariant,
-                  fontWeight: index == selectedIndex
-                      ? FontWeight.w600
-                      : FontWeight.w400,
-                ),
+              label: LayoutBuilder(
+                builder: (context, constraints) {
+                  final style =
+                      (theme.textTheme.labelSmall ?? const TextStyle())
+                          .copyWith(
+                            height: 1.25,
+                            color: index == selectedIndex
+                                ? colors.primary
+                                : colors.onSurfaceVariant,
+                            fontWeight: index == selectedIndex
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          );
+                  // Fit every label using the longest one to keep one shared
+                  // font size and a single baseline across all tabs.
+                  var height = 0.0;
+                  var width = 0.0;
+                  for (final tab in destinations) {
+                    final painter = TextPainter(
+                      text: TextSpan(
+                        text: tab.label,
+                        style: style.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      textDirection: Directionality.of(context),
+                      textScaler: MediaQuery.textScalerOf(context),
+                      locale: Localizations.localeOf(context),
+                      maxLines: 1,
+                    )..layout();
+                    if (painter.height > height) height = painter.height;
+                    if (painter.width > width) width = painter.width;
+                    painter.dispose();
+                  }
+                  final fit = width > constraints.maxWidth
+                      ? constraints.maxWidth / width
+                      : 1.0;
+                  final fontSize = style.fontSize ?? 11;
+                  final textScale =
+                      MediaQuery.textScalerOf(context).scale(fontSize) /
+                      fontSize;
+                  return SizedBox(
+                    height: height * fit,
+                    width: constraints.maxWidth,
+                    child: Text(
+                      destination.label,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      softWrap: false,
+                      textScaler: TextScaler.linear(textScale * fit),
+                      overflow: TextOverflow.visible,
+                      style: style,
+                    ),
+                  );
+                },
               ),
             ),
         ],

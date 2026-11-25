@@ -1,8 +1,7 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
-import '../../../../core/theme/dashboard_surface.dart';
 
 class DashboardCollapsibleWidget extends StatefulWidget {
   const DashboardCollapsibleWidget({
@@ -23,6 +22,13 @@ class DashboardCollapsibleWidget extends StatefulWidget {
 class _DashboardCollapsibleWidgetState extends State<DashboardCollapsibleWidget>
     with AutomaticKeepAliveClientMixin {
   bool _collapsed = false;
+  int? _memberCount;
+
+  void _updateMemberCount(int count) {
+    if (mounted && _memberCount != count) {
+      setState(() => _memberCount = count);
+    }
+  }
 
   // Retain loaded content and disclosure state outside the list's cache.
   // Recreating a card briefly restores its skeleton and changes its height,
@@ -33,40 +39,49 @@ class _DashboardCollapsibleWidgetState extends State<DashboardCollapsibleWidget>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (_collapsed)
-          Material(
-            color: Theme.of(context).colorScheme.surfaceContainerLowest,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              side: const BorderSide(color: DashboardSurface.border),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              key: const Key('dashboard_widget_expand'),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
+    final usesTextDisclosure = widget.title == tr(context, 'AI рекомендации');
+    return AnimatedSize(
+      key: const Key('dashboard_widget_size_animation'),
+      duration: const Duration(milliseconds: 220),
+      reverseDuration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          WidgetCollapseScope(
+            expanded: !_collapsed,
+            onToggle: () => setState(() => _collapsed = !_collapsed),
+            child: AppWidgetHeading(
+              icon: widget.icon,
+              iconAsset: usesTextDisclosure ? 'assets/images/JBee.svg' : null,
+              title: widget.title,
+              memberCount: _memberCount,
+              titleFontWeight: FontWeight.w600,
+              fullWidthToggle: true,
+              toggleKey: Key(
+                _collapsed
+                    ? 'dashboard_widget_expand'
+                    : 'dashboard_widget_collapse',
               ),
-              title: AppWidgetHeading(icon: widget.icon, title: widget.title),
-              trailing: Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              onTap: () => setState(() => _collapsed = !_collapsed),
+              toggleSemanticLabel:
+                  '${_collapsed ? 'Показать' : 'Скрыть'} ${widget.title}',
             ),
           ),
-        Offstage(
-          offstage: _collapsed,
-          child: WidgetCollapseScope(
-            onToggle: () => setState(() => _collapsed = true),
-            child: widget.child,
+          Offstage(
+            offstage: _collapsed,
+            child: WidgetCollapseScope(
+              hideHeading: true,
+              memberCount: _memberCount,
+              onMemberCountChanged: _updateMemberCount,
+              onToggle: () => setState(() => _collapsed = true),
+              child: widget.child,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -416,15 +416,15 @@ void main() {
       expect(tasks.length, 101);
       expect(
         adapter.requests
-            .lastWhere((r) => r.path == 'project-tasks')
+            .lastWhere((r) => r.path == 'project-tasks/timing')
             .queryParameters['skip'],
         100,
       );
       expect(
         adapter.requests
-            .lastWhere((r) => r.path == 'project-tasks')
-            .queryParameters['projectIds'],
-        'p',
+            .lastWhere((r) => r.path == 'project-tasks/timing')
+            .queryParameters['take'],
+        100,
       );
       expect(tasks.every((e) => e['projectId'] == 'p'), true);
     },

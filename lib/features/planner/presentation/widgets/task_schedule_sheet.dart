@@ -1,3 +1,6 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import 'planner_date_picker.dart';
+import 'planner_time_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -110,14 +113,10 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
       _prepare(state);
       final colors = Theme.of(context).colorScheme;
       final enabled = _prepared && !state.isSaving;
-      final now = plannerNow();
-      final today = plannerDate(now);
-      final tomorrow = DateTime(today.year, today.month, today.day + 1);
       final start = plannerLocal(
         plannerInstant(_date, _time.hour, _time.minute),
       );
-      final end = start.add(Duration(minutes: _duration));
-      final style = GoogleFonts.manrope(
+      final style = GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w600,
       );
@@ -144,9 +143,9 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                             Expanded(
                               child: Text(
                                 _existing
-                                    ? 'Изменить план'
-                                    : 'Добавить в ежедневник',
-                                style: GoogleFonts.manrope(
+                                    ? tr(context, 'Изменить план')
+                                    : tr(context, 'Добавить в ежедневник'),
+                                style: GoogleFonts.inter(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w800,
                                   color: colors.onSurface,
@@ -154,7 +153,7 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                               ),
                             ),
                             IconButton(
-                              tooltip: 'Закрыть',
+                              tooltip: tr(context, 'Закрыть'),
                               onPressed: state.isSaving
                                   ? null
                                   : () => Navigator.pop(context),
@@ -164,8 +163,11 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Добавьте задачу в день. Время можно назначить позже.',
-                          style: GoogleFonts.manrope(
+                          tr(
+                            context,
+                            'Добавьте задачу в день. Время можно назначить позже.',
+                          ),
+                          style: GoogleFonts.inter(
                             fontSize: 13,
                             color: colors.onSurfaceVariant,
                           ),
@@ -195,7 +197,7 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                                   children: [
                                     Text(
                                       widget.source,
-                                      style: GoogleFonts.manrope(
+                                      style: GoogleFonts.inter(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w700,
                                         color: AppColors.accent,
@@ -235,36 +237,15 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                           TextButton(
                             onPressed: () =>
                                 context.read<PlannerCubit>().refresh(),
-                            child: const Text('Повторить'),
+                            child: Text(tr(context, 'Повторить')),
                           ),
                         ],
                         const SizedBox(height: 24),
                         Text(
-                          'День',
+                          tr(context, 'День'),
                           style: style.copyWith(color: colors.onSurface),
                         ),
                         const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final entry in {
-                              'Сегодня': today,
-                              'Завтра': tomorrow,
-                            }.entries)
-                              ChoiceChip(
-                                key: ValueKey('schedule-day-${entry.key}'),
-                                label: Text(entry.key),
-                                labelStyle: style.copyWith(fontSize: 13),
-                                showCheckmark: false,
-                                selected: samePlannerDay(_date, entry.value),
-                                onSelected: enabled
-                                    ? (_) => setState(() => _date = entry.value)
-                                    : null,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
                         _ScheduleField(
                           fieldKey: const Key('schedule-date'),
                           icon: LucideIcons.calendarDays,
@@ -272,14 +253,9 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                           value: _dateLabel(_date),
                           enabled: enabled,
                           onTap: () async {
-                            final date = await showDatePicker(
+                            final date = await showPlannerDatePicker(
                               context: context,
                               initialDate: _date,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                              helpText: 'День для задачи',
-                              cancelText: 'Отмена',
-                              confirmText: 'Готово',
                             );
                             if (mounted && date != null) {
                               setState(() => _date = date);
@@ -294,63 +270,13 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                               : null,
                         ),
                         if (_hasTime) ...[
-                          _ScheduleField(
-                            fieldKey: const Key('schedule-time'),
-                            icon: LucideIcons.clock3,
-                            label: 'Начало',
-                            value: plannerClock(start),
-                            enabled: enabled,
-                            onTap: () async {
-                              final time = await showTimePicker(
-                                context: context,
-                                initialTime: _time,
-                                helpText: 'Время начала',
-                                cancelText: 'Отмена',
-                                confirmText: 'Готово',
-                                builder: (context, child) => MediaQuery(
-                                  data: MediaQuery.of(
-                                    context,
-                                  ).copyWith(alwaysUse24HourFormat: true),
-                                  child: child!,
-                                ),
-                              );
-                              if (mounted && time != null) {
-                                setState(() => _time = time);
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            'Сколько времени выделить',
-                            style: style.copyWith(color: colors.onSurface),
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              for (final minutes in ({
-                                15,
-                                30,
-                                45,
-                                60,
-                                90,
-                                120,
-                                180,
-                                _duration,
-                              }.toList()..sort()))
-                                ChoiceChip(
-                                  key: ValueKey('schedule-duration-$minutes'),
-                                  label: Text('$minutes мин'),
-                                  labelStyle: style.copyWith(fontSize: 13),
-                                  showCheckmark: false,
-                                  selected: _duration == minutes,
-                                  onSelected: enabled
-                                      ? (_) =>
-                                            setState(() => _duration = minutes)
-                                      : null,
-                                ),
-                            ],
+                          const SizedBox(height: 12),
+                          PlannerTimeField(
+                            key: const Key('schedule-time'),
+                            time: _time,
+                            onChanged: enabled
+                                ? (time) => setState(() => _time = time)
+                                : null,
                           ),
                         ],
                       ],
@@ -365,10 +291,12 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                     children: [
                       Text(
                         _hasTime
-                            ? '${_dateLabel(_date)} · ${plannerClock(start)}–${plannerClock(end)}${samePlannerDay(start, end) ? '' : ' (${_dateLabel(end)})'}'
-                            : '${_dateLabel(_date)} · Без времени',
+                            ? '${_dateLabel(_date)} · ${plannerClock(start)}'
+                            : tr(context, "{p0} · Весь день", {
+                                'p0': _dateLabel(_date),
+                              }),
                         key: const Key('schedule-summary'),
-                        style: GoogleFonts.manrope(
+                        style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: colors.onSurfaceVariant,
@@ -378,7 +306,7 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                         Padding(
                           padding: const EdgeInsets.only(top: 12),
                           child: Text(
-                            _error!,
+                            tr(context, _error!),
                             style: TextStyle(color: colors.error),
                           ),
                         ),
@@ -397,10 +325,10 @@ class _TaskScheduleSheetState extends State<TaskScheduleSheet> {
                         ),
                         child: Text(
                           state.isSaving
-                              ? 'Сохранение…'
+                              ? tr(context, 'Сохранение…')
                               : _existing
-                              ? 'Сохранить план'
-                              : 'Добавить в мой день',
+                              ? tr(context, 'Сохранить план')
+                              : tr(context, 'Добавить в мой день'),
                         ),
                       ),
                     ],
@@ -433,12 +361,19 @@ class _ScheduleField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: colors.surfaceContainerHighest.withValues(alpha: 0.4),
-      borderRadius: BorderRadius.circular(16),
+      color: dark ? const Color(0xFF242424) : const Color(0xFFF7F7F7),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: dark ? const Color(0xFF3C3C3C) : const Color(0xFFE5E5E5),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         key: fieldKey,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         onTap: enabled ? onTap : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
@@ -449,7 +384,7 @@ class _ScheduleField extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: GoogleFonts.manrope(
+                  style: GoogleFonts.inter(
                     fontSize: 13,
                     color: colors.onSurfaceVariant,
                   ),
@@ -459,7 +394,7 @@ class _ScheduleField extends StatelessWidget {
                 child: Text(
                   value,
                   textAlign: TextAlign.end,
-                  style: GoogleFonts.manrope(
+                  style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: colors.onSurface,

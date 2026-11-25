@@ -1,3 +1,4 @@
+import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -80,6 +81,14 @@ class _Inbox implements InboxRepository {
 }
 
 class _Planner implements PlannerRepository {
+  @override
+  Future<void> updateExtras(
+    String itemId, {
+    bool updateIcon = false,
+    String? icon,
+    List<TaskChecklistModel>? checklists,
+  }) async {}
+
   final items = <PlannerItemModel>[];
   int loads = 0;
   int writes = 0;
@@ -156,7 +165,7 @@ void main() {
       final profile = _Profile();
       final inbox = _Inbox();
       await _show(tester, planner, tasks, profile, inbox);
-      expect(find.byKey(const Key('planner-empty-title')), findsOneWidget);
+      expect(find.text('6:00'), findsOneWidget);
       for (final mode in ['День', 'Неделя', 'Месяц']) {
         await tester.tap(find.text(mode));
         await tester.pumpAndSettle();

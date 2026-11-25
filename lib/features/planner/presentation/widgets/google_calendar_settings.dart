@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -55,38 +56,48 @@ class _GoogleCalendarSettingsState extends State<GoogleCalendarSettings> {
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Google Календарь',
+                    tr(context, 'Google Календарь'),
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Закрыть',
+                  tooltip: tr(context, 'Закрыть'),
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close, size: 20),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text(state.connection.connected ? 'Подключено' : 'Не подключено'),
+            Text(
+              state.connection.connected
+                  ? tr(context, 'Подключено')
+                  : tr(context, 'Не подключено'),
+            ),
             const SizedBox(height: 8),
-            const Text(
-              'События Google отображаются в ежедневнике. Задачи Jospar с датой и временем отправляются в основной календарь Google примерно раз в минуту.',
+            Text(
+              tr(
+                context,
+                'События Google отображаются в ежедневнике. Задачи Jospar с датой и временем отправляются в основной календарь Google примерно раз в минуту.',
+              ),
               style: TextStyle(fontSize: 13, height: 1.5),
             ),
             if (state.connection.connected && !state.connection.canWrite)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 12),
                 child: Text(
-                  'Разрешено только чтение. Подключите заново и разрешите управление событиями, чтобы задачи появились в Google.',
+                  tr(
+                    context,
+                    'Разрешено только чтение. Подключите заново и разрешите управление событиями, чтобы задачи появились в Google.',
+                  ),
                 ),
               ),
             if (state.connection.connected) ...[
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
-                title: const Text(
-                  'Показывать события Google',
+                title: Text(
+                  tr(context, 'Показывать события Google'),
                   style: TextStyle(fontSize: 14),
                 ),
                 value: state.showEvents,
@@ -94,8 +105,8 @@ class _GoogleCalendarSettingsState extends State<GoogleCalendarSettings> {
               ),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
-                title: const Text(
-                  'Праздничные календари Google',
+                title: Text(
+                  tr(context, 'Праздничные календари Google'),
                   style: TextStyle(fontSize: 14),
                 ),
                 value: state.includeHolidays,
@@ -111,8 +122,11 @@ class _GoogleCalendarSettingsState extends State<GoogleCalendarSettings> {
                 ),
               ),
             const SizedBox(height: 16),
-            const Text(
-              'После разрешения доступа в браузере вернитесь в Jospar. Подключение проверится автоматически.',
+            Text(
+              tr(
+                context,
+                'После разрешения доступа в браузере вернитесь в Jospar. Подключение проверится автоматически.',
+              ),
               style: TextStyle(fontSize: 12, height: 1.5),
             ),
             const SizedBox(height: 12),
@@ -120,18 +134,18 @@ class _GoogleCalendarSettingsState extends State<GoogleCalendarSettings> {
               onPressed: _opening || state.loading ? null : _connect,
               child: Text(
                 _opening
-                    ? 'Открываем Google…'
+                    ? tr(context, 'Открываем Google…')
                     : state.connection.connected
-                    ? 'Подключить заново'
-                    : 'Подключить Google Календарь',
+                    ? tr(context, 'Подключить заново')
+                    : tr(context, 'Подключить Google Календарь'),
               ),
             ),
             TextButton(
               onPressed: state.loading ? null : () => widget.cubit.refresh(),
               child: Text(
                 state.loading
-                    ? 'Проверка подключения…'
-                    : 'Проверить подключение',
+                    ? tr(context, 'Проверка подключения…')
+                    : tr(context, 'Проверить подключение'),
               ),
             ),
             if (state.connection.connected)
@@ -141,8 +155,11 @@ class _GoogleCalendarSettingsState extends State<GoogleCalendarSettings> {
                     : () async {
                         final confirmed = await showAppConfirmation(
                           context,
-                          'Отключить Google?',
-                          'Подключение общее с Google Drive. Отключение также уберёт доступ к Drive. События Google сохранятся.',
+                          tr(context, 'Отключить Google?'),
+                          tr(
+                            context,
+                            'Подключение общее с Google Drive. Отключение также уберёт доступ к Drive. События Google сохранятся.',
+                          ),
                           confirmLabel: 'Отключить',
                           destructive: true,
                         );
@@ -150,11 +167,14 @@ class _GoogleCalendarSettingsState extends State<GoogleCalendarSettings> {
                           await widget.cubit.disconnect();
                         }
                       },
-                child: const Text('Отключить Google'),
+                child: Text(tr(context, 'Отключить Google')),
               ),
             const SizedBox(height: 8),
-            const Text(
-              'Название и время задач меняйте в Jospar. При удалении задачи из ежедневника связанное событие удалится из Google. Остальные события Google не изменяются.',
+            Text(
+              tr(
+                context,
+                'Название и время задач меняйте в Jospar. При удалении задачи из ежедневника связанное событие удалится из Google. Остальные события Google не изменяются.',
+              ),
               style: TextStyle(fontSize: 12, height: 1.5),
             ),
           ],

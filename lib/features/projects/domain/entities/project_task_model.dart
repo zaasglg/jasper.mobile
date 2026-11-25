@@ -1,3 +1,4 @@
+import '../../../tasks/domain/entities/task_resource_model.dart';
 import 'package:equatable/equatable.dart';
 import '../../../tasks/domain/entities/task_label_model.dart';
 import 'task_assignee_model.dart';
@@ -27,6 +28,7 @@ class ProjectTaskModel extends Equatable {
     this.commentCount = 0,
     this.fileCount = 0,
     this.resourceCount = 0,
+    this.resources,
     this.checklistCompleted = 0,
     this.checklistTotal = 0,
     this.assignees = const <TaskAssigneeModel>[],
@@ -55,13 +57,17 @@ class ProjectTaskModel extends Equatable {
   final int fileCount;
   final int resourceCount;
 
+  /// Null means the API omitted resource data; an empty list is authoritative.
+  final List<TaskResourceModel>? resources;
+
   final int checklistCompleted;
   final int checklistTotal;
   final List<TaskAssigneeModel> assignees;
   final List<TaskEpicModel> epics;
   final List<TaskLabelModel> labels;
 
-  bool get isDone => status.toUpperCase() == 'DONE' || (progress ?? 0) >= 100;
+  /// Completion follows the web: column placement alone does not finish a task.
+  bool get isDone => (progress ?? 0) >= 100;
 
   List<String> get epicNames => epics
       .map((item) => item.name.trim())
@@ -101,6 +107,7 @@ class ProjectTaskModel extends Equatable {
     int? commentCount,
     int? fileCount,
     int? resourceCount,
+    List<TaskResourceModel>? resources,
     int? checklistCompleted,
     int? checklistTotal,
     List<TaskAssigneeModel>? assignees,
@@ -128,6 +135,7 @@ class ProjectTaskModel extends Equatable {
       commentCount: commentCount ?? this.commentCount,
       fileCount: fileCount ?? this.fileCount,
       resourceCount: resourceCount ?? this.resourceCount,
+      resources: resources ?? this.resources,
       checklistCompleted: checklistCompleted ?? this.checklistCompleted,
       checklistTotal: checklistTotal ?? this.checklistTotal,
       assignees: assignees ?? this.assignees,
@@ -158,6 +166,7 @@ class ProjectTaskModel extends Equatable {
     commentCount,
     fileCount,
     resourceCount,
+    resources,
     checklistCompleted,
     checklistTotal,
     assignees,

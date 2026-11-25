@@ -1,3 +1,5 @@
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import 'dart:async';
 
@@ -28,7 +30,7 @@ class QrLoginScreen extends StatefulWidget {
 class _QrLoginScreenState extends State<QrLoginScreen>
     with WidgetsBindingObserver {
   late final MobileScannerController _scanner = MobileScannerController(
-    formats: const <BarcodeFormat>[BarcodeFormat.qrCode],
+    formats: <BarcodeFormat>[BarcodeFormat.qrCode],
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
   bool _handling = false;
@@ -101,13 +103,12 @@ class _QrLoginScreenState extends State<QrLoginScreen>
           }
         },
         builder: (context, state) => Scaffold(
-          backgroundColor: const Color(0xFFF7F7FB),
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.surfaceContainerLow
+              : const Color(0xFFF7F7FB),
           appBar: AppBar(
             title: Text(strings.title),
-            leading: IconButton(
-              onPressed: _leave,
-              icon: const Icon(LucideIcons.arrowLeft),
-            ),
+            leading: AppBackButton(onPressed: _leave),
           ),
           body: switch (state) {
             QrLoginConfirmation confirmation => _confirmation(
@@ -191,7 +192,7 @@ class _QrLoginScreenState extends State<QrLoginScreen>
                           ? strings.scanHint
                           : strings.error(errorMessage),
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.manrope(
+                      style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 15,
                         height: 1.4,
@@ -203,7 +204,9 @@ class _QrLoginScreenState extends State<QrLoginScreen>
                       FilledButton(
                         onPressed: context.read<QrLoginCubit>().retryScanning,
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.white,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surface,
                           foregroundColor: const Color(0xFF1D1B24),
                         ),
                         child: Text(strings.retry),
@@ -245,7 +248,7 @@ class _QrLoginScreenState extends State<QrLoginScreen>
         Text(
           strings.allowTitle,
           textAlign: TextAlign.center,
-          style: GoogleFonts.manrope(fontSize: 24, fontWeight: FontWeight.w700),
+          style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 28),
         _info(strings.account, '${widget.accountName}\n${widget.email}'),
@@ -294,7 +297,7 @@ class _QrLoginScreenState extends State<QrLoginScreen>
     margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: AppColors.of(context).canvas,
       borderRadius: BorderRadius.circular(16),
     ),
     child: Column(
@@ -321,7 +324,7 @@ class _QrLoginScreenState extends State<QrLoginScreen>
         const SizedBox(height: 18),
         Text(
           strings.approved,
-          style: GoogleFonts.manrope(fontSize: 24, fontWeight: FontWeight.w700),
+          style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w700),
         ),
       ],
     ),
@@ -347,7 +350,7 @@ class _CameraError extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.inter(
                 color: Colors.white70,
                 fontSize: 14,
                 height: 1.4,

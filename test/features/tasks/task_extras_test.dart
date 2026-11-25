@@ -222,7 +222,8 @@ void main() {
       final adapter = _ExtrasAdapter()
         ..failEpics = true
         ..epics = [
-          {'id': 'e1', 'name': 'Эпик 1'},
+          {'id': 'empty', 'name': '', 'color': '#16A34A'},
+          {'id': 'e1', 'name': 'Эпик 1', 'color': '#2563EB'},
           {'id': 'e2', 'name': 'Эпик 2'},
         ];
       final cubit = await _mountExtras(tester, adapter, TaskExtraTab.epics);
@@ -230,6 +231,11 @@ void main() {
       adapter.failEpics = false;
       await tester.tap(find.text('Повторить загрузку эпиков'));
       await tester.pumpAndSettle();
+      expect(find.text('Без названия'), findsOneWidget);
+      expect(
+        tester.getSize(find.byKey(const ValueKey('task-epic-e1'))).height,
+        lessThan(64),
+      );
       await tester.tap(find.text('Эпик 1'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Эпик 2'));

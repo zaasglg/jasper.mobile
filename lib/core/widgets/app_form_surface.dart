@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import '../theme/app_theme.dart';
-import '../theme/app_input_theme.dart';
 
 /// Shared visual language for compact editing sheets.
 class AppFormSurface extends StatelessWidget {
@@ -14,7 +13,7 @@ class AppFormSurface extends StatelessWidget {
     final colors = theme.colorScheme;
     return Theme(
       data: theme.copyWith(
-        inputDecorationTheme: AppInputTheme.light,
+        inputDecorationTheme: theme.inputDecorationTheme,
         listTileTheme: ListTileThemeData(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),

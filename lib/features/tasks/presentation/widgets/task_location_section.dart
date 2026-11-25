@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -40,14 +41,14 @@ class TaskLocationSection extends StatelessWidget {
         children: [
           const Icon(LucideIcons.mapPin, size: AppIconSizes.standard),
           const SizedBox(width: 9),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Местоположение',
+              tr(context, 'Местоположение'),
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
           ),
           IconButton(
-            tooltip: 'Изменить местоположение',
+            tooltip: tr(context, 'Изменить местоположение'),
             onPressed: enabled ? () => _edit(context) : null,
             icon: const Icon(LucideIcons.pencil, size: AppIconSizes.standard),
           ),
@@ -57,7 +58,7 @@ class TaskLocationSection extends StatelessWidget {
         TextButton.icon(
           onPressed: enabled ? () => _edit(context) : null,
           icon: const Icon(LucideIcons.plus, size: AppIconSizes.standard),
-          label: const Text('Добавить местоположение'),
+          label: Text(tr(context, 'Добавить местоположение')),
         ),
       if (location != null) ...[
         if (location!.latitude != null)
@@ -91,7 +92,7 @@ class TaskLocationSection extends StatelessWidget {
               onPressed: () async {
                 if (await showAppConfirmation(
                       context,
-                      'Убрать местоположение?',
+                      tr(context, 'Убрать местоположение?'),
                       location!.address,
                       confirmLabel: 'Убрать',
                     ) &&
@@ -99,7 +100,7 @@ class TaskLocationSection extends StatelessWidget {
                   await cubit.updateLocation(null);
                 }
               },
-              child: const Text('Убрать местоположение'),
+              child: Text(tr(context, 'Убрать местоположение')),
             ),
           ),
       ],
@@ -227,8 +228,8 @@ class _LocationEditorState extends State<_LocationEditor> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Местоположение',
+          Text(
+            tr(context, 'Местоположение'),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 16),
@@ -236,11 +237,11 @@ class _LocationEditorState extends State<_LocationEditor> {
             controller: _address,
             maxLength: 500,
             decoration: InputDecoration(
-              labelText: 'Адрес или название места',
+              labelText: tr(context, 'Адрес или название места'),
               suffixIcon: _map == null
                   ? null
                   : IconButton(
-                      tooltip: 'Найти на Яндекс Карте',
+                      tooltip: tr(context, 'Найти на Яндекс Карте'),
                       onPressed: () => _map!.runJavaScript(
                         'window.searchPlace(${jsonEncode(_address.text)})',
                       ),
@@ -259,8 +260,8 @@ class _LocationEditorState extends State<_LocationEditor> {
           const SizedBox(height: 12),
           TextField(
             controller: _coordinates,
-            decoration: const InputDecoration(
-              labelText: 'Координаты (необязательно)',
+            decoration: InputDecoration(
+              labelText: tr(context, 'Координаты (необязательно)'),
               hintText: '43.238949, 76.889709',
             ),
           ),
@@ -268,12 +269,12 @@ class _LocationEditorState extends State<_LocationEditor> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
-                _error!,
+                tr(context, _error!),
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _save, child: const Text('Сохранить')),
+          FilledButton(onPressed: _save, child: Text(tr(context, 'Сохранить'))),
         ],
       ),
     ),

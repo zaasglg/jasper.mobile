@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
 import '../data/call_events.dart';
@@ -219,7 +220,7 @@ class _CallsHostState extends State<CallsHost> with WidgetsBindingObserver {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(14),
                     onTap: widget.onOpen,
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 12,
@@ -230,7 +231,7 @@ class _CallsHostState extends State<CallsHost> with WidgetsBindingObserver {
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Вернуться к звонку',
+                              tr(context, 'Вернуться к звонку'),
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 13,

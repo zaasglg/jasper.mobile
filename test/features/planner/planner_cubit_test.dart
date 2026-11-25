@@ -1,3 +1,4 @@
+import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/assistant/data/services/assistant_task_changes.dart';
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
@@ -190,6 +191,14 @@ void main() {
 }
 
 class _Repository implements PlannerRepository {
+  @override
+  Future<void> updateExtras(
+    String itemId, {
+    bool updateIcon = false,
+    String? icon,
+    List<TaskChecklistModel>? checklists,
+  }) async {}
+
   final pending = <String, Completer<void>>{};
   Completer<List<PlannerItemModel>>? nextLoad;
   Completer<void>? pendingAdd;
@@ -216,6 +225,7 @@ class _Repository implements PlannerRepository {
     DateTime? plannedDate,
     int? durationMinutes,
     bool? completed,
+    int? reminderMinutes,
   }) async {
     await (pending[item.id] = Completer<void>()).future;
   }

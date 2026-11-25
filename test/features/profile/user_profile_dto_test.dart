@@ -20,6 +20,7 @@ void main() {
         'name': 'Айгерим',
         'email': 'a@jospar.me',
         'role': 'ADMIN',
+        'locale': 'ru',
         'avatarUrl': ApiConstants.origin
             .resolve('/uploads/avatar.jpg')
             .toString(),
@@ -41,6 +42,7 @@ void main() {
         'email': '',
         'role': '',
         'avatarUrl': null,
+        'locale': 'ru',
       });
     });
   }
@@ -108,6 +110,7 @@ void main() {
       'email': 'mail',
       'avatarUrl': '/raw.jpg',
       'role': 'OWNER',
+      'locale': 'ru',
     });
   });
   test('toEntity preserves every field and equality', () {

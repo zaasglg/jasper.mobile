@@ -20,6 +20,8 @@ class ProjectTaskSummary extends Equatable {
 class ProjectsState extends Equatable {
   const ProjectsState({
     this.workspaceId,
+    this.isMoving = false,
+    this.isUpdating = false,
     this.projects = const <ProjectModel>[],
     this.selectedProjectId,
     this.isLoading = false,
@@ -33,6 +35,8 @@ class ProjectsState extends Equatable {
     this.progressErrorMessage,
   });
 
+  final bool isUpdating;
+  final bool isMoving;
   final String? workspaceId;
   final List<ProjectModel> projects;
   final String? selectedProjectId;
@@ -47,6 +51,9 @@ class ProjectsState extends Equatable {
   final String? progressErrorMessage;
 
   ProjectsState copyWith({
+    bool? isUpdating,
+    bool clearSelectedProject = false,
+    bool? isMoving,
     String? workspaceId,
     List<ProjectModel>? projects,
     String? selectedProjectId,
@@ -64,9 +71,13 @@ class ProjectsState extends Equatable {
     bool clearProgressError = false,
   }) {
     return ProjectsState(
+      isUpdating: isUpdating ?? this.isUpdating,
+      isMoving: isMoving ?? this.isMoving,
       workspaceId: workspaceId ?? this.workspaceId,
       projects: projects ?? this.projects,
-      selectedProjectId: selectedProjectId ?? this.selectedProjectId,
+      selectedProjectId: clearSelectedProject
+          ? null
+          : selectedProjectId ?? this.selectedProjectId,
       isLoading: isLoading ?? this.isLoading,
       isCreating: isCreating ?? this.isCreating,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
@@ -85,6 +96,8 @@ class ProjectsState extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
+    isUpdating,
+    isMoving,
     workspaceId,
     projects,
     selectedProjectId,

@@ -41,9 +41,14 @@ import '../../features/chat/domain/repositories/chat_repository.dart';
 import '../../features/chat/presentation/cubit/chat_cubit.dart';
 import '../../features/chat/presentation/cubit/conversation_cubit.dart';
 import '../../features/inbox/presentation/screens/inbox_screen.dart';
+import '../../features/inbox/presentation/screens/inbox_quick_add_screen.dart';
+import '../../features/inbox/presentation/screens/inbox_task_details_screen.dart';
+import '../../features/inbox/domain/entities/inbox_task_model.dart';
+import '../../features/projects/presentation/cubit/projects_cubit.dart';
+import '../storage/workspace_selection_storage.dart';
 import '../../features/inbox/presentation/cubit/inbox_cubit.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
-import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/profile/presentation/widgets/profile_settings_sections.dart';
 import '../../features/search/data/search_repository.dart';
 import '../../features/search/presentation/search_cubit.dart';
 import '../../features/search/presentation/search_screen.dart';
@@ -163,13 +168,32 @@ final appRouter = GoRouter(
           ..initialize(),
         child: AssistantScreen(
           startVoice: state.uri.queryParameters['voice'] == 'true',
+          startKeyboard: state.uri.queryParameters['keyboard'] == 'true',
           initialCommand: state.extra is String ? state.extra as String : null,
         ),
       ),
     ),
     GoRoute(
       path: '/profile',
-      builder: (context, state) => const ProfileScreen(),
+      builder: (context, state) {
+        final data = state.extra is ProfileNavigationData
+            ? state.extra as ProfileNavigationData
+            : null;
+        if (data != null) return ProfileScreen(settings: data);
+        return BlocProvider<WorkspaceCubit>(
+          create: (_) => sl<WorkspaceCubit>()..load(),
+          child: Builder(
+            builder: (context) => ProfileScreen(
+              settings: (
+                workspace: context.read<WorkspaceCubit>(),
+                voice: state.extra is VoiceSettingsController
+                    ? state.extra as VoiceSettingsController
+                    : null,
+              ),
+            ),
+          ),
+        );
+      },
     ),
     GoRoute(
       path: '/qr-sessions',
@@ -195,34 +219,6 @@ final appRouter = GoRouter(
         return BlocProvider<QrLoginCubit>(
           create: (_) => sl<QrLoginCubit>(),
           child: QrLoginScreen(accountName: account.name, email: account.email),
-        );
-      },
-    ),
-    GoRoute(
-      path: '/settings',
-      builder: (context, state) {
-        final data = state.extra is SettingsNavigationData
-            ? state.extra! as SettingsNavigationData
-            : null;
-        final voice =
-            data?.voice ??
-            (state.extra is VoiceSettingsController
-                ? state.extra! as VoiceSettingsController
-                : null);
-        if (data != null) {
-          return SettingsScreen(
-            voiceController: voice,
-            workspaceCubit: data.workspace,
-          );
-        }
-        return BlocProvider<WorkspaceCubit>(
-          create: (_) => sl<WorkspaceCubit>()..load(),
-          child: Builder(
-            builder: (context) => SettingsScreen(
-              voiceController: voice,
-              workspaceCubit: context.read<WorkspaceCubit>(),
-            ),
-          ),
         );
       },
     ),
@@ -259,6 +255,40 @@ final appRouter = GoRouter(
           child: TaskDetailsScreen(taskId: taskId, task: task),
         );
       },
+    ),
+    GoRoute(
+      path: '/inbox/quick-add',
+      builder: (context, state) => BlocProvider<InboxCubit>(
+        create: (_) => sl<InboxCubit>(),
+        child: const InboxQuickAddScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/inbox/:taskId',
+      builder: (context, state) => MultiBlocProvider(
+        providers: [
+          BlocProvider<WorkspaceCubit>(
+            create: (_) => sl<WorkspaceCubit>()..load(),
+          ),
+          BlocProvider<ProfileCubit>(create: (_) => sl<ProfileCubit>()..load()),
+          BlocProvider<ProjectsCubit>(
+            create: (_) {
+              final cubit = sl<ProjectsCubit>();
+              sl<WorkspaceSelectionStorage>().read().then((id) {
+                if (!cubit.isClosed && id != null) cubit.loadForWorkspace(id);
+              });
+              return cubit;
+            },
+          ),
+          BlocProvider<InboxCubit>(create: (_) => sl<InboxCubit>()..load()),
+        ],
+        child: InboxTaskDetailsScreen(
+          taskId: state.pathParameters['taskId']!,
+          initialTask: state.extra is InboxTaskModel
+              ? state.extra as InboxTaskModel
+              : null,
+        ),
+      ),
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {

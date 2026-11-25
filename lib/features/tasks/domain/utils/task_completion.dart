@@ -1,7 +1,7 @@
 import '../../../projects/domain/entities/project_task_model.dart';
 import '../entities/kanban_column_model.dart';
 
-/// Reopening must clear DONE as well as progress, since either marks a task done.
+/// Reopening also moves tasks out of the DONE column when needed.
 String? reopenedTaskStatus(
   ProjectTaskModel task,
   Iterable<KanbanColumnModel> columns,

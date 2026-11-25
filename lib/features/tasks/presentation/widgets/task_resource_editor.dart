@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'task_extras_sheet.dart' show showResourceCalculator;
 import '../../data/models/task_detail_model.dart';
@@ -132,8 +133,8 @@ class _TaskResourceEditorState extends State<TaskResourceEditor> {
                 children: [
                   Text(
                     widget.resource == null
-                        ? 'Новый ресурс'
-                        : 'Изменить ресурс',
+                        ? tr(context, 'Новый ресурс')
+                        : tr(context, 'Изменить ресурс'),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
@@ -142,13 +143,16 @@ class _TaskResourceEditorState extends State<TaskResourceEditor> {
                       controller: _name,
                       enabled: !_busy,
                       maxLength: 120,
-                      decoration: const InputDecoration(
-                        labelText: 'Название',
-                        helperText: 'Например: бетон, бюджет, работа дизайнера',
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'Название'),
+                        helperText: tr(
+                          context,
+                          'Например: бетон, бюджет, работа дизайнера',
+                        ),
                         helperMaxLines: 2,
                       ),
                       validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Введите название'
+                          ? tr(context, 'Введите название')
                           : null,
                     ),
                   ],
@@ -171,7 +175,7 @@ class _TaskResourceEditorState extends State<TaskResourceEditor> {
                             suffixIcon: widget.resource != null
                                 ? null
                                 : IconButton(
-                                    tooltip: 'Калькулятор',
+                                    tooltip: tr(context, 'Калькулятор'),
                                     icon: const Icon(Icons.calculate_outlined),
                                     onPressed: _busy
                                         ? null
@@ -196,12 +200,12 @@ class _TaskResourceEditorState extends State<TaskResourceEditor> {
                           validator: (v) {
                             final n = _parseValue(v ?? '');
                             return n == null || !n.isFinite || n < 0
-                                ? 'Введите число от 0'
+                                ? tr(context, 'Введите число от 0')
                                 : !RegExp(
                                         r'^\d+(?:[.,]\d{1,4})?$',
                                       ).hasMatch((v ?? '').trim()) &&
                                       (v ?? '').trim().isNotEmpty
-                                ? 'Не более 4 знаков после запятой'
+                                ? tr(context, 'Не более 4 знаков после запятой')
                                 : null;
                           },
                         ),
@@ -209,8 +213,11 @@ class _TaskResourceEditorState extends State<TaskResourceEditor> {
                   const SizedBox(height: 16),
                   Text(
                     preview.planValue > 0
-                        ? 'Использовано: ${preview.percentage.round()}%${preview.isOverBudget ? ' · Перерасход' : ''}'
-                        : 'Использовано: —',
+                        ? tr(context, "Использовано: {p0}%{p1}", {
+                            'p0': preview.percentage.round(),
+                            'p1': preview.isOverBudget ? ' · Перерасход' : '',
+                          })
+                        : tr(context, 'Использовано: —'),
                     style: TextStyle(
                       color: preview.isOverBudget
                           ? Theme.of(context).colorScheme.error
@@ -218,10 +225,10 @@ class _TaskResourceEditorState extends State<TaskResourceEditor> {
                     ),
                   ),
                   if (preview.planValue == 0 && preview.factValue > 0)
-                    const Text('Укажите план для расчёта процента'),
+                    Text(tr(context, 'Укажите план для расчёта процента')),
                   if (_error != null)
                     Text(
-                      _error!,
+                      tr(context, _error!),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),
@@ -229,7 +236,11 @@ class _TaskResourceEditorState extends State<TaskResourceEditor> {
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: _busy ? null : _save,
-                    child: Text(_busy ? 'Сохранение…' : 'Сохранить'),
+                    child: Text(
+                      _busy
+                          ? tr(context, 'Сохранение…')
+                          : tr(context, 'Сохранить'),
+                    ),
                   ),
                 ],
               ),

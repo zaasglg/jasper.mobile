@@ -1,3 +1,6 @@
+import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
+import 'package:jospar/features/planner/presentation/widgets/planner_date_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:jospar/features/projects/domain/entities/project_model.dart';
 import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'dart:async';
@@ -42,6 +45,14 @@ const _capture = bool.fromEnvironment('CAPTURE_PLANNER_PREVIEWS');
 final _previewKey = GlobalKey();
 
 class _Planner implements PlannerRepository {
+  @override
+  Future<void> updateExtras(
+    String itemId, {
+    bool updateIcon = false,
+    String? icon,
+    List<TaskChecklistModel>? checklists,
+  }) async {}
+
   List<PlannerItemModel> items = [];
   int writes = 0;
   String? taskId, inboxId, projectId;
@@ -99,6 +110,7 @@ class _Planner implements PlannerRepository {
     DateTime? plannedDate,
     int? durationMinutes,
     bool? completed,
+    int? reminderMinutes,
   }) async {
     writes++;
     this.scheduledAt = scheduledAt;
@@ -250,17 +262,21 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('planner-mode-timed')));
       await tester.pumpAndSettle();
       if (source == 'project') await _capturePreview(tester, '02-date-time');
-      await tester.tap(find.byKey(const ValueKey('schedule-day-Завтра')));
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('schedule-duration-60')),
-      );
-      await tester.tap(find.byKey(const ValueKey('schedule-duration-60')));
+      expect(find.byKey(const ValueKey('schedule-day-Завтра')), findsNothing);
+      expect(find.text('Сколько времени выделить'), findsNothing);
+      await tester.tap(find.byKey(const Key('schedule-date')));
+      await tester.pumpAndSettle();
+      expect(find.byType(PlannerDatePickerDialog), findsOneWidget);
+      Navigator.of(
+        tester.element(find.byType(PlannerDatePickerDialog)),
+      ).pop(plannerDate(plannerNow().add(const Duration(days: 1))));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('schedule-time')));
       await tester.tap(find.byKey(const Key('schedule-time')));
       await tester.pumpAndSettle();
-      expect(find.byType(TimePickerDialog), findsOneWidget);
+      expect(find.byType(CupertinoDatePicker), findsOneWidget);
       Navigator.of(
-        tester.element(find.byType(TimePickerDialog)),
+        tester.element(find.byType(CupertinoDatePicker)),
       ).pop(const TimeOfDay(hour: 14, minute: 30));
       await tester.pumpAndSettle();
       final tomorrow = plannerNow().add(const Duration(days: 1));
@@ -276,7 +292,7 @@ void main() {
         source == 'inbox' ? 'inbox' : null,
       );
       expect(repository.scheduledAt, plannerInstant(tomorrow, 14, 30));
-      expect(repository.duration, 60);
+      expect(repository.duration, 30);
       expect(repository.taskId, source == 'inbox' ? null : 'task');
       expect(repository.inboxId, source == 'inbox' ? 'inbox' : null);
       expect(repository.projectId, source == 'inbox' ? null : 'project');
@@ -314,10 +330,9 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('planner-mode-timed')));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('schedule-duration-90')),
-      );
-      await tester.tap(find.byKey(const ValueKey('schedule-duration-90')));
+      final summary = tester
+          .widget<Text>(find.byKey(const Key('schedule-summary')))
+          .data;
       await tester.tap(find.byKey(const Key('schedule-confirm')));
       await tester.pumpAndSettle();
       expect(repository.writes, 1);
@@ -326,18 +341,14 @@ void main() {
         findsOneWidget,
       );
       expect(
-        tester
-            .widget<ChoiceChip>(
-              find.byKey(const ValueKey('schedule-duration-90')),
-            )
-            .selected,
-        isTrue,
+        tester.widget<Text>(find.byKey(const Key('schedule-summary'))).data,
+        summary,
       );
       repository.fail = false;
       await tester.tap(find.byKey(const Key('schedule-confirm')));
       await tester.pumpAndSettle();
       expect(repository.writes, 2);
-      expect(repository.duration, 90);
+      expect(repository.duration, 30);
       expect(tester.takeException(), isNull);
     },
   );

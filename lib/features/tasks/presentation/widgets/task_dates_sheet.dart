@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
 
@@ -159,10 +160,13 @@ class _TaskDatesSheetState extends State<TaskDatesSheet> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text('Даты', style: AppTypography.title(context)),
+                      child: Text(
+                        tr(context, 'Даты'),
+                        style: AppTypography.title(context),
+                      ),
                     ),
                     IconButton(
-                      tooltip: 'Закрыть даты',
+                      tooltip: tr(context, 'Закрыть даты'),
                       onPressed: _busy ? null : () => Navigator.pop(context),
                       icon: const Icon(Icons.close),
                     ),
@@ -185,9 +189,11 @@ class _TaskDatesSheetState extends State<TaskDatesSheet> {
                               borderRadius: BorderRadius.circular(AppRadius.lg),
                             ),
                             tileColor: colors.surfaceContainerLow,
-                            title: const Text('Начало'),
+                            title: Text(tr(context, 'Начало')),
                             subtitle: Text(
-                              _startEnabled ? 'Включена' : 'Необязательно',
+                              _startEnabled
+                                  ? tr(context, 'Включена')
+                                  : tr(context, 'Необязательно'),
                             ),
                             value: _startEnabled,
                             onChanged: _busy
@@ -260,7 +266,10 @@ class _TaskDatesSheetState extends State<TaskDatesSheet> {
                                 },
                         ),
                         if (_error != null)
-                          Text(_error!, style: TextStyle(color: colors.error)),
+                          Text(
+                            tr(context, _error!),
+                            style: TextStyle(color: colors.error),
+                          ),
                       ],
                     ),
                   ),
@@ -274,14 +283,18 @@ class _TaskDatesSheetState extends State<TaskDatesSheet> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _busy ? null : () => _save(clear: true),
-                        child: const Text('Очистить'),
+                        child: Text(tr(context, 'Очистить')),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: FilledButton(
                         onPressed: _busy ? null : _save,
-                        child: Text(_busy ? 'Сохранение…' : 'Сохранить'),
+                        child: Text(
+                          _busy
+                              ? tr(context, 'Сохранение…')
+                              : tr(context, 'Сохранить'),
+                        ),
                       ),
                     ),
                   ],
@@ -375,10 +388,13 @@ class _TimeChoice extends StatelessWidget {
                 const Icon(Icons.schedule_outlined),
                 const SizedBox(width: AppSpacing.smMd),
                 Expanded(
-                  child: Text('Время', style: AppTypography.body(context)),
+                  child: Text(
+                    tr(context, 'Время'),
+                    style: AppTypography.body(context),
+                  ),
                 ),
                 Semantics(
-                  label: 'Указать время',
+                  label: tr(context, 'Указать время'),
                   child: Switch(
                     key: const Key('task_time_toggle'),
                     value: enabled,
@@ -392,10 +408,13 @@ class _TimeChoice extends StatelessWidget {
                 key: const Key('task_time_edit'),
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined),
-                label: Text('$value · Изменить'),
+                label: Text(tr(context, "{p0} · Изменить", {'p0': value})),
               )
             else
-              Text('Только дата', style: AppTypography.caption(context)),
+              Text(
+                tr(context, 'Только дата'),
+                style: AppTypography.caption(context),
+              ),
           ],
         ),
       ),

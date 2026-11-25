@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -69,8 +70,8 @@ class _TaskDetailsSkeletonState extends State<TaskDetailsSkeleton>
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
-                  'Загрузка задачи…',
-                  style: GoogleFonts.manrope(
+                  tr(context, 'Загрузка задачи…'),
+                  style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: colors.onSurfaceVariant,

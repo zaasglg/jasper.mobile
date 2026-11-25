@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../domain/entities/project_model.dart';
 import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
@@ -6,6 +7,7 @@ import '../../../storage/domain/entities/storage_scope.dart';
 import '../../../storage/domain/entities/storage_enums.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_action_menu.dart';
+import '../../../../core/widgets/app_back_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -18,7 +20,7 @@ import '../../../kanban/presentation/cubit/kanban_state.dart';
 import '../cubit/projects_cubit.dart';
 import '../cubit/projects_state.dart';
 
-class ProjectDetailsScreen extends StatelessWidget {
+class ProjectDetailsScreen extends StatefulWidget {
   const ProjectDetailsScreen({
     required this.projectId,
     this.initialProject,
@@ -29,20 +31,97 @@ class ProjectDetailsScreen extends StatelessWidget {
   final ProjectModel? initialProject;
 
   @override
+  State<ProjectDetailsScreen> createState() => _ProjectDetailsScreenState();
+}
+
+class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> {
+  final _boardKey = GlobalKey<KanbanBoardState>();
+
+  Future<void> _showProjectActions(ProjectModel project) async {
+    final action = await showAppActionMenu<String>(
+      context,
+      title: project.name,
+      groups: [
+        [
+          const AppMenuAction(
+            value: 'epics',
+            label: 'Эпики',
+            icon: LucideIcons.layers,
+          ),
+          const AppMenuAction(
+            value: 'view',
+            label: 'Вид карточек',
+            icon: LucideIcons.panelsTopLeft,
+          ),
+        ],
+        [
+          const AppMenuAction(
+            value: 'members',
+            label: 'Участники',
+            icon: LucideIcons.users,
+          ),
+          const AppMenuAction(
+            value: 'storage',
+            label: 'Кладовка',
+            icon: LucideIcons.archive,
+          ),
+          const AppMenuAction(
+            value: 'settings',
+            label: 'Настройки проекта',
+            icon: LucideIcons.settings,
+          ),
+        ],
+      ],
+    );
+    if (!mounted) return;
+    switch (action) {
+      case 'epics':
+        context.push(
+          '/projects/${project.id}/epics',
+          extra: context.read<KanbanCubit>(),
+        );
+      case 'view':
+        _boardKey.currentState?.showCardView();
+      case 'members':
+        context.push('/projects/${project.id}/participants');
+      case 'storage':
+        context.push(
+          '/storage',
+          extra: StorageScope(
+            source: StorageSource.project,
+            id: project.id,
+            workspaceId: project.workspaceId,
+            title: project.name,
+          ),
+        );
+      case 'settings':
+        final cubit = context.read<ProjectsCubit>();
+        final result = await context.push<String>(
+          '/manage/projects/${project.id}',
+        );
+        await cubit.loadForWorkspace(project.workspaceId, refresh: true);
+        if (mounted && result == 'removed') context.go('/projects');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return BlocBuilder<ProjectsCubit, ProjectsState>(
       builder: (context, state) {
         final project =
-            _findProject(state.projects, projectId) ?? initialProject;
+            _findProject(state.projects, widget.projectId) ??
+            widget.initialProject;
         return Scaffold(
           backgroundColor: Theme.of(context).brightness == Brightness.dark
               ? Theme.of(context).colorScheme.surface
               : Colors.white,
           appBar: DashboardAppBar(
+            compact: true,
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(kToolbarHeight),
+              preferredSize: const Size.fromHeight(48),
               child: AppBar(
                 primary: false,
+                toolbarHeight: 48,
                 centerTitle: false,
                 titleTextStyle: AppTypography.title(
                   context,
@@ -58,66 +137,31 @@ class ProjectDetailsScreen extends StatelessWidget {
                     ? Theme.of(context).colorScheme.surface
                     : Colors.white,
                 surfaceTintColor: Colors.transparent,
-                leading: IconButton(
-                  tooltip: 'Назад',
-                  onPressed: context.pop,
-                  icon: const Icon(
-                    LucideIcons.arrowLeft,
-                    size: BoardStyle.iconSize,
-                  ),
-                ),
+                leading: AppBackButton(onPressed: context.pop),
                 actions: [
-                  if (project != null)
+                  if (project != null) ...[
                     IconButton(
-                      tooltip: 'Участники',
+                      key: const Key('board-add-column'),
+                      tooltip: tr(context, 'Добавить колонку'),
                       icon: const Icon(
-                        LucideIcons.users,
+                        LucideIcons.plus,
                         size: BoardStyle.iconSize,
                       ),
                       onPressed: () =>
-                          context.push('/projects/${project.id}/participants'),
+                          _boardKey.currentState?.showCreateColumn(),
                     ),
-                  if (project != null)
                     IconButton(
-                      tooltip: 'Кладовка',
+                      tooltip: tr(context, 'Действия проекта'),
                       icon: const Icon(
-                        LucideIcons.database,
+                        LucideIcons.ellipsis,
                         size: BoardStyle.iconSize,
                       ),
-                      onPressed: () => context.push(
-                        '/storage',
-                        extra: StorageScope(
-                          source: StorageSource.project,
-                          id: project.id,
-                          workspaceId: project.workspaceId,
-                          title: project.name,
-                        ),
-                      ),
+                      onPressed: () => _showProjectActions(project),
                     ),
-                  if (project != null)
-                    IconButton(
-                      tooltip: 'Настройки проекта',
-                      icon: const Icon(
-                        LucideIcons.settings,
-                        size: BoardStyle.iconSize,
-                      ),
-                      onPressed: () async {
-                        final cubit = context.read<ProjectsCubit>();
-                        final result = await context.push<String>(
-                          '/manage/projects/${project.id}',
-                        );
-                        await cubit.loadForWorkspace(
-                          project.workspaceId,
-                          refresh: true,
-                        );
-                        if (context.mounted && result == 'removed') {
-                          context.go('/projects');
-                        }
-                      },
-                    ),
+                  ],
                 ],
                 title: project == null
-                    ? const Text('Проект')
+                    ? Text(tr(context, 'Проект'))
                     : _ProjectSwitcher(
                         project: project,
                         projects: state.projects,
@@ -127,7 +171,9 @@ class ProjectDetailsScreen extends StatelessWidget {
           ),
           body: project == null
               ? const _ProjectNotFound()
-              : SafeArea(child: _ProjectDetails(project: project)),
+              : SafeArea(
+                  child: _ProjectDetails(project: project, boardKey: _boardKey),
+                ),
         );
       },
     );
@@ -144,7 +190,9 @@ class ProjectDetailsScreen extends StatelessWidget {
 }
 
 class _ProjectDetails extends StatelessWidget {
-  const _ProjectDetails({required this.project});
+  const _ProjectDetails({required this.project, required this.boardKey});
+
+  final GlobalKey<KanbanBoardState> boardKey;
 
   final ProjectModel project;
 
@@ -154,7 +202,7 @@ class _ProjectDetails extends StatelessWidget {
       buildWhen: (previous, current) => previous.status != current.status,
       builder: (context, state) => Stack(
         children: <Widget>[
-          KanbanBoard(project: project),
+          KanbanBoard(key: boardKey, project: project, showToolbar: false),
           if (state.status == KanbanStatus.loading)
             const Positioned(
               top: 0,
@@ -180,8 +228,8 @@ class _ProjectSwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppActionMenuButton<ProjectModel>(
-      title: 'Выбрать проект',
-      tooltip: 'Выбрать проект',
+      title: tr(context, 'Выбрать проект'),
+      tooltip: tr(context, 'Выбрать проект'),
       onSelected: (selected) =>
           context.go('/projects/${selected.id}', extra: selected),
       groups: [
@@ -220,8 +268,8 @@ class _ProjectNotFound extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Text(
-        'Проект не найден',
-        style: GoogleFonts.manrope(
+        tr(context, 'Проект не найден'),
+        style: GoogleFonts.inter(
           fontSize: 14,
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),

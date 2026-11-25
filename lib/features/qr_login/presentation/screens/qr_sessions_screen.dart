@@ -1,3 +1,5 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../../core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -20,14 +22,16 @@ class QrSessionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF7F7FB),
+    backgroundColor: Theme.of(context).brightness == Brightness.dark
+        ? Theme.of(context).colorScheme.surfaceContainerLow
+        : const Color(0xFFF7F7FB),
     appBar: AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.of(context).canvas,
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
       title: Text(
-        'Активные сеансы',
-        style: GoogleFonts.manrope(fontSize: 20, fontWeight: FontWeight.w600),
+        tr(context, 'Активные сеансы'),
+        style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w600),
       ),
     ),
     body: BlocBuilder<QrSessionsCubit, QrSessionsState>(
@@ -51,8 +55,8 @@ class QrSessionsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
               Text(
-                'Подключённые устройства',
-                style: GoogleFonts.manrope(
+                tr(context, 'Подключённые устройства'),
+                style: GoogleFonts.inter(
                   color: const Color(0xFF858297),
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -74,9 +78,12 @@ class QrSessionsScreen extends StatelessWidget {
                 ),
               const SizedBox(height: 12),
               Text(
-                'Если вы не узнаёте устройство, завершите его сеанс.',
+                tr(
+                  context,
+                  'Если вы не узнаёте устройство, завершите его сеанс.',
+                ),
                 textAlign: TextAlign.center,
-                style: GoogleFonts.manrope(
+                style: GoogleFonts.inter(
                   color: const Color(0xFF858297),
                   fontSize: 13,
                   height: 1.4,
@@ -96,7 +103,7 @@ class QrSessionsScreen extends StatelessWidget {
     final accepted = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.of(context).canvas,
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
@@ -110,9 +117,9 @@ class QrSessionsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Text(
-                'Выйти на этом устройстве?',
+                tr(context, 'Выйти на этом устройстве?'),
                 textAlign: TextAlign.center,
-                style: GoogleFonts.manrope(
+                style: GoogleFonts.inter(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                 ),
@@ -131,12 +138,12 @@ class QrSessionsScreen extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFD64545),
                   ),
-                  child: const Text('Завершить сеанс'),
+                  child: Text(tr(context, 'Завершить сеанс')),
                 ),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(sheetContext, false),
-                child: const Text('Отмена'),
+                child: Text(tr(context, 'Отмена')),
               ),
             ],
           ),
@@ -181,8 +188,8 @@ class _LinkDeviceCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Подключить устройство',
-                    style: GoogleFonts.manrope(
+                    tr(context, 'Подключить устройство'),
+                    style: GoogleFonts.inter(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -190,8 +197,8 @@ class _LinkDeviceCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'Отсканируйте QR-код на компьютере',
-                    style: GoogleFonts.manrope(
+                    tr(context, 'Отсканируйте QR-код на компьютере'),
+                    style: GoogleFonts.inter(
                       color: Colors.white70,
                       fontSize: 13,
                     ),
@@ -220,7 +227,7 @@ class _SessionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: Colors.white,
+    color: AppColors.of(context).canvas,
     borderRadius: BorderRadius.circular(18),
     child: InkWell(
       key: Key('qr_session_${session.id}'),
@@ -248,7 +255,7 @@ class _SessionTile extends StatelessWidget {
                     session.deviceInfo,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -289,7 +296,7 @@ class _EmptySessions extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(28),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: AppColors.of(context).canvas,
       borderRadius: BorderRadius.circular(18),
     ),
     child: Column(
@@ -297,12 +304,12 @@ class _EmptySessions extends StatelessWidget {
         const Icon(LucideIcons.monitor, color: Color(0xFFAAA6B8), size: 34),
         const SizedBox(height: 12),
         Text(
-          'Нет активных сеансов',
-          style: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+          tr(context, 'Нет активных сеансов'),
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 5),
-        const Text(
-          'Подключённые через QR устройства появятся здесь.',
+        Text(
+          tr(context, 'Подключённые через QR устройства появятся здесь.'),
           textAlign: TextAlign.center,
           style: TextStyle(color: Color(0xFF858297), fontSize: 13),
         ),
@@ -327,7 +334,10 @@ class _Failure extends StatelessWidget {
           const SizedBox(height: 14),
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: 18),
-          FilledButton(onPressed: onRetry, child: const Text('Повторить')),
+          FilledButton(
+            onPressed: onRetry,
+            child: Text(tr(context, 'Повторить')),
+          ),
         ],
       ),
     ),

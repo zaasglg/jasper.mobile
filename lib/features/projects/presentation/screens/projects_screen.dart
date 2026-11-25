@@ -1,3 +1,7 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../../core/widgets/app_dialog.dart';
+import '../widgets/project_drag.dart';
+import '../utils/project_tree.dart';
 import '../../domain/entities/project_model.dart';
 import '../../../dashboard/presentation/widgets/dashboard_app_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
@@ -17,11 +21,23 @@ import '../cubit/projects_cubit.dart';
 import '../cubit/projects_state.dart';
 import '../widgets/create_project_sheet.dart';
 
-const _ink = AppColors.ink;
+Color _ink(BuildContext context) => AppColors.of(context).ink;
 const _secondary = BoardStyle.metadata;
-const _border = AppColors.border;
+Color _border(BuildContext context) => AppColors.of(context).border;
 const _surface = BoardStyle.canvas;
 const _accent = AppColors.accent;
+
+const _projectCovers = [
+  (base: Color(0xFFEFECFA), ink: Color(0xFF7868B3)),
+  (base: Color(0xFFEAF1FA), ink: Color(0xFF577EAD)),
+  (base: Color(0xFFEAF3EF), ink: Color(0xFF50877C)),
+  (base: Color(0xFFFAEEE7), ink: Color(0xFFB27C60)),
+];
+int _projectCoverSeed(String id) =>
+    id.codeUnits.fold<int>(0, (sum, unit) => sum * 31 + unit) & 0x7fffffff;
+
+Key? _dragPreviewKey(BuildContext context, String id) =>
+    ProjectDragScope.previewOf(context)?.keyFor(id);
 
 class ProjectsScreen extends StatelessWidget {
   const ProjectsScreen({super.key});
@@ -33,54 +49,37 @@ class ProjectsScreen extends StatelessWidget {
         final workspace = workspaceState is WorkspaceLoaded
             ? workspaceState.selected
             : null;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Scaffold(
-          backgroundColor: BoardStyle.background(context),
+          backgroundColor: isDark
+              ? BoardStyle.background(context)
+              : const Color(0xFFF8F9FC),
           appBar: DashboardAppBar(
             pageTitle: 'Проекты',
             pageActions: [
-              IconButton(
-                tooltip: 'Архив проектов',
-                icon: const Icon(
-                  LucideIcons.archive,
-                  size: AppIconSizes.standard,
-                ),
-                onPressed: workspace == null
-                    ? null
-                    : () async {
-                        final cubit = context.read<ProjectsCubit>();
-                        await context.push(
-                          '/archives/projects?workspaceId=${Uri.encodeQueryComponent(workspace.id)}',
-                        );
-                        await cubit.loadForWorkspace(
-                          workspace.id,
-                          refresh: true,
-                        );
-                      },
-              ),
-
-              Padding(
-                padding: const EdgeInsets.only(left: AppSpacing.sm),
-                child: _ProjectPressFeedback(
-                  enabled: workspace != null,
-                  child: FilledButton.icon(
-                    key: const Key('create_project_button'),
-                    onPressed: workspace == null
-                        ? null
-                        : () => showCreateProjectFlow(context),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _accent,
-                      disabledBackgroundColor: _border,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.square(AppSpacing.touchTarget),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
+              _ProjectPressFeedback(
+                enabled: workspace != null,
+                child: FilledButton.icon(
+                  key: const Key('create_project_button'),
+                  onPressed: workspace == null
+                      ? null
+                      : () => showCreateProjectFlow(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _accent,
+                    disabledBackgroundColor: _border(context),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 40),
+                    fixedSize: const Size.fromHeight(40),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    label: const Text('Создать'),
-                    icon: const Icon(
-                      LucideIcons.plus,
-                      size: AppIconSizes.standard,
-                    ),
+                  ),
+                  label: Text(tr(context, 'Создать')),
+                  icon: const Icon(
+                    LucideIcons.plus,
+                    size: AppIconSizes.standard,
                   ),
                 ),
               ),
@@ -91,6 +90,13 @@ class ProjectsScreen extends StatelessWidget {
               : _ProjectsBody(
                   workspace: workspace,
                   onCreate: () => showCreateProjectFlow(context),
+                  onOpenArchive: () async {
+                    final cubit = context.read<ProjectsCubit>();
+                    await context.push(
+                      '/archives/projects?workspaceId=${Uri.encodeQueryComponent(workspace.id)}',
+                    );
+                    await cubit.loadForWorkspace(workspace.id, refresh: true);
+                  },
                 ),
         );
       },
@@ -99,10 +105,15 @@ class ProjectsScreen extends StatelessWidget {
 }
 
 class _ProjectsBody extends StatefulWidget {
-  const _ProjectsBody({required this.workspace, required this.onCreate});
+  const _ProjectsBody({
+    required this.workspace,
+    required this.onCreate,
+    required this.onOpenArchive,
+  });
 
   final WorkspaceModel workspace;
   final VoidCallback onCreate;
+  final VoidCallback onOpenArchive;
 
   @override
   State<_ProjectsBody> createState() => _ProjectsBodyState();
@@ -110,53 +121,66 @@ class _ProjectsBody extends StatefulWidget {
 
 class _ProjectsBodyState extends State<_ProjectsBody> {
   final _search = TextEditingController();
-  bool _listView = false;
+  final _dragActive = ValueNotifier(false);
+  final _dragPreview = ProjectDragPreview();
+  bool _listView = true;
 
   @override
   void didUpdateWidget(covariant _ProjectsBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.workspace.id != widget.workspace.id) {
+      _dragPreview.finish();
       _search.clear();
     }
   }
 
   @override
   void dispose() {
+    _dragPreview.dispose();
+    _dragActive.dispose();
     _search.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    return ProjectDragScope(
+      active: _dragActive,
+      preview: _dragPreview,
+      child: ListenableBuilder(
+        listenable: _dragPreview,
+        builder: (context, _) => _buildProjects(context),
+      ),
+    );
+  }
+
+  Widget _buildProjects(BuildContext context) {
     return BlocBuilder<ProjectsCubit, ProjectsState>(
       builder: (context, state) {
         return Column(
           children: <Widget>[
             _ProjectsToolbar(
               controller: _search,
+              projectCount: buildProjectTree(state.projects).length,
               listView: _listView,
               onSearchChanged: (_) => setState(() {}),
               onClear: () => setState(_search.clear),
+              onOpenArchive: widget.onOpenArchive,
               onViewChanged: (value) => setState(() => _listView = value),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _projectCount(state.projects.length),
-                  style: GoogleFonts.manrope(fontSize: 12, color: _secondary),
-                ),
-              ),
             ),
             if (state.errorMessage != null && state.projects.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'Не удалось обновить проекты. Потяните список вниз, чтобы повторить.',
+                  tr(
+                    context,
+                    'Не удалось обновить проекты. Потяните список вниз, чтобы повторить.',
+                  ),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
+            const ProjectRootDrop(),
+            if (state.isMoving) const LinearProgressIndicator(minHeight: 2),
             Expanded(child: _content(context, state)),
           ],
         );
@@ -171,15 +195,19 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
     if (state.errorMessage != null && state.projects.isEmpty) {
       return _ProjectsError(
         message: state.errorMessage!,
-        onRetry: () =>
-            context.read<ProjectsCubit>().loadForWorkspace(widget.workspace.id),
+        onRetry: () => context.read<ProjectsCubit>().loadForWorkspace(
+          widget.workspace.id,
+          refresh: true,
+        ),
       );
     }
     if (state.projects.isEmpty) {
       return RefreshIndicator(
         color: _accent,
-        onRefresh: () =>
-            context.read<ProjectsCubit>().loadForWorkspace(widget.workspace.id),
+        onRefresh: () => context.read<ProjectsCubit>().loadForWorkspace(
+          widget.workspace.id,
+          refresh: true,
+        ),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: <Widget>[
@@ -192,11 +220,9 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
       );
     }
     final query = _search.text.trim().toLowerCase();
-    final projects = state.projects.where((project) {
-      return '${project.name} ${project.code} ${project.description ?? ''}'
-          .toLowerCase()
-          .contains(query);
-    }).toList();
+    final projects = buildProjectTree(
+      _dragPreview.projects ?? state.projects,
+    ).where((project) => projectMatchesQuery(project, query)).toList();
     if (projects.isEmpty) {
       return Center(
         child: Padding(
@@ -210,20 +236,20 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
                 size: AppIconSizes.standard,
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Проекты не найдены',
+              Text(
+                tr(context, 'Проекты не найдены'),
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Попробуйте другое название или код проекта.',
+              Text(
+                tr(context, 'Попробуйте другое название или код проекта.'),
                 textAlign: TextAlign.center,
               ),
               TextButton(
                 onPressed: () => setState(() {
                   _search.clear();
                 }),
-                child: const Text('Сбросить поиск'),
+                child: Text(tr(context, 'Сбросить поиск')),
               ),
             ],
           ),
@@ -232,8 +258,10 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
     }
     return RefreshIndicator(
       color: _accent,
-      onRefresh: () =>
-          context.read<ProjectsCubit>().loadForWorkspace(widget.workspace.id),
+      onRefresh: () => context.read<ProjectsCubit>().loadForWorkspace(
+        widget.workspace.id,
+        refresh: true,
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final scale = MediaQuery.textScalerOf(context).scale(1);
@@ -253,35 +281,81 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
                 ),
                 sliver: _listView
                     ? SliverList.separated(
+                        findItemIndexCallback: (key) {
+                          final index = projects.indexWhere(
+                            (p) =>
+                                key ==
+                                ValueKey(
+                                  'group-${p.id}-${widget.workspace.id}',
+                                ),
+                          );
+                          return index < 0 ? null : index;
+                        },
                         itemCount: projects.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: AppSpacing.sm),
-                        itemBuilder: (context, index) => _ProjectRow(
-                          compact: true,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) => _ProjectGroup(
+                          key: ValueKey(
+                            'group-${projects[index].id}-${widget.workspace.id}',
+                          ),
                           project: projects[index],
-                          isActive:
-                              projects[index].id == state.selectedProjectId,
-                          calculatedProgress:
-                              state.projectTaskProgress[projects[index].id],
-                          onTap: () => _openProject(projects[index]),
+                          compact: true,
+                          onOpen: _openProject,
+                          child: _ProjectRow(
+                            compact: true,
+                            project: projects[index],
+                            calculatedProgress:
+                                state.projectTaskProgress[projects[index].id],
+                            onTap: () => _openProject(projects[index]),
+                          ),
                         ),
                       )
-                    : SliverGrid.builder(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          mainAxisSpacing: AppSpacing.smMd,
-                          crossAxisSpacing: AppSpacing.smMd,
-                          mainAxisExtent:
-                              _ProjectTileStyle.height * scale.clamp(1, 2),
-                        ),
-                        itemCount: projects.length,
-                        itemBuilder: (context, index) => _ProjectRow(
-                          project: projects[index],
-                          isActive:
-                              projects[index].id == state.selectedProjectId,
-                          calculatedProgress:
-                              state.projectTaskProgress[projects[index].id],
-                          onTap: () => _openProject(projects[index]),
+                    : SliverToBoxAdapter(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (
+                              var column = 0;
+                              column < columns;
+                              column++
+                            ) ...[
+                              if (column > 0)
+                                const SizedBox(width: AppSpacing.smMd),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    for (
+                                      var index = column;
+                                      index < projects.length;
+                                      index += columns
+                                    )
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: AppSpacing.smMd,
+                                        ),
+                                        child: _ProjectGroup(
+                                          key: ValueKey(
+                                            'group-${projects[index].id}-${widget.workspace.id}',
+                                          ),
+                                          project: projects[index],
+                                          compact: false,
+                                          onOpen: _openProject,
+                                          child: _ProjectRow(
+                                            project: projects[index],
+                                            calculatedProgress:
+                                                state
+                                                    .projectTaskProgress[projects[index]
+                                                    .id],
+                                            onTap: () =>
+                                                _openProject(projects[index]),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
               ),
@@ -296,45 +370,46 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
     context.read<ProjectsCubit>().selectProject(project.id);
     context.push('/projects/${project.id}', extra: project);
   }
-
-  String _projectCount(int count) {
-    final lastTwo = count % 100;
-    final last = count % 10;
-    final noun = lastTwo >= 11 && lastTwo <= 14
-        ? 'проектов'
-        : last == 1
-        ? 'проект'
-        : last >= 2 && last <= 4
-        ? 'проекта'
-        : 'проектов';
-    return '$count $noun';
-  }
 }
 
 class _ProjectsToolbar extends StatelessWidget {
   const _ProjectsToolbar({
     required this.controller,
+    required this.projectCount,
     required this.listView,
     required this.onSearchChanged,
     required this.onClear,
+    required this.onOpenArchive,
     required this.onViewChanged,
   });
 
   final TextEditingController controller;
+  final int projectCount;
   final bool listView;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClear;
+  final VoidCallback onOpenArchive;
   final ValueChanged<bool> onViewChanged;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final surface = dark ? colors.surfaceContainerLow : AppColors.canvas;
+    final surface = dark ? colors.surfaceContainerLow : Colors.white;
+    final borderColor = dark ? colors.outlineVariant : const Color(0xFFE8EAF0);
+    final activeBg = dark
+        ? _accent.withValues(alpha: 0.22)
+        : AppColors.of(context).outgoingMessage;
+    final activeFg = dark ? colors.primary : _accent;
     final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(AppRadius.sm),
-      borderSide: BorderSide.none,
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: borderColor),
     );
+    final focusedBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: _accent, width: 1.5),
+    );
+
     final search = TextField(
       key: const Key('projects-search'),
       controller: controller,
@@ -344,7 +419,7 @@ class _ProjectsToolbar extends StatelessWidget {
       onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
       onChanged: onSearchChanged,
       decoration: InputDecoration(
-        hintText: 'Поиск проектов',
+        hintText: tr(context, 'Поиск проектов'),
         hintStyle: AppTypography.body(
           context,
         )?.copyWith(color: colors.onSurfaceVariant),
@@ -357,7 +432,7 @@ class _ProjectsToolbar extends StatelessWidget {
             ? null
             : IconButton(
                 key: const Key('projects-search-clear'),
-                tooltip: 'Очистить поиск',
+                tooltip: tr(context, 'Очистить поиск'),
                 onPressed: onClear,
                 icon: const Icon(LucideIcons.x, size: AppIconSizes.standard),
               ),
@@ -372,77 +447,466 @@ class _ProjectsToolbar extends StatelessWidget {
         ),
         border: border,
         enabledBorder: border,
-        focusedBorder: border,
+        focusedBorder: focusedBorder,
       ),
     );
-    final toggle = Semantics(
-      label: 'Вид проектов',
-      child: Material(
-        color: surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
+
+    final titleRow = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            tr(context, 'Все проекты'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: colors.onSurface,
+            ),
+          ),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Row(
+        const SizedBox(width: AppSpacing.sm),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: activeBg,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: Text(
+            '$projectCount',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: activeFg,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: tr(context, 'Архив проектов'),
+          onPressed: onOpenArchive,
+          style: IconButton.styleFrom(
+            fixedSize: const Size.square(38),
+            minimumSize: const Size.square(38),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: EdgeInsets.zero,
+            foregroundColor: colors.onSurfaceVariant,
+          ),
+          icon: const Icon(LucideIcons.archive, size: AppIconSizes.standard),
+        ),
+        for (final list in [false, true]) ...[
+          const SizedBox(width: 4),
+          IconButton(
+            key: Key(list ? 'projects-list-view' : 'projects-card-view'),
+            tooltip: list ? tr(context, 'Список') : tr(context, 'Карточки'),
+            isSelected: listView == list,
+            onPressed: () => onViewChanged(list),
+            style: IconButton.styleFrom(
+              fixedSize: const Size.square(38),
+              minimumSize: const Size.square(38),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: EdgeInsets.zero,
+              backgroundColor: listView == list ? activeBg : Colors.transparent,
+              foregroundColor: listView == list
+                  ? activeFg
+                  : colors.onSurfaceVariant,
+              shape: const CircleBorder(),
+            ),
+            icon: Icon(
+              list ? LucideIcons.list : LucideIcons.layoutGrid,
+              size: AppIconSizes.standard,
+            ),
+          ),
+        ],
+      ],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
+          child: search,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            0,
+            AppSpacing.md,
+            AppSpacing.smMd,
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 300 ||
+                  MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    titleRow,
+                    const SizedBox(height: AppSpacing.xs),
+                    Align(alignment: Alignment.centerRight, child: actions),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: titleRow),
+                  const SizedBox(width: AppSpacing.sm),
+                  actions,
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProjectGroup extends StatefulWidget {
+  const _ProjectGroup({
+    super.key,
+    required this.project,
+    required this.compact,
+    required this.onOpen,
+    required this.child,
+  });
+
+  final ProjectModel project;
+  final bool compact;
+  final ValueChanged<ProjectModel> onOpen;
+  final Widget child;
+
+  @override
+  State<_ProjectGroup> createState() => _ProjectGroupState();
+}
+
+class _ProjectGroupState extends State<_ProjectGroup> {
+  bool _expanded = true;
+
+  @override
+  void didUpdateWidget(covariant _ProjectGroup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.project.children.length > oldWidget.project.children.length) {
+      _expanded = true;
+    }
+  }
+
+  Widget _subproject(ProjectModel sub, int depth) {
+    final colors = Theme.of(context).colorScheme;
+    final progress =
+        (context.read<ProjectsCubit>().state.projectTaskProgress[sub.id] ??
+                sub.progress)
+            .clamp(0, 100)
+            .round();
+    final progressColor = progress == 100
+        ? AppColors.of(context).success
+        : _accent;
+    if (!widget.compact) {
+      return ProjectDrag(
+        key: _dragPreviewKey(context, sub.id),
+        project: sub,
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final list in [false, true]) ...[
-              IconButton(
-                key: Key(list ? 'projects-list-view' : 'projects-card-view'),
-                tooltip: list ? 'Список' : 'Карточки',
-                isSelected: listView == list,
-                onPressed: () => onViewChanged(list),
-                style: IconButton.styleFrom(
-                  fixedSize: const Size.square(AppSpacing.touchTarget),
-                  minimumSize: const Size.square(AppSpacing.touchTarget),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding: const EdgeInsets.all(AppSpacing.smMd),
-                  backgroundColor: listView == list
-                      ? _accent.withValues(alpha: dark ? .24 : .1)
-                      : Colors.transparent,
-                  foregroundColor: listView == list
-                      ? (dark ? colors.primary : _accent)
-                      : colors.onSurfaceVariant,
-                  shape: const RoundedRectangleBorder(),
+            InkWell(
+              key: Key('subproject-${sub.id}'),
+              onTap: () => widget.onOpen(sub),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  12 + depth.clamp(0, 2) * 8.0,
+                  6,
+                  12,
+                  6,
                 ),
-                icon: Icon(
-                  list ? LucideIcons.list : LucideIcons.layoutGrid,
-                  size: AppIconSizes.standard,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Icon(
+                            LucideIcons.hash,
+                            size: 14,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            sub.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              height: 1.35,
+                              fontWeight: FontWeight.w600,
+                              color: colors.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: LinearProgressIndicator(
+                              value: progress / 100,
+                              minHeight: 3,
+                              borderRadius: BorderRadius.circular(4),
+                              color: progressColor,
+                              backgroundColor: colors.outlineVariant.withValues(
+                                alpha: .45,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$progress%',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
+            for (final child in sub.children) _subproject(child, depth + 1),
           ],
         ),
+      );
+    }
+    return ProjectDrag(
+      key: _dragPreviewKey(context, sub.id),
+      project: sub,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            key: Key('subproject-${sub.id}'),
+            onTap: () => widget.onOpen(sub),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 36),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  38 + depth.clamp(0, 3) * 12.0,
+                  4,
+                  16,
+                  4,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      LucideIcons.hash,
+                      size: 14,
+                      color: colors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        sub.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: colors.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 36,
+                      child: LinearProgressIndicator(
+                        value: progress / 100,
+                        minHeight: 3,
+                        borderRadius: BorderRadius.circular(4),
+                        color: progressColor,
+                        backgroundColor: colors.outlineVariant.withValues(
+                          alpha: .45,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 30,
+                      child: Text(
+                        '$progress%',
+                        textAlign: TextAlign.right,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          fontFeatures: [const FontFeature.tabularFigures()],
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          for (final child in sub.children) _subproject(child, depth + 1),
+        ],
       ),
     );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.smMd,
-        AppSpacing.md,
-        AppSpacing.smMd,
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final count = projectDescendants(widget.project).length;
+    final add = IconButton(
+      key: Key('add-subproject-${widget.project.id}'),
+      tooltip: tr(context, 'Добавить подпроект'),
+      onPressed: () => showCreateProjectFlow(context, parent: widget.project),
+      icon: const Icon(LucideIcons.plus, size: 18),
+      style: IconButton.styleFrom(
+        foregroundColor: colors.onSurfaceVariant,
+        minimumSize: const Size.square(36),
+        maximumSize: const Size.square(36),
+        padding: EdgeInsets.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 300 ||
-              MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                search,
-                const SizedBox(height: AppSpacing.sm),
-                Align(alignment: Alignment.centerRight, child: toggle),
-              ],
-            );
-          }
-          return Row(
+    );
+    final section = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Divider(height: 1, color: colors.outlineVariant.withValues(alpha: .5)),
+        if (count == 0)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: Key('add-subproject-${widget.project.id}'),
+              onPressed: () =>
+                  showCreateProjectFlow(context, parent: widget.project),
+              icon: const Icon(LucideIcons.plus, size: 16),
+              label: Text(tr(context, 'Добавить подпроект')),
+              style: TextButton.styleFrom(
+                foregroundColor: colors.onSurfaceVariant,
+                minimumSize: const Size(0, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                textStyle: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          )
+        else ...[
+          Row(
             children: [
-              Expanded(child: search),
-              const SizedBox(width: AppSpacing.smMd),
-              toggle,
+              Expanded(
+                child: Semantics(
+                  expanded: _expanded,
+                  child: InkWell(
+                    key: Key('toggle-subprojects-${widget.project.id}'),
+                    overlayColor: const WidgetStatePropertyAll(
+                      Colors.transparent,
+                    ),
+                    hoverColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    focusColor: Colors.transparent,
+                    splashColor: Colors.transparent,
+                    splashFactory: NoSplash.splashFactory,
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _expanded
+                                ? LucideIcons.chevronDown
+                                : LucideIcons.chevronRight,
+                            size: 16,
+                            color: colors.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              tr(context, 'Подпроекты'),
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$count',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              add,
             ],
-          );
-        },
+          ),
+          if (_expanded)
+            for (final sub in widget.project.children) _subproject(sub, 0),
+        ],
+      ],
+    );
+    final cover =
+        _projectCovers[_projectCoverSeed(widget.project.id) %
+            _projectCovers.length];
+    final tabColor = dark
+        ? Color.alphaBlend(
+            cover.ink.withValues(alpha: widget.compact ? .06 : .18),
+            colors.surfaceContainerLow,
+          )
+        : widget.compact
+        ? Color.lerp(Colors.white, cover.base, .24)!
+        : cover.base;
+    return Material(
+      color: dark ? colors.surfaceContainerLow : Colors.white,
+      shape: _ProjectFolderBorder(
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .6)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 10,
+            width: double.infinity,
+            child: ColoredBox(color: tabColor),
+          ),
+          widget.child,
+          section,
+        ],
       ),
     );
   }
@@ -451,7 +915,6 @@ class _ProjectsToolbar extends StatelessWidget {
 class _ProjectRow extends StatelessWidget {
   const _ProjectRow({
     required this.project,
-    required this.isActive,
     required this.calculatedProgress,
     required this.onTap,
     this.compact = false,
@@ -459,12 +922,17 @@ class _ProjectRow extends StatelessWidget {
 
   final bool compact;
   final ProjectModel project;
-  final bool isActive;
   final int? calculatedProgress;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ProjectDrag(
+    key: _dragPreviewKey(context, project.id),
+    project: project,
+    child: _content(context),
+  );
+
+  Widget _content(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final progress = (calculatedProgress ?? project.progress)
@@ -473,111 +941,126 @@ class _ProjectRow extends StatelessWidget {
     if (compact) {
       return _CompactProjectRow(
         project: project,
-        isActive: isActive,
         progress: progress,
         onTap: onTap,
       );
     }
+    final variant = _projectCoverSeed(project.id);
+    final cover = _projectCovers[variant % _projectCovers.length];
+    final headerBg = isDark
+        ? Color.alphaBlend(
+            cover.ink.withValues(alpha: .18),
+            colorScheme.surfaceContainerLow,
+          )
+        : cover.base;
+    final iconColor = isDark
+        ? Color.lerp(cover.ink, Colors.white, .4)!
+        : cover.ink;
+    final iconBg = isDark
+        ? cover.ink.withValues(alpha: .18)
+        : Colors.white.withValues(alpha: .82);
+    final progressColor = progress == 100
+        ? AppColors.of(context).success
+        : _accent;
     return Semantics(
       button: true,
-      selected: isActive,
-      label: '${project.name}, выполнено ${progress.round()} процентов',
+      label: tr(context, "{p0}, выполнено {p1} процентов", {
+        'p0': project.name,
+        'p1': progress.round(),
+      }),
       child: Material(
-        color: isDark ? colorScheme.surfaceContainerLow : colorScheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          side: BorderSide(
-            color: isActive ? _accent : colorScheme.outlineVariant,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
+        color: Colors.transparent,
         child: InkWell(
           key: Key('project-row-${project.id}'),
           onTap: onTap,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: ColoredBox(
-                  color: _accent,
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.smMd),
-                    child: Stack(
-                      children: [
-                        const Center(
-                          child: Icon(
-                            LucideIcons.columns3,
-                            color: AppColors.onAccent,
-                            size: AppSpacing.xl,
+              Container(
+                height: 58,
+                color: headerBg,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: iconBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withValues(
+                            alpha: isDark ? .08 : .7,
                           ),
                         ),
-                        if (project.isPinned)
-                          const Align(
-                            alignment: Alignment.topRight,
-                            child: Icon(
-                              LucideIcons.pin,
-                              size: AppIconSizes.standard,
-                              color: AppColors.onAccent,
-                            ),
-                          ),
-                        if (isActive)
-                          Align(
-                            alignment: Alignment.bottomLeft,
-                            child: Text(
-                              'Текущий',
-                              style: AppTypography.caption(context)?.copyWith(
-                                color: AppColors.onAccent,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                      ],
+                      ),
+                      child: Icon(
+                        LucideIcons.folder,
+                        color: iconColor,
+                        size: 18,
+                      ),
                     ),
-                  ),
+                    const Spacer(),
+                    _ProjectQuickActions(project: project),
+                  ],
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(AppSpacing.smMd),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       project.name.trim().isEmpty
-                          ? 'Без названия'
+                          ? tr(context, 'Без названия')
                           : project.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.title(context),
+                      style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                        letterSpacing: -0.2,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: 18),
                     Row(
                       children: [
                         Expanded(
                           child: Text(
-                            'Выполнено',
+                            tr(context, 'Выполнено'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppTypography.caption(
-                              context,
-                            )?.copyWith(color: colorScheme.onSurfaceVariant),
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                         const SizedBox(width: AppSpacing.xs),
                         Text(
                           '${progress.round()}%',
-                          style: AppTypography.caption(
-                            context,
-                          )?.copyWith(fontWeight: FontWeight.w700),
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: progressColor,
+                            fontFeatures: [const FontFeature.tabularFigures()],
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: 6),
                     LinearProgressIndicator(
                       value: progress / 100,
-                      minHeight: AppSpacing.xs,
+                      minHeight: 5,
                       borderRadius: BorderRadius.circular(AppRadius.pill),
-                      backgroundColor: colorScheme.surfaceContainerHighest,
-                      color: progress == 100 ? AppColors.success : _accent,
+                      backgroundColor: isDark
+                          ? colorScheme.surfaceContainerHighest
+                          : AppColors.of(context).outgoingMessage,
+                      color: progressColor,
                     ),
                   ],
                 ),
@@ -590,112 +1073,273 @@ class _ProjectRow extends StatelessWidget {
   }
 }
 
-abstract final class _ProjectTileStyle {
-  static const height = 208.0;
+class _ProjectQuickActions extends StatelessWidget {
+  const _ProjectQuickActions({required this.project});
+  final ProjectModel project;
+
+  Future<void> _run(
+    BuildContext context,
+    Future<String?> Function() action,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await action();
+    if (context.mounted && error != null) {
+      messenger.showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = context.select(
+      (ProjectsCubit cubit) =>
+          cubit.state.isUpdating ||
+          cubit.state.isLoading ||
+          cubit.state.isMoving ||
+          cubit.state.isCreating,
+    );
+    final colors = Theme.of(context).colorScheme;
+    final actions = [
+      (
+        id: 'edit',
+        label: 'Редактировать проект',
+        icon: LucideIcons.pencil,
+        run: () async {
+          final cubit = context.read<ProjectsCubit>();
+          await context.push('/manage/projects/${project.id}');
+          if (!cubit.isClosed) {
+            await cubit.loadForWorkspace(project.workspaceId, refresh: true);
+          }
+        },
+      ),
+      (
+        id: 'pin',
+        label: project.isPinned ? 'Открепить проект' : 'Закрепить проект',
+        icon: LucideIcons.pin,
+        run: () async {
+          final cubit = context.read<ProjectsCubit>();
+          await _run(
+            context,
+            () => cubit.setPinned(project.id, !project.isPinned),
+          );
+        },
+      ),
+      (
+        id: 'archive',
+        label: 'Архивировать проект',
+        icon: LucideIcons.archive,
+        run: () async {
+          final cubit = context.read<ProjectsCubit>();
+          if (!await showAppConfirmation(
+                context,
+                tr(context, 'Архивировать проект?'),
+                tr(context, "«{p0}» можно будет восстановить из архива.", {
+                  'p0': project.name,
+                }),
+                confirmLabel: 'Архивировать',
+                destructive: false,
+              ) ||
+              !context.mounted) {
+            return;
+          }
+          await _run(context, () => cubit.archiveProject(project.id));
+        },
+      ),
+    ];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final action in actions)
+          SizedBox(
+            width: 30,
+            height: 44,
+            child: IconButton(
+              key: Key('project-${action.id}-${project.id}'),
+              tooltip: action.label,
+              onPressed: busy ? null : action.run,
+              padding: EdgeInsets.zero,
+              style: IconButton.styleFrom(
+                minimumSize: const Size(30, 44),
+                foregroundColor: action.id == 'pin' && project.isPinned
+                    ? _accent
+                    : colors.onSurfaceVariant,
+                backgroundColor: action.id == 'pin' && project.isPinned
+                    ? _accent.withValues(alpha: .1)
+                    : Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              icon: Icon(action.icon, size: 16),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ProjectFolderBorder extends OutlinedBorder {
+  const _ProjectFolderBorder({super.side});
+
+  Path _outline(Rect rect) {
+    final l = rect.left;
+    final t = rect.top;
+    final r = rect.right;
+    final b = rect.bottom;
+    final tab = (rect.width * .26).clamp(54.0, 88.0);
+    return Path()
+      ..moveTo(l + 14, t)
+      ..lineTo(l + tab, t)
+      ..quadraticBezierTo(l + tab + 4, t, l + tab + 7, t + 4)
+      ..lineTo(l + tab + 13, t + 10)
+      ..lineTo(r - 14, t + 10)
+      ..quadraticBezierTo(r, t + 10, r, t + 24)
+      ..lineTo(r, b - 14)
+      ..quadraticBezierTo(r, b, r - 14, b)
+      ..lineTo(l + 14, b)
+      ..quadraticBezierTo(l, b, l, b - 14)
+      ..lineTo(l, t + 14)
+      ..quadraticBezierTo(l, t, l + 14, t)
+      ..close();
+  }
+
+  @override
+  EdgeInsetsGeometry get dimensions => EdgeInsets.all(side.width);
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) =>
+      _outline(rect);
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) =>
+      _outline(rect.deflate(side.width));
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    if (side.style == BorderStyle.solid && side.width > 0) {
+      canvas.drawPath(_outline(rect.deflate(side.width / 2)), side.toPaint());
+    }
+  }
+
+  @override
+  _ProjectFolderBorder copyWith({BorderSide? side}) =>
+      _ProjectFolderBorder(side: side ?? this.side);
+  @override
+  _ProjectFolderBorder scale(double t) =>
+      _ProjectFolderBorder(side: side.scale(t));
 }
 
 class _CompactProjectRow extends StatelessWidget {
   const _CompactProjectRow({
     required this.project,
-    required this.isActive,
     required this.progress,
     required this.onTap,
   });
   final ProjectModel project;
-  final bool isActive;
   final double progress;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: isActive,
-      label: project.name,
-      child: _ProjectPressFeedback(
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final progressColor = progress == 100
+        ? AppColors.of(context).success
+        : _accent;
+    final seed = _projectCoverSeed(project.id);
+    final cover = _projectCovers[seed % _projectCovers.length];
+    final background = isDark
+        ? Color.alphaBlend(
+            cover.ink.withValues(alpha: .06),
+            colorScheme.surfaceContainerLow,
+          )
+        : Color.lerp(Colors.white, cover.base, .24)!;
+
+    return _ProjectPressFeedback(
+      pressedScale: .99,
+      child: Semantics(
+        button: true,
+        label: project.name,
         child: Material(
-          color: Theme.of(context).colorScheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            side: BorderSide(
-              color: isActive
-                  ? _accent.withValues(alpha: .28)
-                  : Theme.of(context).colorScheme.outlineVariant,
-            ),
-          ),
+          color: Colors.transparent,
           child: InkWell(
             key: Key('project-row-${project.id}'),
-            borderRadius: BorderRadius.circular(8),
+            splashColor: _accent.withValues(alpha: 0.10),
+            highlightColor: _accent.withValues(alpha: 0.06),
+            hoverColor: _accent.withValues(alpha: 0.04),
             onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: _accent.withValues(alpha: .08),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
+            child: ColoredBox(
+              color: background,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? colorScheme.surfaceContainerHigh
+                            : _accent.withValues(alpha: .06),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        LucideIcons.folder,
+                        size: 18,
+                        color: _accent,
+                      ),
                     ),
-                    child: const Icon(
-                      LucideIcons.folder,
-                      size: AppIconSizes.standard,
-                      color: _accent,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          project.name.trim().isEmpty
-                              ? 'Без названия'
-                              : project.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.manrope(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            project.name.trim().isEmpty
+                                ? tr(context, 'Без названия')
+                                : project.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurface,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 42,
-                    child: Column(
-                      children: [
-                        Text(
-                          '${progress.round()}%',
-                          style: GoogleFonts.manrope(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: _accent,
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 48,
+                      child: Column(
+                        children: [
+                          Text(
+                            '${progress.round()}%',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: progressColor,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 5),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
+                          const SizedBox(height: 3),
+                          LinearProgressIndicator(
                             value: progress / 100,
                             minHeight: 3,
-                            color: _accent,
-                            backgroundColor: _border,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            color: progressColor,
+                            backgroundColor: isDark
+                                ? colorScheme.surfaceContainerHighest
+                                : _accent.withValues(alpha: 0.14),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(
-                    LucideIcons.chevronRight,
-                    size: AppIconSizes.standard,
-                    color: _secondary,
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    _ProjectQuickActions(project: project),
+                  ],
+                ),
               ),
             ),
           ),
@@ -725,11 +1369,11 @@ class _LoadingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Загрузка проекта',
+      label: tr(context, 'Загрузка проекта'),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.of(context).canvas,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -790,20 +1434,23 @@ class _EmptyProjects extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              'В этом workspace пока нет проектов',
+              tr(context, 'В этом workspace пока нет проектов'),
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.inter(
                 fontSize: 18,
                 height: 1.35,
                 fontWeight: FontWeight.w700,
-                color: _ink,
+                color: _ink(context),
               ),
             ),
             const SizedBox(height: 9),
             Text(
-              'Создайте первый проект, чтобы планировать работу команды.',
+              tr(
+                context,
+                'Создайте первый проект, чтобы планировать работу команды.',
+              ),
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.inter(
                 fontSize: 13,
                 height: 1.5,
                 color: _secondary,
@@ -813,7 +1460,7 @@ class _EmptyProjects extends StatelessWidget {
             FilledButton.icon(
               onPressed: onCreate,
               icon: const Icon(LucideIcons.plus, size: AppIconSizes.standard),
-              label: const Text('Создать проект'),
+              label: Text(tr(context, 'Создать проект')),
               style: FilledButton.styleFrom(
                 backgroundColor: _accent,
                 foregroundColor: Colors.white,
@@ -821,7 +1468,7 @@ class _EmptyProjects extends StatelessWidget {
                   horizontal: 18,
                   vertical: 13,
                 ),
-                textStyle: GoogleFonts.manrope(fontWeight: FontWeight.w700),
+                textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -857,16 +1504,16 @@ class _ProjectsError extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(color: _ink),
+              style: GoogleFonts.inter(color: _ink(context)),
             ),
             const SizedBox(height: 18),
             OutlinedButton(
               onPressed: onRetry,
               style: OutlinedButton.styleFrom(
                 foregroundColor: _accent,
-                side: const BorderSide(color: _border),
+                side: BorderSide(color: _border(context)),
               ),
-              child: const Text('Повторить'),
+              child: Text(tr(context, 'Повторить')),
             ),
           ],
         ),
@@ -894,7 +1541,7 @@ class _WorkspaceUnavailable extends StatelessWidget {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: GoogleFonts.manrope(color: _secondary),
+          style: GoogleFonts.inter(color: _secondary),
         ),
       ),
     );
@@ -902,9 +1549,14 @@ class _WorkspaceUnavailable extends StatelessWidget {
 }
 
 class _ProjectPressFeedback extends StatefulWidget {
-  const _ProjectPressFeedback({required this.child, this.enabled = true});
+  const _ProjectPressFeedback({
+    required this.child,
+    this.enabled = true,
+    this.pressedScale = .96,
+  });
   final Widget child;
   final bool enabled;
+  final double pressedScale;
   @override
   State<_ProjectPressFeedback> createState() => _ProjectPressFeedbackState();
 }
@@ -928,7 +1580,7 @@ class _ProjectPressFeedbackState extends State<_ProjectPressFeedback> {
                 _pressed &&
                 !media.disableAnimations &&
                 !media.accessibleNavigation
-            ? .96
+            ? widget.pressedScale
             : 1,
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,

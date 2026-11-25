@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -85,7 +86,7 @@ class TaskFilesSection extends StatelessWidget {
       child: ColoredBox(
         color: Theme.of(context).brightness == Brightness.dark
             ? Theme.of(context).colorScheme.surfaceContainerHighest
-            : AppColors.badgeSurface,
+            : AppColors.of(context).badgeSurface,
         child: Center(child: child),
       ),
     );
@@ -94,7 +95,7 @@ class TaskFilesSection extends StatelessWidget {
   Widget _card(BuildContext context, TaskFileModel file) => Material(
     color: Theme.of(context).brightness == Brightness.dark
         ? Theme.of(context).colorScheme.surfaceContainerLow
-        : AppColors.quietSurface,
+        : AppColors.of(context).quietSurface,
     borderRadius: BorderRadius.circular(12),
     clipBehavior: Clip.antiAlias,
     child: InkWell(
@@ -123,7 +124,10 @@ class TaskFilesSection extends StatelessWidget {
               _meta(file),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, color: AppColors.muted),
+              style: TextStyle(
+                fontSize: 10,
+                color: AppColors.of(context).muted,
+              ),
             ),
           ],
         ),
@@ -135,11 +139,11 @@ class TaskFilesSection extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       if (files.isEmpty)
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 20),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
           child: Text(
-            'Нет прикреплённых файлов.',
-            style: TextStyle(fontSize: 13, color: AppColors.muted),
+            tr(context, 'Нет прикреплённых файлов.'),
+            style: TextStyle(fontSize: 13, color: AppColors.of(context).muted),
           ),
         ),
       if (grid)
@@ -180,7 +184,10 @@ class TaskFilesSection extends StatelessWidget {
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 _meta(file),
-                style: const TextStyle(fontSize: 10, color: AppColors.muted),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppColors.of(context).muted,
+                ),
               ),
             ),
             onTap: () => onOpen(file),
@@ -201,7 +208,9 @@ class TaskFilesSection extends StatelessWidget {
                   )
                 : const Icon(LucideIcons.plus, size: 16),
             label: Text(
-              uploading ? 'Загрузка…' : 'Добавить файлы',
+              uploading
+                  ? tr(context, 'Загрузка…')
+                  : tr(context, 'Добавить файлы'),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             ),
             style: TextButton.styleFrom(
@@ -210,9 +219,9 @@ class TaskFilesSection extends StatelessWidget {
               minimumSize: const Size(44, 44),
             ),
           ),
-          const Text(
-            'До 10 МБ на файл',
-            style: TextStyle(fontSize: 10, color: AppColors.muted),
+          Text(
+            tr(context, 'До 10 МБ на файл'),
+            style: TextStyle(fontSize: 10, color: AppColors.of(context).muted),
           ),
         ],
       ),
@@ -266,7 +275,7 @@ class TaskFilesViewToggle extends StatelessWidget {
                   color: selected
                       ? (dark
                             ? Colors.white.withValues(alpha: .08)
-                            : AppColors.badgeSurface)
+                            : AppColors.of(context).badgeSurface)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(6),
                 ),
@@ -274,8 +283,8 @@ class TaskFilesViewToggle extends StatelessWidget {
                   icon,
                   size: 16,
                   color: selected
-                      ? (dark ? Colors.white : AppColors.ink)
-                      : AppColors.muted,
+                      ? (dark ? Colors.white : AppColors.of(context).ink)
+                      : AppColors.of(context).muted,
                 ),
               ),
             ),

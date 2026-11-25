@@ -1,3 +1,4 @@
+import 'task_test_app.dart';
 import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'package:jospar/features/projects/domain/entities/task_assignee_model.dart';
 import 'package:jospar/features/projects/domain/entities/task_epic_model.dart';
@@ -131,7 +132,8 @@ void main() {
       addTearDown(cubit.close);
       await cubit.load('task-1');
       await tester.pumpWidget(
-        MaterialApp(
+        TaskTestApp(
+          theme: AppTheme.dark,
           home: BlocProvider.value(
             value: cubit,
             child: const TaskDetailsScreen(taskId: 'task-1'),
@@ -167,6 +169,24 @@ void main() {
         Alignment.centerLeft,
       );
       expect(find.text('Вы'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.text('Моё сообщение')).style!.color,
+        const AppPalette(true).ink,
+      );
+      final bubble = tester.widget<Container>(
+        find
+            .ancestor(of: find.text('Вы'), matching: find.byType(Container))
+            .first,
+      );
+      expect(
+        (bubble.decoration! as BoxDecoration).color,
+        const AppPalette(true).outgoingMessage,
+      );
+      expect(
+        tester.widget<Text>(find.text('Вы')).style!.color,
+        const AppPalette(true).accent,
+      );
+
       final disclosure = find.byKey(
         const ValueKey('section-disclosure-Обсуждение'),
       );

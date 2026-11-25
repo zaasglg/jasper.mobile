@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/assistant_widget_root"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="20dp"
+    android:background="@drawable/assistant_widget_background"
+    android:contentDescription="Открыть Jospar AI и написать запрос">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Jospar AI" android:textColor="@color/assistant_widget_ink"
+        android:textSize="18sp" android:textStyle="bold" android:maxLines="1" />
+    <TextView android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:gravity="center_vertical"
+        android:text="Чем помочь?" android:textColor="@color/assistant_widget_muted"
+        android:textSize="14sp" android:maxLines="2" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Написать запрос  ↗" android:textColor="@color/assistant_widget_accent"
+        android:textSize="14sp" android:textStyle="bold" android:maxLines="1" />
+</LinearLayout>

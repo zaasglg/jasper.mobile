@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'dart:async';
 import '../../../../core/widgets/map_gesture_recognizer.dart';
 import 'dashboard_widget_skeleton.dart';
@@ -184,14 +185,14 @@ class _DashboardTaskMapState extends State<DashboardTaskMap> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         LucideIcons.mapPin,
                         size: 22,
-                        color: AppColors.muted,
+                        color: AppColors.of(context).muted,
                       ),
                       const SizedBox(height: 9),
-                      const Text(
-                        'Яндекс Карты',
+                      Text(
+                        tr(context, 'Яндекс Карты'),
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -199,21 +200,21 @@ class _DashboardTaskMapState extends State<DashboardTaskMap> {
                       ),
                       if (_failed) ...[
                         const SizedBox(height: 5),
-                        const Text(
-                          'Не удалось загрузить карту',
+                        Text(
+                          tr(context, 'Не удалось загрузить карту'),
                           style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.muted,
+                            color: AppColors.of(context).muted,
                           ),
                         ),
                         TextButton(
                           onPressed: _load,
-                          child: const Text('Повторить'),
+                          child: Text(tr(context, 'Повторить')),
                         ),
                       ],
                       TextButton(
                         onPressed: _openExternal,
-                        child: const Text('Открыть карту'),
+                        child: Text(tr(context, 'Открыть карту')),
                       ),
                     ],
                   ),

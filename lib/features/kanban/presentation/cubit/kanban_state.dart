@@ -12,6 +12,7 @@ class KanbanState extends Equatable {
     this.projectId = '',
     this.columns = const <KanbanColumnModel>[],
     this.tasks = const <ProjectTaskModel>[],
+    this.translatedTitles = const {},
     this.search = '',
     this.priorityFilter,
     this.epicFilterIds = const <String>{},
@@ -19,12 +20,14 @@ class KanbanState extends Equatable {
     this.errorMessage,
     this.actionErrorMessage,
     this.actionRevision = 0,
+    this.columnCopyDenied = false,
   });
 
   final KanbanStatus status;
   final String projectId;
   final List<KanbanColumnModel> columns;
   final List<ProjectTaskModel> tasks;
+  final Map<String, String> translatedTitles;
   final String search;
   final String? priorityFilter;
   final Set<String> epicFilterIds;
@@ -32,6 +35,7 @@ class KanbanState extends Equatable {
   final String? errorMessage;
   final String? actionErrorMessage;
   final int actionRevision;
+  final bool columnCopyDenied;
 
   List<ProjectTaskModel> tasksFor(KanbanColumnModel column) {
     final query = search.trim().toLowerCase();
@@ -62,6 +66,7 @@ class KanbanState extends Equatable {
     String? projectId,
     List<KanbanColumnModel>? columns,
     List<ProjectTaskModel>? tasks,
+    Map<String, String>? translatedTitles,
     String? search,
     Set<String>? epicFilterIds,
     String? priorityFilter,
@@ -72,12 +77,15 @@ class KanbanState extends Equatable {
     String? actionErrorMessage,
     bool clearActionError = false,
     int? actionRevision,
+    bool? columnCopyDenied,
   }) {
     return KanbanState(
+      columnCopyDenied: columnCopyDenied ?? this.columnCopyDenied,
       status: status ?? this.status,
       projectId: projectId ?? this.projectId,
       columns: columns ?? this.columns,
       tasks: tasks ?? this.tasks,
+      translatedTitles: translatedTitles ?? this.translatedTitles,
       search: search ?? this.search,
       epicFilterIds: epicFilterIds ?? this.epicFilterIds,
       priorityFilter: clearPriorityFilter
@@ -98,6 +106,7 @@ class KanbanState extends Equatable {
     projectId,
     columns,
     tasks,
+    translatedTitles,
     search,
     priorityFilter,
     epicFilterIds,
@@ -105,5 +114,6 @@ class KanbanState extends Equatable {
     errorMessage,
     actionErrorMessage,
     actionRevision,
+    columnCopyDenied,
   ];
 }

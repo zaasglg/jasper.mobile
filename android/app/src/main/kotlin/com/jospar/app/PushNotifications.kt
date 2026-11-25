@@ -77,6 +77,16 @@ object PushNotifications {
                     if (userId.isNullOrBlank()) { result.error("invalid_account", "Не выбран аккаунт", null) }
                     else { activity.getSharedPreferences("jospar_push", Context.MODE_PRIVATE).edit().putString("userId", userId).apply(); result.success(null) }
                 }
+                "setPreferences" -> {
+                    val userId = call.argument<String>("userId")
+                    val preferences = call.argument<Map<String, Any>>("preferences")
+                    if (userId.isNullOrBlank() || preferences == null) result.error("invalid_preferences", "Invalid preferences", null)
+                    else {
+                        val saved = activity.getSharedPreferences("jospar_push", Context.MODE_PRIVATE).edit()
+                            .putString("preferences.$userId", JSONObject(preferences).toString()).commit()
+                        if (saved) result.success(mapOf("timeZone" to java.util.TimeZone.getDefault().id)) else result.error("preferences_write", "Preferences not saved", null)
+                    }
+                }
                 "clearAccount" -> { clearAccount(activity); result.success(null) }
                 "deleteToken" -> {
                     pending = null
@@ -123,7 +133,29 @@ object PushNotifications {
         val manager = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) manager.activeNotifications.filter { it.notification.channelId == CHANNEL }.forEach { manager.cancel(it.tag, it.id) }
     }
+    private fun allows(context: Context, type: String): Boolean {
+        if (type == "call") return true
+        val store = context.getSharedPreferences("jospar_push", Context.MODE_PRIVATE)
+        val owner = store.getString("userId", null) ?: return false
+        val raw = store.getString("preferences.$owner", null) ?: return true
+        return try {
+            val prefs = JSONObject(raw)
+            val now = java.util.Calendar.getInstance()
+            val minute = now.get(java.util.Calendar.HOUR_OF_DAY) * 60 + now.get(java.util.Calendar.MINUTE)
+            val start = prefs.optInt("quietStart", 1320)
+            val end = prefs.optInt("quietEnd", 480)
+            val quiet = prefs.optBoolean("quietEnabled", false) &&
+                (if (start == end) true else if (start < end) minute >= start && minute < end else minute >= start || minute < end)
+            !quiet && when (type) {
+                "message" -> prefs.optBoolean("messages", true)
+                "mention" -> prefs.optBoolean("mentions", true)
+                "deadline", "reminder", "planner" -> prefs.optBoolean("deadlines", true)
+                else -> true
+            }
+        } catch (_: Exception) { true }
+    }
     fun show(context: Context, title: String, body: String, data: Map<String, String>) {
+        if (!allows(context, data["type"] ?: "")) return
         createChannel(context)
         val manager = context.getSystemService(NotificationManager::class.java)
         if (!manager.areNotificationsEnabled()) return

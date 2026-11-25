@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'dart:io';
@@ -176,7 +177,9 @@ class _VoiceMessageState extends State<VoiceMessage> {
     appSnackBar(
       context: context,
       tone: AppSnackBarTone.error,
-      content: Text('Не удалось воспроизвести запись. Попробуйте ещё раз.'),
+      content: Text(
+        tr(context, 'Не удалось воспроизвести запись. Попробуйте ещё раз.'),
+      ),
     ),
   );
   String _time(Duration value) =>
@@ -198,7 +201,9 @@ class _VoiceMessageState extends State<VoiceMessage> {
             children: [
               IconButton.filled(
                 key: Key('voice-play-${widget.message.id}'),
-                tooltip: playing ? 'Пауза' : 'Воспроизвести',
+                tooltip: playing
+                    ? tr(context, 'Пауза')
+                    : tr(context, 'Воспроизвести'),
                 onPressed: playable && !_loading ? _toggle : null,
                 style: IconButton.styleFrom(backgroundColor: AppColors.accent),
                 icon: _loading
@@ -264,10 +269,10 @@ class _VoiceMessageState extends State<VoiceMessage> {
                           child: Text(
                             playable
                                 ? '${_time(current)} / ${_time(duration)}'
-                                : 'Запись недоступна',
-                            style: const TextStyle(
+                                : tr(context, 'Запись недоступна'),
+                            style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.muted,
+                              color: AppColors.of(context).muted,
                             ),
                           ),
                         ),

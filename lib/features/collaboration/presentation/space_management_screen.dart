@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import '../../../core/theme/app_ui_tokens.dart';
 import '../../../core/widgets/app_color_picker.dart';
@@ -49,7 +50,7 @@ class _ManagementBody extends StatelessWidget {
       appSnackBar(
         context: context,
         tone: AppSnackBarTone.error,
-        content: Text(state.error!),
+        content: Text(tr(context, state.error!)),
       ),
     ),
     builder: (context, state) {
@@ -61,7 +62,9 @@ class _ManagementBody extends StatelessWidget {
             : null,
         appBar: AppBar(
           title: Text(
-            'Настройки ${cubit.kind == SpaceKind.project ? 'проекта' : 'workspace'}',
+            tr(context, "Настройки {p0}", {
+              'p0': cubit.kind == SpaceKind.project ? 'проекта' : 'workspace',
+            }),
           ),
         ),
         body: space == null
@@ -70,7 +73,7 @@ class _ManagementBody extends StatelessWidget {
                     ? const CircularProgressIndicator()
                     : TextButton(
                         onPressed: cubit.load,
-                        child: const Text('Повторить загрузку'),
+                        child: Text(tr(context, 'Повторить загрузку')),
                       ),
               )
             : SafeArea(
@@ -105,9 +108,11 @@ class _ManagementBody extends StatelessWidget {
                             vertical: AppSpacing.xs,
                           ),
                           leading: const Icon(LucideIcons.users),
-                          title: const Text('Участники'),
+                          title: Text(tr(context, 'Участники')),
                           subtitle: Text(
-                            'Пользователей с доступом: ${state.members.length}',
+                            tr(context, "Пользователей с доступом: {p0}", {
+                              'p0': state.members.length,
+                            }),
                           ),
                           trailing: const Icon(LucideIcons.chevronRight),
                           onTap: () async {
@@ -122,15 +127,17 @@ class _ManagementBody extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                'Участники · ${state.members.length}',
-                                style: GoogleFonts.manrope(
+                                tr(context, "Участники · {p0}", {
+                                  'p0': state.members.length,
+                                }),
+                                style: GoogleFonts.inter(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 16,
                                 ),
                               ),
                             ),
                             IconButton(
-                              tooltip: 'Добавить участника',
+                              tooltip: tr(context, 'Добавить участника'),
                               onPressed: state.saving
                                   ? null
                                   : () => _addMember(context, cubit, state),
@@ -144,7 +151,9 @@ class _ManagementBody extends StatelessWidget {
                         if (state.error != null && state.members.isEmpty)
                           TextButton(
                             onPressed: cubit.load,
-                            child: const Text('Повторить загрузку участников'),
+                            child: Text(
+                              tr(context, 'Повторить загрузку участников'),
+                            ),
                           ),
                         WorkspaceParticipantsPanel(
                           members: state.members,
@@ -153,7 +162,7 @@ class _ManagementBody extends StatelessWidget {
                               ? null
                               : AppActionMenuButton<String>(
                                   title: member.name,
-                                  tooltip: 'Действия участника',
+                                  tooltip: tr(context, 'Действия участника'),
                                   groups: [
                                     [
                                       for (final role in memberRoles.entries)
@@ -165,9 +174,12 @@ class _ManagementBody extends StatelessWidget {
                                         ),
                                     ],
                                     [
-                                      const AppMenuAction(
+                                      AppMenuAction(
                                         value: 'remove',
-                                        label: 'Удалить из участников',
+                                        label: tr(
+                                          context,
+                                          'Удалить из участников',
+                                        ),
                                         icon: LucideIcons.userMinus,
                                         destructive: true,
                                       ),
@@ -178,8 +190,12 @@ class _ManagementBody extends StatelessWidget {
                                     if (value == 'remove') {
                                       if (!await showAppConfirmation(
                                         context,
-                                        'Удалить участника?',
-                                        '${member.name} потеряет доступ к этому разделу.',
+                                        tr(context, 'Удалить участника?'),
+                                        tr(
+                                          context,
+                                          "{p0} потеряет доступ к этому разделу.",
+                                          {'p0': member.name},
+                                        ),
                                         confirmLabel: 'Удалить',
                                         destructive: true,
                                       )) {
@@ -213,7 +229,7 @@ class _ManagementBody extends StatelessWidget {
                           bottom: AppSpacing.sm,
                         ),
                         child: Text(
-                          'Управление',
+                          tr(context, 'Управление'),
                           style: AppTypography.caption(context)?.copyWith(
                             color: Theme.of(
                               context,
@@ -233,14 +249,19 @@ class _ManagementBody extends StatelessWidget {
                                 LucideIcons.archive,
                                 size: AppIconSizes.standard,
                               ),
-                              title: const Text('Архивировать'),
+                              title: Text(tr(context, 'Архивировать')),
                               onTap: state.saving
                                   ? null
                                   : () async {
                                       if (!await showAppConfirmation(
                                         context,
-                                        'Архивировать ${cubit.kind.label.toLowerCase()}?',
-                                        'Вы сможете восстановить его из архива.',
+                                        tr(context, "Архивировать {p0}?", {
+                                          'p0': cubit.kind.label.toLowerCase(),
+                                        }),
+                                        tr(
+                                          context,
+                                          'Вы сможете восстановить его из архива.',
+                                        ),
                                         confirmLabel: 'Архивировать',
                                         destructive: false,
                                       )) {
@@ -268,22 +289,29 @@ class _ManagementBody extends StatelessWidget {
                                 horizontal: AppSpacing.md,
                                 vertical: AppSpacing.xs,
                               ),
-                              leading: const Icon(
+                              leading: Icon(
                                 LucideIcons.trash2,
                                 size: AppIconSizes.standard,
-                                color: AppColors.error,
+                                color: AppColors.of(context).error,
                               ),
-                              title: const Text(
-                                'Удалить',
-                                style: TextStyle(color: AppColors.error),
+                              title: Text(
+                                tr(context, 'Удалить'),
+                                style: TextStyle(
+                                  color: AppColors.of(context).error,
+                                ),
                               ),
                               onTap: state.saving
                                   ? null
                                   : () async {
                                       if (!await showAppConfirmation(
                                         context,
-                                        'Удалить ${cubit.kind.label.toLowerCase()}?',
-                                        'Это действие нельзя отменить. Связанные данные могут быть удалены.',
+                                        tr(context, "Удалить {p0}?", {
+                                          'p0': cubit.kind.label.toLowerCase(),
+                                        }),
+                                        tr(
+                                          context,
+                                          'Это действие нельзя отменить. Связанные данные могут быть удалены.',
+                                        ),
                                         confirmLabel: 'Удалить',
                                         destructive: true,
                                       )) {
@@ -330,7 +358,9 @@ class _ManagementBody extends StatelessWidget {
           appSnackBar(
             context: context,
             tone: AppSnackBarTone.info,
-            content: Text('Все доступные пользователи уже добавлены.'),
+            content: Text(
+              tr(context, 'Все доступные пользователи уже добавлены.'),
+            ),
           ),
         );
         return;
@@ -420,19 +450,19 @@ class _SpaceFieldsState extends State<_SpaceFields> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       AppFormField(
-        label: 'Название',
+        label: tr(context, 'Название'),
         child: TextField(
           key: const Key('project_settings_name'),
           textInputAction: TextInputAction.next,
           controller: _name,
           enabled: !widget.saving,
-          decoration: InputDecoration(errorText: _error),
+          decoration: InputDecoration(errorText: trn(context, _error)),
         ),
       ),
       if (widget.kind == SpaceKind.project) ...[
         const SizedBox(height: 16),
         AppFormField(
-          label: 'Код проекта',
+          label: tr(context, 'Код проекта'),
           child: TextField(
             key: const Key('project_settings_code'),
             controller: _code,
@@ -441,7 +471,7 @@ class _SpaceFieldsState extends State<_SpaceFields> {
         ),
         const SizedBox(height: 16),
         AppFormField(
-          label: 'Описание · необязательно',
+          label: tr(context, 'Описание · необязательно'),
           child: TextField(
             controller: _description,
             enabled: !widget.saving,
@@ -453,8 +483,8 @@ class _SpaceFieldsState extends State<_SpaceFields> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           secondary: const Icon(LucideIcons.pin, size: AppIconSizes.standard),
-          title: const Text('Закрепить проект'),
-          subtitle: const Text('Показывать в начале списка'),
+          title: Text(tr(context, 'Закрепить проект')),
+          subtitle: Text(tr(context, 'Показывать в начале списка')),
           value: _pinned,
           activeTrackColor: AppColors.accent,
           onChanged: widget.saving
@@ -464,7 +494,7 @@ class _SpaceFieldsState extends State<_SpaceFields> {
       ] else ...[
         const SizedBox(height: 16),
         AppFormField(
-          label: 'Цвет',
+          label: tr(context, 'Цвет'),
           child: AppColorPicker(
             value: _color.text,
             enabled: !widget.saving,
@@ -483,16 +513,18 @@ class _SpaceFieldsState extends State<_SpaceFields> {
                 ),
                 label: Text(
                   _pickingLogo
-                      ? 'Загрузка…'
+                      ? tr(context, 'Загрузка…')
                       : _logo.text.isEmpty
-                      ? 'Добавить логотип'
-                      : 'Заменить логотип',
+                      ? tr(context, 'Добавить логотип')
+                      : tr(context, 'Заменить логотип'),
                 ),
               ),
             ),
             if (_logo.text.isNotEmpty || _pickingLogo)
               IconButton(
-                tooltip: _pickingLogo ? 'Отменить загрузку' : 'Убрать логотип',
+                tooltip: _pickingLogo
+                    ? tr(context, 'Отменить загрузку')
+                    : tr(context, 'Убрать логотип'),
                 onPressed: widget.saving
                     ? null
                     : () => setState(() {
@@ -509,7 +541,10 @@ class _SpaceFieldsState extends State<_SpaceFields> {
         ),
       ],
       if (_error != null)
-        Text(_error!, style: const TextStyle(color: AppColors.error)),
+        Text(
+          tr(context, _error!),
+          style: TextStyle(color: AppColors.of(context).error),
+        ),
       const SizedBox(height: 20),
       AppFormButton(
         key: const Key('project_settings_save'),
@@ -543,7 +578,7 @@ class _SpaceFieldsState extends State<_SpaceFields> {
                 });
               },
         child: Text(
-          widget.saving ? 'Сохранение…' : 'Сохранить',
+          widget.saving ? tr(context, 'Сохранение…') : tr(context, 'Сохранить'),
           style: AppTypography.body(context)?.copyWith(
             color: Theme.of(context).colorScheme.onPrimary,
             fontWeight: FontWeight.w600,

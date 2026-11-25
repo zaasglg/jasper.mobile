@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jospar Review Agent"
+  short_description: "Reviews Jospar changes for correctness and regressions"
+  default_prompt: "Review these Jospar changes and report actionable findings."

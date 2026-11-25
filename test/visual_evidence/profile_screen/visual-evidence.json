@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "uizze.visual-evidence.v1",
+  "scope": "Profile screen redesign at the 440 x 1040 compact reference viewport",
+  "platform": "ios",
+  "sources": [
+    {
+      "path": "../../../lib/core/theme/app_icon_sizes.dart",
+      "sha256": "dd8a96328049b6ce32f9803d6a0c464e791a34a6baa0fcb11254ce6550141d80"
+    },
+    {
+      "path": "../../../lib/core/theme/app_ui_tokens.dart",
+      "sha256": "86360c83173455f04b4c8224a1e4868643e6c49f17df5c7a4cb3466630d8b665"
+    },
+    {
+      "path": "../../../lib/features/profile/presentation/screens/profile_screen.dart",
+      "sha256": "1082d7b4bc5f6f01cd185d6947b6711c2479f3cd34bd2400f22e1d155fd63cba"
+    },
+    {
+      "path": "../../../lib/features/profile/presentation/widgets/profile_avatar.dart",
+      "sha256": "6b5842a312a24d5091971a10afd017d3302a4670e043735b43f5a6a72350bd60"
+    },
+    {
+      "path": "../../features/profile/profile_screen_test.dart",
+      "sha256": "0e7ab3f6fa7f665477426d3399dc4305992bd8be994e7b0b3a068645c904e743"
+    }
+  ],
+  "comparison": "existing-system",
+  "requiredChecks": [
+    {
+      "id": "compact-widget-layout",
+      "kind": "visual"
+    },
+    {
+      "id": "ios-simulator-render",
+      "kind": "visual"
+    }
+  ],
+  "checks": [
+    {
+      "id": "compact-widget-layout",
+      "status": "pass",
+      "state": "Loaded profile with long email and all actions visible",
+      "environment": {
+        "kind": "flutter-widget-test",
+        "name": "Flutter test renderer",
+        "width": 440,
+        "height": 1040
+      },
+      "observed": "The complete profile hierarchy renders without exceptions or overflow; all interactive controls remain present.",
+      "artifacts": [
+        {
+          "path": "../../goldens/profile_screen.png",
+          "kind": "image",
+          "sha256": "2ee98805a6156a541a7da74ee5214da975746f6116fe4582fdab3c81ddf3b6f8"
+        }
+      ]
+    },
+    {
+      "id": "ios-simulator-render",
+      "status": "blocked",
+      "state": "Loaded profile preview",
+      "environment": {
+        "kind": "simulator",
+        "name": "iPhone 17 Pro Max"
+      },
+      "observed": "The local Xcode runner exited with status 255 before installing the preview, so a native screenshot could not be captured.",
+      "artifacts": []
+    }
+  ],
+  "unresolved": [
+    "Native iOS pixel comparison remains blocked by the local Xcode simulator build failure."
+  ]
+}

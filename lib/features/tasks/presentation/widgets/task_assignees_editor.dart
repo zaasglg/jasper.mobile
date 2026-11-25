@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/task_assignee_model.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
@@ -112,12 +113,12 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Исполнители',
+                          tr(context, 'Исполнители'),
                           style: AppTypography.title(context),
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Закрыть выбор исполнителей',
+                        tooltip: tr(context, 'Закрыть выбор исполнителей'),
                         onPressed: _saving
                             ? null
                             : () => Navigator.pop(context),
@@ -133,7 +134,7 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
                     controller: _search,
                     enabled: !_saving,
                     decoration: InputDecoration(
-                      hintText: 'Поиск по имени',
+                      hintText: tr(context, 'Поиск по имени'),
                       prefixIcon: const Icon(
                         Icons.search,
                         size: AppIconSizes.standard,
@@ -153,7 +154,7 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
                       suffixIcon: query.isEmpty
                           ? null
                           : IconButton(
-                              tooltip: 'Очистить поиск',
+                              tooltip: tr(context, 'Очистить поиск'),
                               onPressed: _saving
                                   ? null
                                   : () => setState(_search.clear),
@@ -169,7 +170,9 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Выбрано: ${_selected.length}',
+                          tr(context, "Выбрано: {p0}", {
+                            'p0': _selected.length,
+                          }),
                           style: AppTypography.caption(context)?.copyWith(
                             color: Theme.of(
                               context,
@@ -181,7 +184,7 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
                         onPressed: _saving || _loading || _selected.isEmpty
                             ? null
                             : () => setState(_selected.clear),
-                        child: const Text('Снять всех'),
+                        child: Text(tr(context, 'Снять всех')),
                       ),
                     ],
                   ),
@@ -194,7 +197,7 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
                       children: [
                         Expanded(
                           child: Text(
-                            _error!,
+                            tr(context, _error!),
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.error,
                             ),
@@ -202,7 +205,7 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
                         ),
                         TextButton(
                           onPressed: _saving ? null : _load,
-                          child: const Text('Повторить'),
+                          child: Text(tr(context, 'Повторить')),
                         ),
                       ],
                     ),
@@ -210,7 +213,9 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
                     child: _loading
                         ? const Center(child: CircularProgressIndicator())
                         : visible.isEmpty
-                        ? const Center(child: Text('Участники не найдены'))
+                        ? Center(
+                            child: Text(tr(context, 'Участники не найдены')),
+                          )
                         : ListView.builder(
                             itemCount: visible.length,
                             itemBuilder: (context, index) {
@@ -244,7 +249,7 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
                                   value: _selected.contains(user.userId),
                                   title: Text(
                                     user.name.isEmpty
-                                        ? 'Пользователь'
+                                        ? tr(context, 'Пользователь')
                                         : user.name,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -288,7 +293,11 @@ class _TaskAssigneesEditorState extends State<TaskAssigneesEditor> {
                     onPressed: _saving || _loading || _error != null
                         ? null
                         : _save,
-                    child: Text(_saving ? 'Сохранение…' : 'Сохранить'),
+                    child: Text(
+                      _saving
+                          ? tr(context, 'Сохранение…')
+                          : tr(context, 'Сохранить'),
+                    ),
                   ),
                 ],
               ),

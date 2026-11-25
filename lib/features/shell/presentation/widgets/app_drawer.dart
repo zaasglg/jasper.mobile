@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/network/api_constants.dart';
 import '../../../../core/widgets/cached_svg_image.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
@@ -20,13 +21,12 @@ import '../../../workspaces/presentation/cubit/workspace_cubit.dart';
 import '../../../workspaces/presentation/cubit/workspace_state.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key, required this.onOpenSettings});
+  const AppDrawer({super.key, required this.onOpenProfile});
 
-  final VoidCallback onOpenSettings;
+  final VoidCallback onOpenProfile;
 
-  static const Color _text = Color(0xFF2F333A);
   static const Color _muted = Color(0xFF737A86);
-  static const Color _border = AppColors.border;
+  static Color _border(BuildContext context) => AppColors.of(context).border;
   static const Color _purple = Color(0xFF6D5FE0);
   static const double width = 280;
 
@@ -35,29 +35,29 @@ class AppDrawer extends StatelessWidget {
     return Drawer(
       width: width,
       backgroundColor: Theme.of(context).brightness == Brightness.light
-          ? AppColors.canvas
+          ? AppColors.of(context).canvas
           : Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(),
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
+            const Expanded(
               child: SingleChildScrollView(
-                key: const Key('drawer-scroll-view'),
+                key: Key('drawer-scroll-view'),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                child: const _DrawerWorkspaces(),
+                child: _DrawerWorkspaces(),
               ),
             ),
-            const Divider(height: 1, color: _border),
+            Divider(height: 1, color: _border(context)),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
               child: _SidebarItem(
-                icon: LucideIcons.settings,
+                icon: LucideIcons.user,
                 iconColor: _muted,
-                label: 'Настройки',
-                onTap: onOpenSettings,
+                label: 'Профиль',
+                onTap: onOpenProfile,
               ),
             ),
           ],
@@ -107,7 +107,7 @@ class _DrawerWorkspacesState extends State<_DrawerWorkspaces> {
                 trailing: Icon(
                   _expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
                   size: AppIconSizes.standard,
-                  color: AppColors.muted,
+                  color: AppColors.of(context).muted,
                 ),
                 onTap: () => setState(() => _expanded = !_expanded),
               ),
@@ -158,7 +158,7 @@ class _WorkspaceList extends StatelessWidget {
             Expanded(
               child: Text(
                 failure.message,
-                style: GoogleFonts.manrope(
+                style: GoogleFonts.inter(
                   fontSize: 12,
                   color: const Color(0xFFA53C35),
                 ),
@@ -166,7 +166,7 @@ class _WorkspaceList extends StatelessWidget {
             ),
             TextButton(
               onPressed: () => context.read<WorkspaceCubit>().load(force: true),
-              child: const Text('Повторить'),
+              child: Text(tr(context, 'Повторить')),
             ),
           ],
         ),
@@ -187,7 +187,7 @@ class _WorkspaceList extends StatelessWidget {
     final loaded = state as WorkspaceLoaded;
     return Material(
       color: Theme.of(context).brightness == Brightness.light
-          ? AppColors.canvas
+          ? AppColors.of(context).canvas
           : Theme.of(context).colorScheme.surface,
       child: Padding(
         key: const Key('drawer-workspaces-content'),
@@ -214,7 +214,7 @@ class _WorkspaceList extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Обновить workspace',
+                      tooltip: tr(context, 'Обновить workspace'),
                       onPressed: () =>
                           context.read<WorkspaceCubit>().load(force: true),
                       icon: const Icon(
@@ -231,8 +231,8 @@ class _WorkspaceList extends StatelessWidget {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Доступных workspace пока нет',
-                    style: GoogleFonts.manrope(
+                    tr(context, 'Доступных workspace пока нет'),
+                    style: GoogleFonts.inter(
                       fontSize: 13,
                       color: AppDrawer._muted,
                     ),
@@ -259,7 +259,7 @@ class _WorkspaceList extends StatelessWidget {
                       : () => _selectWorkspace(context, workspace),
                 );
               }),
-            const Divider(height: 1, color: AppDrawer._border),
+            Divider(height: 1, color: AppDrawer._border(context)),
             if (showCreateForm)
               _CreateWorkspacePanel(
                 loaded: loaded,
@@ -278,7 +278,7 @@ class _WorkspaceList extends StatelessWidget {
                   context.push('/manage/workspaces/${loaded.selected!.id}');
                 },
               ),
-            const Divider(height: 1, color: AppDrawer._border),
+            Divider(height: 1, color: AppDrawer._border(context)),
           ],
         ),
       ),
@@ -334,8 +334,8 @@ class _AddWorkspaceRow extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Создать Workspace',
-                style: GoogleFonts.manrope(
+                tr(context, 'Создать Workspace'),
+                style: GoogleFonts.inter(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                   color: const Color(0xFF5F6475),
@@ -384,6 +384,7 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     final isCreating = widget.loaded.isCreating;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
@@ -396,27 +397,25 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
               key: const Key('workspace-name-field'),
               controller: _nameController,
               enabled: !isCreating,
+              cursorColor: colors.accent,
               textInputAction: TextInputAction.done,
               onChanged: (_) =>
                   context.read<WorkspaceCubit>().clearCreationError(),
               onSubmitted: (_) => isCreating ? null : _submit(context),
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: AppDrawer._text,
+                color: colors.ink,
               ),
               decoration: InputDecoration(
-                hintText: 'Название пространства',
-                hintStyle: GoogleFonts.manrope(
-                  fontSize: 14,
-                  color: const Color(0xFF9298A3),
-                ),
+                hintText: tr(context, 'Название пространства'),
+                hintStyle: GoogleFonts.inter(fontSize: 14, color: colors.muted),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                 filled: true,
-                fillColor: const Color(0xFFFCFCFB),
+                fillColor: colors.subtleSurface,
                 border: _fieldBorder(Colors.transparent),
-                enabledBorder: _fieldBorder(AppDrawer._border),
-                focusedBorder: _fieldBorder(const Color(0xFF6D5FE0)),
+                enabledBorder: _fieldBorder(AppDrawer._border(context)),
+                focusedBorder: _fieldBorder(colors.accent),
                 disabledBorder: _fieldBorder(Colors.transparent),
               ),
             ),
@@ -428,7 +427,7 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
               return Semantics(
                 button: true,
                 selected: selected,
-                label: 'Цвет workspace ${index + 1}',
+                label: tr(context, "Цвет workspace {p0}", {'p0': index + 1}),
                 child: InkWell(
                   key: Key('workspace-color-$index'),
                   onTap: isCreating
@@ -476,10 +475,10 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
             Text(
               widget.loaded.creationError!,
               key: const Key('workspace-creation-error'),
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.inter(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFFA53C35),
+                color: colors.error,
               ),
             ),
           ],
@@ -495,26 +494,26 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
                     onPressed: isCreating ? null : () => _submit(context),
                     style: FilledButton.styleFrom(
                       elevation: 0,
-                      backgroundColor: const Color(0xFF6D5FE0),
-                      disabledBackgroundColor: const Color(0xFFD1CEF1),
-                      foregroundColor: Colors.white,
+                      backgroundColor: colors.accent,
+                      disabledBackgroundColor: colors.badgeSurface,
+                      foregroundColor: colors.onAccent,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      textStyle: GoogleFonts.manrope(
+                      textStyle: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     child: isCreating
-                        ? const SizedBox.square(
+                        ? SizedBox.square(
                             dimension: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: colors.onAccent,
                             ),
                           )
-                        : const Text('Создать'),
+                        : Text(tr(context, 'Создать')),
                   ),
                 ),
               ),
@@ -526,17 +525,17 @@ class _CreateWorkspacePanelState extends State<_CreateWorkspacePanel> {
                     key: const Key('cancel-workspace-button'),
                     onPressed: isCreating ? null : _cancel,
                     style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFFF0F0F1),
-                      foregroundColor: const Color(0xFF5F6475),
+                      backgroundColor: colors.badgeSurface,
+                      foregroundColor: colors.ink,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      textStyle: GoogleFonts.manrope(
+                      textStyle: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    child: const Text('Отмена'),
+                    child: Text(tr(context, 'Отмена')),
                   ),
                 ),
               ),
@@ -601,8 +600,8 @@ class _ArchivedWorkspacesRowState extends State<_ArchivedWorkspacesRow> {
                   color: AppDrawer._muted,
                 ),
                 title: Text(
-                  'Архивированные',
-                  style: GoogleFonts.manrope(
+                  tr(context, 'Архивированные'),
+                  style: GoogleFonts.inter(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w500,
                     color: AppDrawer._muted,
@@ -635,7 +634,7 @@ class _ArchivedWorkspacesRowState extends State<_ArchivedWorkspacesRow> {
                       style: const TextStyle(fontSize: 12),
                     ),
                     trailing: IconButton(
-                      tooltip: 'Повторить',
+                      tooltip: tr(context, 'Повторить'),
                       onPressed: () =>
                           context.read<WorkspaceCubit>().loadArchived(),
                       icon: const Icon(
@@ -647,10 +646,10 @@ class _ArchivedWorkspacesRowState extends State<_ArchivedWorkspacesRow> {
                 if (!loaded.isLoadingArchived &&
                     loaded.archivedError == null &&
                     loaded.archivedWorkspaces.isEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.all(14),
                     child: Text(
-                      'Нет архивированных workspace',
+                      tr(context, 'Нет архивированных workspace'),
                       style: TextStyle(fontSize: 12, color: AppDrawer._muted),
                     ),
                   ),
@@ -671,7 +670,7 @@ class _ArchivedWorkspacesRowState extends State<_ArchivedWorkspacesRow> {
                               workspace.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.manrope(
+                              style: GoogleFonts.inter(
                                 fontSize: 13,
                                 color: AppDrawer._muted,
                               ),
@@ -817,7 +816,7 @@ class _WorkspaceBadgeState extends State<_WorkspaceBadge> {
       ),
       child: Text(
         name.isEmpty ? 'W' : name.characters.first.toUpperCase(),
-        style: GoogleFonts.manrope(
+        style: GoogleFonts.inter(
           fontSize: size * 0.46,
           fontWeight: FontWeight.w700,
           color: Colors.white,
@@ -890,7 +889,7 @@ class _SidebarItem extends StatelessWidget {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.manrope(
+                    style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                       color: isActive

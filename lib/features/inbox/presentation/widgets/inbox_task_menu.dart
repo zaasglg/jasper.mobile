@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import '../../domain/entities/inbox_task_label.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
@@ -6,25 +7,34 @@ import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_form_surface.dart';
 import '../../../../core/widgets/app_action_menu.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/di/service_locator.dart';
 import '../../../planner/presentation/screens/planner_screen.dart';
 import '../../../projects/presentation/cubit/projects_cubit.dart';
 import '../../domain/entities/inbox_task_model.dart';
 import '../../domain/repositories/inbox_repository.dart';
 import '../cubit/inbox_cubit.dart';
 
-Future<void> showInboxTaskCard(BuildContext context, InboxTaskModel task) =>
+Future<void> showInboxTaskCard(
+  BuildContext context,
+  InboxTaskModel task,
+) async {
+  final cubit = context.read<InboxCubit>();
+  await context.push('/inbox/${Uri.encodeComponent(task.id)}', extra: task);
+  if (!cubit.isClosed) await cubit.load();
+}
+
+Future<void> editInboxTaskCard(BuildContext context, InboxTaskModel task) =>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => BlocProvider(
-        create: (_) => sl<InboxCubit>(),
+      builder: (_) => BlocProvider.value(
+        value: context.read<InboxCubit>(),
         child: _InboxEditor(task: task, mode: _Action.open),
       ),
     );
@@ -44,6 +54,41 @@ enum _Action {
   final IconData icon;
 }
 
+/// Reuses the card actions so swipe and menu flows have identical validation.
+Future<void> sortInboxTask(
+  BuildContext context,
+  InboxTaskModel task, {
+  required bool schedule,
+}) async {
+  final menu = InboxTaskMenu(task: task);
+  if (schedule) {
+    if (!task.isLocalOnly) await menu._select(context, _Action.schedule);
+    return;
+  }
+  final action = await showAppActionMenu<_Action>(
+    context,
+    title: task.title,
+    groups: [
+      [
+        if (!task.isLocalOnly)
+          const AppMenuAction(
+            value: _Action.move,
+            label: 'В проект',
+            icon: LucideIcons.folder,
+            opensSubmenu: true,
+          ),
+        const AppMenuAction(
+          value: _Action.delete,
+          label: 'Удалить',
+          icon: LucideIcons.trash2,
+          destructive: true,
+        ),
+      ],
+    ],
+  );
+  if (action != null && context.mounted) await menu._select(context, action);
+}
+
 class InboxTaskMenu extends StatelessWidget {
   const InboxTaskMenu({super.key, required this.task, this.busy = false});
   final InboxTaskModel task;
@@ -54,6 +99,8 @@ class InboxTaskMenu extends StatelessWidget {
     Future<void> Function(InboxActionsRepository)? request;
     switch (action) {
       case _Action.open:
+        await showInboxTaskCard(context, task);
+        return;
       case _Action.labels:
       case _Action.dates:
         await showModalBottomSheet<void>(
@@ -77,7 +124,7 @@ class InboxTaskMenu extends StatelessWidget {
       case _Action.delete:
         final confirmed = await showAppConfirmation(
           context,
-          'Удалить задачу?',
+          tr(context, 'Удалить задачу?'),
           task.title,
           confirmLabel: 'Удалить',
           destructive: true,
@@ -97,6 +144,17 @@ class InboxTaskMenu extends StatelessWidget {
             ...flatten(project.children),
           ],
         ];
+        if (projects.isEmpty) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              appSnackBar(
+                context: context,
+                content: Text(tr(context, 'Нет доступных проектов')),
+              ),
+            );
+          }
+          return;
+        }
         final projectId = await showAppActionMenu<String>(
           context,
           title: 'Переместить в проект',
@@ -131,12 +189,12 @@ class InboxTaskMenu extends StatelessWidget {
   Widget build(BuildContext context) => AppActionMenuButton<_Action>(
     key: ValueKey('inbox-task-actions-${task.id}'),
     title: task.title,
-    eyebrow: 'Задача в Инбоксе',
-    tooltip: 'Действия задачи',
+    eyebrow: tr(context, 'Задача в Инбоксе'),
+    tooltip: tr(context, 'Действия задачи'),
     enabled: !busy,
     onSelected: (action) => _select(context, action),
     groups: [
-      for (final group in const [
+      for (final group in [
         [
           _Action.open,
           _Action.labels,
@@ -152,7 +210,7 @@ class InboxTaskMenu extends StatelessWidget {
             AppMenuAction(
               value: action,
               label: action == _Action.archive && task.archived
-                  ? 'Из архива'
+                  ? tr(context, 'Из архива')
                   : action.label,
               icon: action.icon,
               destructive: action == _Action.delete,
@@ -161,7 +219,7 @@ class InboxTaskMenu extends StatelessWidget {
                   !task.isLocalOnly ||
                   action == _Action.open ||
                   action == _Action.delete,
-              opensSubmenu: const {
+              opensSubmenu: {
                 _Action.open,
                 _Action.labels,
                 _Action.dates,
@@ -297,20 +355,17 @@ class _InboxEditorState extends State<_InboxEditor> {
         children: [
           Text(
             widget.mode == _Action.open
-                ? 'Карточка Инбокса'
+                ? tr(context, 'Карточка Инбокса')
                 : widget.mode.label,
-            style: GoogleFonts.manrope(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
+            style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 20),
           AppFormField(
-            label: 'Название',
+            label: tr(context, 'Название'),
             child: TextField(
               controller: _title,
               readOnly: _saving || widget.task.isLocalOnly,
-              decoration: const InputDecoration(hintText: 'Название'),
+              decoration: InputDecoration(hintText: tr(context, 'Название')),
               maxLines: 3,
               minLines: 1,
             ),
@@ -318,11 +373,11 @@ class _InboxEditorState extends State<_InboxEditor> {
           const SizedBox(height: 14),
           if (widget.mode == _Action.open) ...[
             AppFormField(
-              label: 'Описание',
+              label: tr(context, 'Описание'),
               child: TextField(
                 controller: _description,
                 readOnly: _saving || widget.task.isLocalOnly,
-                decoration: const InputDecoration(hintText: 'Описание'),
+                decoration: InputDecoration(hintText: tr(context, 'Описание')),
                 maxLines: 4,
                 minLines: 2,
               ),
@@ -330,7 +385,7 @@ class _InboxEditorState extends State<_InboxEditor> {
             const SizedBox(height: 14),
           ],
           if (widget.mode != _Action.dates) ...[
-            const Text('Метки'),
+            Text(tr(context, 'Метки')),
             Wrap(
               spacing: 6,
               children: [
@@ -344,13 +399,13 @@ class _InboxEditorState extends State<_InboxEditor> {
               ],
             ),
             AppFormField(
-              label: 'Новая метка',
+              label: tr(context, 'Новая метка'),
               child: TextField(
                 controller: _labelText,
                 enabled: !_saving && !widget.task.isLocalOnly,
                 autofocus: widget.mode == _Action.labels,
                 decoration: InputDecoration(
-                  hintText: 'Новая метка',
+                  hintText: tr(context, 'Новая метка'),
                   suffixIcon: IconButton(
                     onPressed: _saving ? null : _addLabel,
                     icon: const Icon(Icons.add, size: AppIconSizes.standard),
@@ -368,7 +423,9 @@ class _InboxEditorState extends State<_InboxEditor> {
                   LucideIcons.calendar,
                   size: AppIconSizes.standard,
                 ),
-                title: Text(start ? 'Начало' : 'Срок'),
+                title: Text(
+                  start ? tr(context, 'Начало') : tr(context, 'Срок'),
+                ),
                 subtitle: Text((start ? _start : _end) ?? 'Не задано'),
                 onTap: _saving || widget.task.isLocalOnly
                     ? null
@@ -376,7 +433,7 @@ class _InboxEditorState extends State<_InboxEditor> {
                 trailing: (start ? _start : _end) == null
                     ? null
                     : IconButton(
-                        tooltip: 'Убрать дату',
+                        tooltip: tr(context, 'Убрать дату'),
                         onPressed: _saving
                             ? null
                             : () => setState(() {
@@ -393,12 +450,17 @@ class _InboxEditorState extends State<_InboxEditor> {
                       ),
               ),
           if (_error != null)
-            Text(_error!, style: const TextStyle(color: AppColors.error)),
+            Text(
+              tr(context, _error!),
+              style: TextStyle(color: AppColors.of(context).error),
+            ),
           const SizedBox(height: 20),
           if (!widget.task.isLocalOnly)
             FilledButton(
               onPressed: _saving ? null : _save,
-              child: Text(_saving ? 'Сохранение…' : 'Сохранить'),
+              child: Text(
+                _saving ? tr(context, 'Сохранение…') : tr(context, 'Сохранить'),
+              ),
             ),
         ],
       ),

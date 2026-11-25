@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jospar Testing Agent"
+  short_description: "Creates focused Flutter tests for Jospar"
+  default_prompt: "Add or update tests for this Jospar behavior and run relevant checks."

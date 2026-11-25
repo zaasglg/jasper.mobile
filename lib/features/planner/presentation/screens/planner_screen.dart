@@ -1,3 +1,12 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../widgets/planner_day_agenda.dart';
+import 'package:forui/forui.dart';
+import '../widgets/planner_entry_extras.dart';
+import '../../../../core/widgets/task_completion_indicator.dart';
+import '../widgets/planner_task_picker.dart';
+import '../widgets/planner_date_picker.dart';
+import '../widgets/planner_time_field.dart';
+import '../widgets/planner_week_view.dart';
 import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../profile/domain/repositories/profile_repository.dart';
@@ -7,13 +16,13 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../domain/repositories/google_calendar_repository.dart';
 import '../cubit/google_calendar_cubit.dart';
 import '../widgets/google_calendar_settings.dart';
-import '../widgets/planner_day_agenda.dart';
 import '../widgets/task_schedule_sheet.dart';
 import '../widgets/planner_time_mode.dart';
 import '../widgets/planner_untimed_list.dart';
 import '../../../../core/widgets/app_action_menu.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
+import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../../core/widgets/app_form_surface.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -83,7 +92,7 @@ class _PlannerScreenState extends State<PlannerScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       if (mounted) setState(() {});
-      unawaited(_google?.refresh() ?? Future<void>.value());
+      unawaited(_refresh());
     }
   }
 
@@ -122,14 +131,9 @@ class _PlannerScreenState extends State<PlannerScreen>
   }
 
   Future<void> _pickDate() async {
-    final date = await showDatePicker(
+    final date = await showPlannerDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-      helpText: 'Выберите дату',
-      cancelText: 'Отмена',
-      confirmText: 'Готово',
     );
     if (date != null && mounted) _selectDate(date);
   }
@@ -146,13 +150,20 @@ class _PlannerScreenState extends State<PlannerScreen>
           title: Text(item!.title),
           content: Text(
             item.allDay
-                ? 'Google Календарь · Весь день'
-                : 'Google Календарь · ${_heading(plannerLocal(item.scheduledAt!))} · ${plannerClock(plannerLocal(item.scheduledAt!))}\nСобытия Google редактируются в Google Календаре.',
+                ? tr(context, 'Google Календарь · Весь день')
+                : tr(
+                    context,
+                    "Google Календарь · {p0} · {p1}\nСобытия Google редактируются в Google Календаре.",
+                    {
+                      'p0': _heading(plannerLocal(item.scheduledAt!)),
+                      'p1': plannerClock(plannerLocal(item.scheduledAt!)),
+                    },
+                  ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Закрыть'),
+              child: Text(tr(context, 'Закрыть')),
             ),
           ],
         ),
@@ -164,7 +175,9 @@ class _PlannerScreenState extends State<PlannerScreen>
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      useRootNavigator: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.of(context).canvas,
       builder: (_) => BlocProvider.value(
         value: cubit,
         child: _PlannerEditor(
@@ -196,25 +209,25 @@ class _PlannerScreenState extends State<PlannerScreen>
       groups: [
         [
           if (item.scheduledAt != null)
-            const AppMenuAction(
+            AppMenuAction(
               value: 'untimed',
-              label: 'Без времени',
+              label: tr(context, 'Весь день'),
               icon: LucideIcons.clock,
             ),
           if (item.scheduledAt == null)
-            const AppMenuAction(
+            AppMenuAction(
               value: 'time',
-              label: 'Назначить время',
+              label: tr(context, 'Назначить время'),
               icon: LucideIcons.clock,
             ),
-          const AppMenuAction(
+          AppMenuAction(
             value: 'edit',
-            label: 'Изменить день и запись',
+            label: tr(context, 'Изменить день и запись'),
             icon: LucideIcons.calendarDays,
           ),
-          const AppMenuAction(
+          AppMenuAction(
             value: 'remove',
-            label: 'Убрать из ежедневника',
+            label: tr(context, 'Убрать из ежедневника'),
             icon: LucideIcons.calendarMinus,
             destructive: true,
           ),
@@ -262,106 +275,218 @@ class _PlannerScreenState extends State<PlannerScreen>
     return screen;
   }
 
-  Widget _dateToolbar(GoogleCalendarState? google) {
+  Widget _dateToolbar(
+    GoogleCalendarState? google,
+    List<PlannerItemModel> items,
+  ) {
     final dateSelector = InkWell(
       key: const Key('planner-date-picker'),
+      borderRadius: BorderRadius.circular(10),
       onTap: _pickDate,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 48),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.calendar_month_rounded,
-              size: AppIconSizes.standard,
-            ),
-            const SizedBox(width: 6),
             Flexible(
               child: Text(
                 '${_months[_selectedDate.month - 1]} ${_selectedDate.year}',
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
+                  color: AppColors.of(context).ink,
                 ),
               ),
             ),
-            const Icon(
+            const SizedBox(width: 2),
+            Icon(
               Icons.keyboard_arrow_down_rounded,
-              size: AppIconSizes.standard,
+              size: 18,
+              color: AppColors.of(context).muted,
             ),
           ],
         ),
       ),
     );
+    final label = switch (_view) {
+      _View.day => 'День',
+      _View.week => 'Неделя',
+      _View.month => 'Месяц',
+    };
+    final selectedDay = plannerDate(_selectedDate);
+    final start = switch (_view) {
+      _View.day => selectedDay,
+      _View.week => selectedDay.subtract(
+        Duration(days: selectedDay.weekday - 1),
+      ),
+      _View.month => DateTime(selectedDay.year, selectedDay.month, 1),
+    };
+    final end = switch (_view) {
+      _View.day => DateTime(start.year, start.month, start.day + 1),
+      _View.week => DateTime(start.year, start.month, start.day + 7),
+      _View.month => DateTime(start.year, start.month + 1, 1),
+    };
+    final count = items.where((item) {
+      final day = item.scheduledAt == null
+          ? item.day
+          : plannerLocal(item.scheduledAt!);
+      return day != null && !day.isBefore(start) && day.isBefore(end);
+    }).length;
     final navigation = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          key: const Key('planner-previous-day'),
-          constraints: const BoxConstraints.tightFor(width: 40, height: 48),
-          padding: EdgeInsets.zero,
-          tooltip: 'Назад',
-          onPressed: () => _move(-1),
-          icon: const Icon(
-            Icons.chevron_left_rounded,
-            size: AppIconSizes.standard,
+        Container(
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.of(context).subtleSurface,
+            border: Border.all(color: AppColors.of(context).border),
+            borderRadius: BorderRadius.circular(10),
           ),
-        ),
-        TextButton(
-          style: TextButton.styleFrom(
-            minimumSize: const Size(0, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            textStyle: GoogleFonts.manrope(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            color: Colors.transparent,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  key: const Key('planner-previous-day'),
+                  tooltip: tr(context, 'Предыдущий период'),
+                  onPressed: () => _move(-1),
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size(32, 36),
+                    minimumSize: const Size(32, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: EdgeInsets.zero,
+                    foregroundColor: AppColors.of(context).ink,
+                  ),
+                  icon: const Icon(Icons.chevron_left_rounded, size: 18),
+                ),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  indent: 7,
+                  endIndent: 7,
+                  color: AppColors.of(context).border,
+                ),
+                InkWell(
+                  key: const Key('planner-view-selector'),
+                  onTap: () => setState(() {
+                    _view = switch (_view) {
+                      _View.day => _View.week,
+                      _View.week => _View.month,
+                      _View.month => _View.day,
+                    };
+                  }),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Center(
+                      child: Text(
+                        label,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.of(context).ink,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  indent: 7,
+                  endIndent: 7,
+                  color: AppColors.of(context).border,
+                ),
+                IconButton(
+                  key: const Key('planner-next-day'),
+                  tooltip: tr(context, 'Следующий период'),
+                  onPressed: () => _move(1),
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size(32, 36),
+                    minimumSize: const Size(32, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: EdgeInsets.zero,
+                    foregroundColor: AppColors.of(context).ink,
+                  ),
+                  icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                ),
+              ],
             ),
           ),
-          onPressed: () => _selectDate(plannerNow()),
-          child: const Text('Сегодня'),
         ),
-        IconButton(
-          key: const Key('planner-next-day'),
-          constraints: const BoxConstraints.tightFor(width: 40, height: 48),
-          padding: EdgeInsets.zero,
-          tooltip: 'Вперёд',
-          onPressed: () => _move(1),
-          icon: const Icon(
-            Icons.chevron_right_rounded,
-            size: AppIconSizes.standard,
+        const SizedBox(width: 8),
+        Tooltip(
+          message: tr(context, "Записей с датой за выбранный период: {p0}", {
+            'p0': count,
+          }),
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.of(context).outgoingMessage,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Text(
+              '$count',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.accent,
+                fontFeatures: [const FontFeature.tabularFigures()],
+              ),
+            ),
           ),
         ),
       ],
     );
-    return Row(
-      children: [
-        if (_google != null) ...[
-          IconButton(
+    final connected = google?.connection.connected == true;
+    final sources = _google == null
+        ? null
+        : IconButton(
             key: const Key('planner-calendar-sources'),
-            constraints: const BoxConstraints.tightFor(width: 40, height: 48),
-            padding: EdgeInsets.zero,
-            tooltip: 'Источники календаря',
-            onPressed: _calendarSettings,
-            icon: Icon(
-              LucideIcons.calendars,
-              size: AppIconSizes.standard,
-              color: google?.connection.connected == true
+            style: IconButton.styleFrom(
+              fixedSize: const Size.square(36),
+              minimumSize: const Size.square(36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: EdgeInsets.zero,
+              backgroundColor: connected
+                  ? AppColors.of(context).outgoingMessage
+                  : AppColors.of(context).subtleSurface,
+              foregroundColor: connected
                   ? AppColors.accent
-                  : null,
+                  : AppColors.of(context).ink,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(
+                  color: connected
+                      ? AppColors.accent.withValues(alpha: 0.25)
+                      : AppColors.of(context).border,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-        ],
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Flexible(child: dateSelector),
-              navigation,
+            tooltip: tr(context, 'Источники календаря'),
+            onPressed: _calendarSettings,
+            icon: const Icon(LucideIcons.calendars, size: 18),
+          );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        return Row(
+          children: [
+            if (sources != null) ...[
+              sources,
+              SizedBox(width: compact ? 4 : 10),
             ],
-          ),
-        ),
-      ],
+            Expanded(child: dateSelector),
+            SizedBox(width: compact ? 4 : 8),
+            navigation,
+          ],
+        );
+      },
     );
   }
 
@@ -383,17 +508,20 @@ class _PlannerScreenState extends State<PlannerScreen>
           ),
     ];
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.of(context).canvas,
       appBar: const DashboardAppBar(accountTitle: 'Ежедневник'),
       floatingActionButton: _cubit == null
           ? null
-          : FloatingActionButton.small(
+          : FloatingActionButton(
               key: const Key('planner-add'),
-              tooltip: 'Добавить задачу',
+              tooltip: tr(context, 'Добавить задачу'),
+              shape: const CircleBorder(),
+              elevation: 2,
+              highlightElevation: 4,
               onPressed: state.isSaving ? null : () => _edit(),
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
-              child: const Icon(Icons.add, size: AppIconSizes.standard),
+              child: const Icon(Icons.add_rounded, size: 30),
             ),
       body: SafeArea(
         top: false,
@@ -403,49 +531,18 @@ class _PlannerScreenState extends State<PlannerScreen>
           onRefresh: _refresh,
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: SegmentedButton<_View>(
-                        showSelectedIcon: false,
-                        style: SegmentedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          textStyle: GoogleFonts.manrope(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        segments: const [
-                          ButtonSegment(value: _View.day, label: Text('День')),
-                          ButtonSegment(
-                            value: _View.week,
-                            label: Text('Неделя'),
-                          ),
-                          ButtonSegment(
-                            value: _View.month,
-                            label: Text('Месяц'),
-                          ),
-                        ],
-                        selected: {_view},
-                        onSelectionChanged: (value) =>
-                            setState(() => _view = value.single),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               Container(
-                constraints: const BoxConstraints(minHeight: 52),
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: const BoxDecoration(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.of(context).canvas,
                   border: Border(
-                    top: BorderSide(color: AppColors.border),
-                    bottom: BorderSide(color: AppColors.border),
+                    bottom: BorderSide(color: AppColors.of(context).border),
                   ),
                 ),
-                child: _dateToolbar(google),
+                child: _dateToolbar(google, items),
               ),
               if (state.status == PlannerStatus.loading ||
                   google?.loading == true)
@@ -455,8 +552,10 @@ class _PlannerScreenState extends State<PlannerScreen>
                 ),
               if (state.error != null)
                 MaterialBanner(
-                  content: Text(state.error!),
-                  actions: [const Text('Потяните вниз, чтобы повторить')],
+                  content: Text(tr(context, state.error!)),
+                  actions: [
+                    Text(tr(context, 'Потяните вниз, чтобы повторить')),
+                  ],
                 ),
               if (google?.error != null)
                 Padding(
@@ -471,15 +570,37 @@ class _PlannerScreenState extends State<PlannerScreen>
                       ),
                       TextButton(
                         onPressed: () => _google?.refresh(),
-                        child: const Text('Повторить'),
+                        child: Text(tr(context, 'Повторить')),
                       ),
                     ],
                   ),
                 ),
-              if (_view == _View.week) _weekStrip(items),
               Expanded(
                 child: _view == _View.month
                     ? _monthGrid(items)
+                    : _view == _View.week
+                    ? PlannerWeekView(
+                        selectedDate: _selectedDate,
+                        items: items,
+                        busyIds: state.busyIds,
+                        saving: state.isSaving,
+                        onEdit: (item) => _edit(item: item),
+                        onToggle: (item) => _cubit?.toggle(item),
+                        onCreate: _cubit == null
+                            ? null
+                            : (day, title, time) => _cubit!.save(
+                                title: title,
+                                scheduledAt: time == null
+                                    ? null
+                                    : plannerInstant(
+                                        day,
+                                        time.hour,
+                                        time.minute,
+                                      ),
+                                plannedDate: time == null ? day : null,
+                                durationMinutes: 30,
+                              ),
+                      )
                     : GestureDetector(
                         onHorizontalDragEnd: (details) {
                           final velocity = details.primaryVelocity ?? 0;
@@ -495,7 +616,7 @@ class _PlannerScreenState extends State<PlannerScreen>
                                 child: Text(
                                   _heading(_selectedDate),
                                   key: const Key('planner-selected-date'),
-                                  style: GoogleFonts.manrope(
+                                  style: GoogleFonts.inter(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -544,28 +665,7 @@ class _PlannerScreenState extends State<PlannerScreen>
                                   ],
                                 ),
                               ),
-                            if (items.any(
-                              (e) =>
-                                  e.scheduledAt == null &&
-                                  (e.plannedDate == null ||
-                                      samePlannerDay(
-                                        e.plannedDate!,
-                                        _selectedDate,
-                                      )),
-                            ))
-                              _unscheduled(
-                                items
-                                    .where(
-                                      (e) =>
-                                          e.scheduledAt == null &&
-                                          (e.plannedDate == null ||
-                                              samePlannerDay(
-                                                e.plannedDate!,
-                                                _selectedDate,
-                                              )),
-                                    )
-                                    .toList(),
-                              ),
+                            _allDayArea(items),
                             Expanded(
                               child: _view == _View.day
                                   ? PlannerDayAgenda(
@@ -575,18 +675,23 @@ class _PlannerScreenState extends State<PlannerScreen>
                                       items: items,
                                       busyIds: state.busyIds,
                                       onCreate: () => _edit(),
+                                      onSchedule:
+                                          state.isSaving ||
+                                              state.busyIds.isNotEmpty
+                                          ? null
+                                          : (item, time) => _cubit?.save(
+                                              item: item,
+                                              title: item.title,
+                                              scheduledAt: time,
+                                              durationMinutes:
+                                                  item.durationMinutes,
+                                            ),
+                                      enableUntimedDrag:
+                                          !state.isSaving &&
+                                          state.busyIds.isEmpty,
                                       onEdit: (item) => _edit(item: item),
                                       onToggle: (item) => _cubit?.toggle(item),
                                       onMenu: (item) => _itemMenu(item),
-                                      hasUntimedPlans: items.any(
-                                        (item) =>
-                                            item.scheduledAt == null &&
-                                            item.plannedDate != null &&
-                                            samePlannerDay(
-                                              item.plannedDate!,
-                                              _selectedDate,
-                                            ),
-                                      ),
                                     )
                                   : _DayTimeline(
                                       key: ValueKey(_selectedDate),
@@ -610,6 +715,7 @@ class _PlannerScreenState extends State<PlannerScreen>
                                           _cubit?.toggle(item);
                                         }
                                       },
+                                      onMenu: (item) => _itemMenu(item),
                                       onMove: (item, hour) => _cubit?.save(
                                         item: item,
                                         title: item.title,
@@ -633,89 +739,100 @@ class _PlannerScreenState extends State<PlannerScreen>
     );
   }
 
+  Widget _allDayArea(List<PlannerItemModel> items) {
+    final untimed = items
+        .where(
+          (item) =>
+              item.scheduledAt == null &&
+              (item.plannedDate == null ||
+                  samePlannerDay(item.plannedDate!, _selectedDate)),
+        )
+        .toList();
+    if (_view != _View.day) {
+      return untimed.isEmpty ? const SizedBox.shrink() : _unscheduled(untimed);
+    }
+    bool accepts(PlannerItemModel item) =>
+        _cubit != null &&
+        !_cubit!.state.isSaving &&
+        _cubit!.state.busyIds.isEmpty &&
+        !item.external &&
+        !item.archived &&
+        item.scheduledAt != null &&
+        samePlannerDay(plannerLocal(item.scheduledAt!), _selectedDate) &&
+        _cubit!.state.items.any(
+          (current) =>
+              current.id == item.id &&
+              !current.archived &&
+              current.scheduledAt != null,
+        );
+    return DragTarget<PlannerItemModel>(
+      key: ValueKey('planner-all-day-drop-${plannerDayString(_selectedDate)}'),
+      onWillAcceptWithDetails: (details) => accepts(details.data),
+      onAcceptWithDetails: (details) {
+        if (!accepts(details.data)) return;
+        final item = _cubit!.state.items.firstWhere(
+          (item) => item.id == details.data.id,
+        );
+        _cubit!.save(
+          item: item,
+          title: item.title,
+          scheduledAt: null,
+          plannedDate: _selectedDate,
+          durationMinutes: item.durationMinutes,
+          reminderMinutes: 0,
+        );
+      },
+      builder: (context, candidates, rejected) => ColoredBox(
+        color: candidates.isEmpty
+            ? Colors.transparent
+            : AppColors.of(context).accent.withValues(alpha: .12),
+        child: untimed.isNotEmpty
+            ? _unscheduled(untimed)
+            : Container(
+                height: 44,
+                alignment: AlignmentDirectional.centerStart,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: candidates.isEmpty
+                          ? AppColors.of(context).border
+                          : AppColors.of(context).accent,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  tr(
+                    context,
+                    candidates.isEmpty ? 'Весь день' : 'Отпустите: весь день',
+                  ),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: candidates.isEmpty
+                        ? AppColors.of(context).muted
+                        : AppColors.of(context).accent,
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
   Widget _unscheduled(List<PlannerItemModel> items) => PlannerUntimedList(
     items: items,
-    busyIds: _cubit?.state.busyIds ?? {},
+    enableDrag:
+        _view == _View.day &&
+        _cubit != null &&
+        !_cubit!.state.isSaving &&
+        _cubit!.state.busyIds.isEmpty,
+    busyIds: _cubit?.state.isSaving == true
+        ? items.map((item) => item.id).toSet()
+        : _cubit?.state.busyIds ?? {},
     onAssign: (item) =>
         item.plannedDate == null ? _edit(item: item) : _assignTime(item),
     onMenu: _itemMenu,
     onToggle: (item) => _cubit?.toggle(item),
   );
-
-  Widget _weekStrip(List<PlannerItemModel> items) {
-    final monday = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day - _selectedDate.weekday + 1,
-    );
-    return SizedBox(
-      height: 64,
-      child: Row(
-        children: [
-          for (var index = 0; index < 7; index++)
-            Expanded(
-              child: Builder(
-                builder: (_) {
-                  final day = DateTime(
-                    monday.year,
-                    monday.month,
-                    monday.day + index,
-                  );
-                  final selected = samePlannerDay(day, _selectedDate);
-                  final count = items
-                      .where(
-                        (e) => e.day != null && samePlannerDay(e.day!, day),
-                      )
-                      .length;
-                  return InkWell(
-                    onTap: () => _selectDate(day),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _shortDays[index],
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                        Container(
-                          margin: const EdgeInsets.only(top: 3),
-                          width: 28,
-                          height: 28,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? AppColors.accent
-                                : Colors.transparent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '${day.day}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: selected ? Colors.white : null,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          count > 0 ? '$count' : '',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: AppColors.accent,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 
   Widget _monthGrid(List<PlannerItemModel> items) {
     final first = DateTime(_selectedDate.year, _selectedDate.month);
@@ -731,9 +848,9 @@ class _PlannerScreenState extends State<PlannerScreen>
                   child: Center(
                     child: Text(
                       name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.muted,
+                        color: AppColors.of(context).muted,
                       ),
                     ),
                   ),
@@ -769,7 +886,9 @@ class _PlannerScreenState extends State<PlannerScreen>
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: AppColors.border.withValues(alpha: 0.5),
+                        color: AppColors.of(
+                          context,
+                        ).border.withValues(alpha: 0.5),
                       ),
                       color: samePlannerDay(day, plannerNow())
                           ? AppColors.accent.withValues(alpha: 0.06)
@@ -785,7 +904,7 @@ class _PlannerScreenState extends State<PlannerScreen>
                             fontWeight: FontWeight.w700,
                             color: day.month == _selectedDate.month
                                 ? null
-                                : AppColors.muted,
+                                : AppColors.of(context).muted,
                           ),
                         ),
                         for (final item in events.take(2))
@@ -816,9 +935,9 @@ class _PlannerScreenState extends State<PlannerScreen>
                         if (events.length > 2)
                           Text(
                             '+${events.length - 2}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 9,
-                              color: AppColors.muted,
+                              color: AppColors.of(context).muted,
                             ),
                           ),
                       ],
@@ -844,12 +963,13 @@ class _DayTimeline extends StatefulWidget {
     required this.onEdit,
     required this.onToggle,
     required this.onMove,
+    required this.onMenu,
   });
   final DateTime selectedDate;
   final List<PlannerItemModel> items;
   final Set<String> busyIds;
   final ValueChanged<int> onCreate;
-  final ValueChanged<PlannerItemModel> onEdit, onToggle;
+  final ValueChanged<PlannerItemModel> onEdit, onToggle, onMenu;
   final void Function(PlannerItemModel item, int hour) onMove;
   @override
   State<_DayTimeline> createState() => _DayTimelineState();
@@ -863,7 +983,13 @@ class _DayTimelineState extends State<_DayTimeline> {
     super.initState();
     final dates = widget.items.map((e) => plannerLocal(e.scheduledAt!)).toList()
       ..sort();
-    final hour = dates.isEmpty ? 8 : dates.first.hour;
+    final hour = dates.isEmpty
+        ? 6
+        : dates.first.hour < 6
+        ? 0
+        : dates.first.hour > 18
+        ? 18
+        : 6;
     _scroll = ScrollController(initialScrollOffset: hour * hourHeight);
   }
 
@@ -915,10 +1041,12 @@ class _DayTimelineState extends State<_DayTimeline> {
                         child: Center(
                           heightFactor: 1.3,
                           child: Text(
-                            hour.toString().padLeft(2, '0'),
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: AppColors.muted,
+                            hour >= 6 && hour <= 18 && hour % 3 == 0
+                                ? '$hour:00'
+                                : '',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.of(context).muted,
                             ),
                           ),
                         ),
@@ -936,8 +1064,9 @@ class _DayTimelineState extends State<_DayTimeline> {
                                     ? null
                                     : AppColors.accent.withValues(alpha: 0.08),
                                 border: Border(
-                                  left: BorderSide(color: AppColors.border),
-                                  top: BorderSide(color: AppColors.border),
+                                  left: BorderSide(
+                                    color: AppColors.of(context).border,
+                                  ),
                                 ),
                               ),
                             ),
@@ -945,6 +1074,18 @@ class _DayTimelineState extends State<_DayTimeline> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              for (final hour in [6, 9, 12, 15, 18])
+                Positioned(
+                  top: hour * hourHeight + 7,
+                  left: 53,
+                  width: 9,
+                  child: IgnorePointer(
+                    child: Divider(
+                      height: 1,
+                      color: AppColors.of(context).border,
+                    ),
                   ),
                 ),
               for (final item in sorted)
@@ -964,6 +1105,7 @@ class _DayTimelineState extends State<_DayTimeline> {
                       left: 61 + lanes[item.id]! * width,
                       width: width - 4,
                       height: height,
+                      key: ValueKey('planner-agenda-${item.id}'),
                       child: LongPressDraggable<PlannerItemModel>(
                         data: item,
                         maxSimultaneousDrags:
@@ -997,6 +1139,7 @@ class _DayTimelineState extends State<_DayTimeline> {
                               : const Color(0xFFE8E4FA),
                           borderRadius: BorderRadius.circular(6),
                           child: InkWell(
+                            key: ValueKey('planner-open-${item.id}'),
                             onTap: () => widget.onEdit(item),
                             borderRadius: BorderRadius.circular(6),
                             child: Container(
@@ -1005,7 +1148,7 @@ class _DayTimelineState extends State<_DayTimeline> {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                border: Border(
+                                border: const Border(
                                   left: BorderSide(
                                     color: AppColors.accent,
                                     width: 3,
@@ -1043,15 +1186,14 @@ class _DayTimelineState extends State<_DayTimeline> {
                                                           strokeWidth: 1.5,
                                                         ),
                                                   )
-                                                : Icon(
-                                                    item.external
-                                                        ? Icons.event_outlined
-                                                        : item.completed
-                                                        ? Icons.check_circle
-                                                        : Icons
-                                                              .radio_button_unchecked,
+                                                : item.external
+                                                ? const Icon(
+                                                    Icons.event_outlined,
                                                     size: AppIconSizes.standard,
-                                                    color: AppColors.accent,
+                                                  )
+                                                : TaskCompletionIndicator(
+                                                    completed: item.completed,
+                                                    size: AppIconSizes.standard,
                                                   ),
                                           ),
                                         ),
@@ -1070,7 +1212,7 @@ class _DayTimelineState extends State<_DayTimeline> {
                                             item.displayTitle,
                                             maxLines: height >= 64 ? 2 : 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: GoogleFonts.manrope(
+                                            style: GoogleFonts.inter(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w600,
                                               decoration: item.completed
@@ -1079,6 +1221,30 @@ class _DayTimelineState extends State<_DayTimeline> {
                                             ),
                                           ),
                                         ),
+                                        if (!item.external)
+                                          SizedBox.square(
+                                            dimension: 24,
+                                            child: IconButton(
+                                              key: ValueKey(
+                                                'planner-item-menu-${item.id}',
+                                              ),
+                                              tooltip: tr(
+                                                context,
+                                                'Действия записи',
+                                              ),
+                                              padding: EdgeInsets.zero,
+                                              iconSize: 16,
+                                              onPressed:
+                                                  widget.busyIds.contains(
+                                                    item.id,
+                                                  )
+                                                  ? null
+                                                  : () => widget.onMenu(item),
+                                              icon: const Icon(
+                                                LucideIcons.ellipsis,
+                                              ),
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -1144,7 +1310,7 @@ Future<void> _showScheduleTask(
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
+    backgroundColor: AppColors.of(context).canvas,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
@@ -1173,8 +1339,8 @@ Future<void> _showScheduleTask(
         description: task?.title ?? inboxTask!.title,
         content: Text(
           saved == TaskScheduleResult.added
-              ? 'Задача добавлена в ежедневник'
-              : 'План в ежедневнике обновлён',
+              ? tr(context, 'Задача добавлена в ежедневник')
+              : tr(context, 'План в ежедневнике обновлён'),
         ),
       ),
     );
@@ -1203,10 +1369,12 @@ class _PlannerEditorState extends State<_PlannerEditor> {
   late DateTime _date;
   late TimeOfDay _time;
   late int _duration;
+  late int _reminder;
   ProjectTaskModel? _task;
   InboxTaskModel? _inbox;
   String? _validation;
   String? _removeError;
+  String? _saveError;
   bool _removing = false;
   bool _picking = false;
   late bool _hasTime;
@@ -1227,6 +1395,7 @@ class _PlannerEditorState extends State<_PlannerEditor> {
         : TimeOfDay(hour: local.hour, minute: local.minute);
     _time = widget.assignedTime ?? _time;
     _duration = (widget.item?.durationMinutes ?? 30).clamp(15, 1440);
+    _reminder = widget.item?.reminderMinutes ?? 0;
   }
 
   @override
@@ -1280,47 +1449,15 @@ class _PlannerEditorState extends State<_PlannerEditor> {
     }
     final result = await showModalBottomSheet<Object>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
-      builder: (_) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.65,
-          child: Column(
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'Добавить существующую задачу',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  children: [
-                    if (tasks.isEmpty && inbox.isEmpty)
-                      const ListTile(title: Text('Нет доступных задач')),
-                    for (final task in tasks.where((e) => !e.archived))
-                      ListTile(
-                        title: Text(task.title),
-                        subtitle: Text(
-                          task.displayId.isEmpty ? 'Проект' : task.displayId,
-                        ),
-                        onTap: () => Navigator.pop(context, task),
-                      ),
-                    for (final task in inbox.where(
-                      (e) => !e.archived && !e.isLocalOnly,
-                    ))
-                      ListTile(
-                        title: Text(task.title),
-                        subtitle: const Text('Инбокс'),
-                        onTap: () => Navigator.pop(context, task),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+      backgroundColor: AppColors.of(context).canvas,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      clipBehavior: Clip.antiAlias,
+      builder: (_) => PlannerTaskPicker(tasks: tasks, inbox: inbox),
     );
     if (!mounted || result == null) return;
     setState(() {
@@ -1335,6 +1472,7 @@ class _PlannerEditorState extends State<_PlannerEditor> {
       setState(() => _validation = 'Введите название задачи');
       return;
     }
+    setState(() => _saveError = null);
     final cubit = context.read<PlannerCubit>();
     final scheduled = _hasTime
         ? plannerInstant(_date, _time.hour, _time.minute)
@@ -1350,12 +1488,23 @@ class _PlannerEditorState extends State<_PlannerEditor> {
           )
         : await cubit.save(
             item: widget.item,
+            reminderMinutes: widget.item == null
+                ? null
+                : _hasTime
+                ? _reminder
+                : 0,
             title: _title.text,
             scheduledAt: scheduled,
             plannedDate: _hasTime ? null : _date,
             durationMinutes: _duration,
           );
     if (mounted && success) Navigator.pop(context, true);
+    if (mounted && !success) {
+      setState(
+        () => _saveError =
+            cubit.state.actionError ?? 'Не удалось сохранить изменения.',
+      );
+    }
   }
 
   Future<void> _remove() async {
@@ -1380,11 +1529,441 @@ class _PlannerEditorState extends State<_PlannerEditor> {
     }
   }
 
+  Future<void> _chooseDate() async {
+    final date = await showPlannerDatePicker(
+      context: context,
+      initialDate: _date,
+    );
+    if (date != null && mounted) setState(() => _date = date);
+  }
+
+  Future<void> _chooseTime() async {
+    final time = await showPlannerTimePicker(context, _time);
+    if (time != null && mounted) {
+      setState(() {
+        _time = time;
+        _hasTime = true;
+      });
+    }
+  }
+
+  Widget _entryView(PlannerItemModel item, PlannerState state, bool saving) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final neutral = dark ? const Color(0xFF242424) : const Color(0xFFF7F7F7);
+    final fBase = dark ? FTheme.neutral.dark.touch : FTheme.neutral.light.touch;
+    final source = item.inboxTaskId != null
+        ? 'Инбокс'
+        : item.isStandalone
+        ? 'Ежедневник'
+        : item.projectName;
+    Widget caption(String text) => Text(
+      text,
+      style: GoogleFonts.inter(fontSize: 12, color: colors.onSurfaceVariant),
+    );
+    Widget picker(Key key, String label, String value, VoidCallback action) =>
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            caption(label),
+            const SizedBox(height: 6),
+            Material(
+              color: neutral,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(
+                  color: colors.outlineVariant.withValues(alpha: .6),
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                key: key,
+                onTap: saving ? null : action,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
+                  child: Text(
+                    value,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+    return FTheme(
+      data: FThemeData(
+        touch: true,
+        colors: fBase.colors.copyWith(
+          primary: AppColors.accent,
+          primaryForeground: Colors.white,
+        ),
+      ),
+      child: AppFormSurface(
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              MediaQuery.viewInsetsOf(context).bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    BlocBuilder<PlannerCubit, PlannerState>(
+                      buildWhen: (before, after) =>
+                          _currentEntry(before)?.completed !=
+                              _currentEntry(after)?.completed ||
+                          before.isSaving != after.isSaving,
+                      builder: (context, latest) {
+                        final current = _currentEntry(latest) ?? item;
+                        return IconButton(
+                          key: const Key('planner-entry-complete'),
+                          tooltip: current.completed
+                              ? tr(context, 'Вернуть в план')
+                              : tr(context, 'Отметить выполненной'),
+                          onPressed: latest.isSaving || _removing
+                              ? null
+                              : () {
+                                  final cubit = context.read<PlannerCubit>();
+                                  unawaited(
+                                    cubit.toggle(
+                                      _currentEntry(cubit.state) ?? current,
+                                    ),
+                                  );
+                                },
+                          icon: TaskCompletionIndicator(
+                            completed: current.completed,
+                            size: 22,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextField(
+                            key: const Key('planner-editor-title'),
+                            controller: _title,
+                            readOnly: saving || !item.isStandalone,
+                            decoration: InputDecoration(
+                              hintText: tr(context, 'Введите название'),
+                              errorText: trn(context, _validation),
+                            ),
+                            minLines: 1,
+                            maxLines: 3,
+                          ),
+                          const SizedBox(height: 6),
+                          caption(source),
+                          if (item.creatorName?.trim().isNotEmpty == true)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text.rich(
+                                TextSpan(
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                  children: [
+                                    TextSpan(text: tr(context, 'Создал(а): ')),
+                                    TextSpan(
+                                      text: item.creatorName,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: colors.onSurface,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: tr(context, 'Закрыть'),
+                      onPressed: saving ? null : () => Navigator.pop(context),
+                      icon: const Icon(LucideIcons.x, size: 18),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                BlocBuilder<PlannerCubit, PlannerState>(
+                  buildWhen: (before, after) =>
+                      _currentEntry(before)?.icon !=
+                          _currentEntry(after)?.icon ||
+                      before.isSaving != after.isSaving,
+                  builder: (context, latest) => PlannerIconSelector(
+                    item: _currentEntry(latest) ?? item,
+                    enabled: !saving && !latest.isSaving,
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 18),
+                  child: Divider(height: 1),
+                ),
+                PlannerTimeMode(
+                  hasTime: _hasTime,
+                  onChanged: saving
+                      ? null
+                      : (value) => setState(() => _hasTime = value),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: picker(
+                        const Key('planner-editor-date'),
+                        'Дата задачи',
+                        '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
+                        _chooseDate,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: picker(
+                        const Key('planner-editor-time'),
+                        'Время задачи',
+                        _hasTime
+                            ? '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}'
+                            : 'Весь день',
+                        _chooseTime,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_hasTime) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        LucideIcons.bell,
+                        size: 20,
+                        color: colors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          key: const Key('planner-entry-reminder'),
+                          initialValue: _reminder,
+                          isExpanded: true,
+                          decoration: const InputDecoration(isDense: true),
+                          items:
+                              {
+                                    0: 'Без напоминания',
+                                    5: 'За 5 минут',
+                                    15: 'За 15 минут',
+                                    30: 'За 30 минут',
+                                    60: 'За 1 час',
+                                    120: 'За 2 часа',
+                                    1440: 'За 1 день',
+                                    if (![
+                                      0,
+                                      5,
+                                      15,
+                                      30,
+                                      60,
+                                      120,
+                                      1440,
+                                    ].contains(_reminder))
+                                      _reminder: 'За $_reminder мин',
+                                  }.entries
+                                  .map(
+                                    (entry) => DropdownMenuItem(
+                                      value: entry.key,
+                                      child: Text(
+                                        entry.value,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged: saving
+                              ? null
+                              : (value) =>
+                                    setState(() => _reminder = value ?? 0),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: caption('Длительность')),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 130,
+                        child: DropdownButtonFormField<int>(
+                          initialValue: _duration,
+                          isExpanded: true,
+                          decoration: const InputDecoration(isDense: true),
+                          items:
+                              ({
+                                    15,
+                                    30,
+                                    45,
+                                    60,
+                                    90,
+                                    120,
+                                    180,
+                                    _duration,
+                                  }.toList()..sort())
+                                  .map(
+                                    (value) => DropdownMenuItem(
+                                      value: value,
+                                      child: Text(
+                                        tr(context, "{p0} мин", {'p0': value}),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged: saving
+                              ? null
+                              : (value) =>
+                                    setState(() => _duration = value ?? 30),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 16),
+                FButton(
+                  key: const Key('planner-editor-save'),
+                  onPress: saving ? null : _save,
+                  child: Flexible(
+                    child: Text(
+                      saving
+                          ? tr(context, 'Сохранение…')
+                          : tr(context, 'Сохранить дату и время'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                if (_saveError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        _saveError!,
+                        key: const Key('planner-entry-save-error'),
+                        style: TextStyle(color: colors.error),
+                      ),
+                    ),
+                  ),
+                if (item.isStandalone) ...[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Divider(height: 1),
+                  ),
+                  BlocBuilder<PlannerCubit, PlannerState>(
+                    buildWhen: (before, after) =>
+                        _currentEntry(before) != _currentEntry(after) ||
+                        before.busyIds.contains(item.id) !=
+                            after.busyIds.contains(item.id) ||
+                        before.isSaving != after.isSaving,
+                    builder: (context, latest) => PlannerChecklistsPanel(
+                      item: _currentEntry(latest) ?? item,
+                      enabled:
+                          !saving &&
+                          !latest.isSaving &&
+                          !latest.busyIds.contains(item.id),
+                    ),
+                  ),
+                ],
+                if (!item.isStandalone && item.taskId != null)
+                  TextButton(
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            final router = GoRouter.of(context);
+                            final cubit = context.read<PlannerCubit>();
+                            Navigator.pop(context);
+                            await router.push(
+                              '/tasks/${item.taskId}',
+                              extra: item.task,
+                            );
+                            if (!cubit.isClosed) await cubit.refresh();
+                          },
+                    child: Text(tr(context, 'Открыть задачу проекта')),
+                  ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Divider(height: 1),
+                ),
+                if (_removeError != null)
+                  Text(
+                    _removeError!,
+                    key: const Key('planner-remove-error'),
+                    style: TextStyle(color: colors.error),
+                  ),
+                TextButton(
+                  key: const Key('planner-remove'),
+                  onPressed: saving ? null : _remove,
+                  style: TextButton.styleFrom(
+                    alignment: Alignment.centerLeft,
+                    foregroundColor: colors.error,
+                  ),
+                  child: Text(
+                    _removing
+                        ? tr(context, 'Удаление…')
+                        : tr(context, 'Убрать из ежедневника'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  PlannerItemModel? _currentEntry(PlannerState state) =>
+      state.items.where((entry) => entry.id == widget.item?.id).firstOrNull;
+
+  // Extras have their own subscriptions. Keep the form and its focus/scroll
+  // stable while checklist writes enter and leave the item's busy state.
+  Object? _formEntry(PlannerState state) {
+    final item = _currentEntry(state);
+    return item?.copyWith(
+      checklists: [],
+      detail: {},
+      completed: false,
+      icon: null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) => BlocBuilder<PlannerCubit, PlannerState>(
+    buildWhen: (before, after) =>
+        widget.item == null ||
+        before.isSaving != after.isSaving ||
+        _formEntry(before) != _formEntry(after),
     builder: (context, state) {
       final saving = state.isSaving || _removing;
       final item = widget.item;
+      if (item != null) {
+        final current =
+            state.items.where((entry) => entry.id == item.id).firstOrNull ??
+            item;
+        return _entryView(current, state, saving);
+      }
       return AppFormSurface(
         child: SafeArea(
           child: Padding(
@@ -1401,16 +1980,16 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                 children: [
                   Text(
                     item == null
-                        ? 'Добавить в ежедневник'
-                        : 'Задача ежедневника',
-                    style: GoogleFonts.manrope(
+                        ? tr(context, 'Добавить в ежедневник')
+                        : tr(context, 'Задача ежедневника'),
+                    style: GoogleFonts.inter(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 16),
                   AppFormField(
-                    label: 'Название',
+                    label: tr(context, 'Название'),
                     child: TextField(
                       controller: _title,
                       readOnly:
@@ -1419,8 +1998,8 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                           _task != null ||
                           _inbox != null,
                       decoration: InputDecoration(
-                        hintText: 'Введите название',
-                        errorText: _validation,
+                        hintText: tr(context, 'Введите название'),
+                        errorText: trn(context, _validation),
                       ),
                       maxLines: 2,
                       minLines: 1,
@@ -1434,7 +2013,9 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                         size: AppIconSizes.standard,
                       ),
                       label: Text(
-                        _picking ? 'Загрузка…' : 'Из проекта или Инбокса',
+                        _picking
+                            ? tr(context, 'Загрузка…')
+                            : tr(context, 'Из проекта или Инбокса'),
                       ),
                     ),
                   if (_task != null || _inbox != null)
@@ -1446,31 +2027,74 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                               _inbox = null;
                               _title.clear();
                             }),
-                      child: const Text('Создать новую задачу'),
+                      child: Text(tr(context, 'Создать новую задачу')),
                     ),
                   const SizedBox(height: 12),
-                  const SizedBox(height: 8),
-                  ListTile(
-                    key: const Key('planner-editor-date'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(
-                      Icons.calendar_month_outlined,
-                      size: AppIconSizes.standard,
+                  Material(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF242424)
+                        : const Color(0xFFF7F7F7),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF3C3C3C)
+                            : const Color(0xFFE5E5E5),
+                      ),
                     ),
-                    title: Text(_heading(_date)),
-                    onTap: saving
-                        ? null
-                        : () async {
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: _date,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                            );
-                            if (date != null && mounted) {
-                              setState(() => _date = date);
-                            }
-                          },
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      key: const Key('planner-editor-date'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 4,
+                      ),
+                      leading: const Icon(
+                        LucideIcons.calendarDays,
+                        size: 19,
+                        color: AppColors.accent,
+                      ),
+                      title: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            tr(context, 'Дата'),
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            _heading(_date),
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                      trailing: Icon(
+                        LucideIcons.chevronDown,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      onTap: saving
+                          ? null
+                          : () async {
+                              final date = await showPlannerDatePicker(
+                                context: context,
+                                initialDate: _date,
+                              );
+                              if (date != null && mounted) {
+                                setState(() => _date = date);
+                              }
+                            },
+                    ),
                   ),
                   const SizedBox(height: 8),
                   PlannerTimeMode(
@@ -1480,34 +2104,22 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                         : (value) => setState(() => _hasTime = value),
                   ),
                   if (_hasTime) ...[
-                    ListTile(
+                    const SizedBox(height: 12),
+                    PlannerTimeField(
                       key: const Key('planner-editor-time'),
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.schedule,
-                        size: AppIconSizes.standard,
-                      ),
-                      title: Text(_time.format(context)),
-                      onTap: saving
+                      time: _time,
+                      onChanged: saving
                           ? null
-                          : () async {
-                              final time = await showTimePicker(
-                                context: context,
-                                initialTime: _time,
-                              );
-                              if (time != null && mounted) {
-                                setState(() => _time = time);
-                              }
-                            },
+                          : (time) => setState(() => _time = time),
                     ),
                     const SizedBox(height: 16),
                     AppFormField(
-                      label: 'Длительность',
+                      label: tr(context, 'Длительность'),
                       child: DropdownButtonFormField<int>(
                         isExpanded: true,
                         initialValue: _duration,
-                        decoration: const InputDecoration(
-                          hintText: 'Выберите длительность',
+                        decoration: InputDecoration(
+                          hintText: tr(context, 'Выберите длительность'),
                         ),
                         items:
                             ({15, 30, 45, 60, 90, 120, 180, _duration}.toList()
@@ -1515,7 +2127,9 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                                 .map(
                                   (minutes) => DropdownMenuItem(
                                     value: minutes,
-                                    child: Text('$minutes мин'),
+                                    child: Text(
+                                      tr(context, "{p0} мин", {'p0': minutes}),
+                                    ),
                                   ),
                                 )
                                 .toList(),
@@ -1529,7 +2143,11 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                   AppFormButton(
                     key: const Key('planner-editor-save'),
                     onPressed: saving ? null : _save,
-                    child: Text(saving ? 'Сохранение…' : 'Сохранить'),
+                    child: Text(
+                      saving
+                          ? tr(context, 'Сохранение…')
+                          : tr(context, 'Сохранить'),
+                    ),
                   ),
                   if (item?.taskId != null)
                     TextButton(
@@ -1546,7 +2164,7 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                               );
                               if (!cubit.isClosed) await cubit.refresh();
                             },
-                      child: const Text('Открыть задачу проекта'),
+                      child: Text(tr(context, 'Открыть задачу проекта')),
                     ),
                   if (item != null && _removeError != null)
                     Semantics(
@@ -1556,7 +2174,7 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                         child: Text(
                           _removeError!,
                           key: const Key('planner-remove-error'),
-                          style: const TextStyle(color: AppColors.error),
+                          style: TextStyle(color: AppColors.of(context).error),
                         ),
                       ),
                     ),
@@ -1567,8 +2185,10 @@ class _PlannerEditorState extends State<_PlannerEditor> {
                           ? null
                           : _remove,
                       child: Text(
-                        _removing ? 'Удаление…' : 'Убрать из ежедневника',
-                        style: const TextStyle(color: AppColors.error),
+                        _removing
+                            ? tr(context, 'Удаление…')
+                            : tr(context, 'Убрать из ежедневника'),
+                        style: TextStyle(color: AppColors.of(context).error),
                       ),
                     ),
                 ],

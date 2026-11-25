@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
+import es.antonborri.home_widget.HomeWidgetBackgroundIntent
 
 class InboxWidgetProvider : HomeWidgetProvider() {
     override fun onUpdate(
@@ -27,6 +28,13 @@ class InboxWidgetProvider : HomeWidgetProvider() {
                 bindTask(R.id.inbox_widget_task_1, tasks[0])
                 bindTask(R.id.inbox_widget_task_2, tasks[1])
                 bindTask(R.id.inbox_widget_task_3, tasks[2])
+                val rowIds = listOf(R.id.inbox_widget_task_1, R.id.inbox_widget_task_2, R.id.inbox_widget_task_3)
+                rowIds.forEachIndexed { index, viewId ->
+                    val id = widgetData.getString("inbox_task_id_${index + 1}", "").orEmpty()
+                    if (id.isNotEmpty()) setOnClickPendingIntent(viewId,
+                        HomeWidgetBackgroundIntent.getBroadcast(context,
+                            Uri.Builder().scheme("jospar").authority("complete").appendQueryParameter("id", id).build()))
+                }
 
                 val isEmpty = tasks.all(String::isEmpty)
                 setViewVisibility(
@@ -43,7 +51,7 @@ class InboxWidgetProvider : HomeWidgetProvider() {
                     R.id.inbox_widget_add,
                     HomeWidgetLaunchIntent.getActivity(
                         context,
-                        MainActivity::class.java,
+                        InboxQuickAddActivity::class.java,
                         Uri.parse("jospar://inbox?homeWidget&action=add"),
                     ),
                 )
@@ -53,7 +61,7 @@ class InboxWidgetProvider : HomeWidgetProvider() {
     }
 
     private fun RemoteViews.bindTask(viewId: Int, title: String) {
-        setTextViewText(viewId, if (title.isEmpty()) "" else "○  $title")
+        setTextViewText(viewId, if (title.isEmpty()) "" else "◯  $title")
         setViewVisibility(viewId, if (title.isEmpty()) View.GONE else View.VISIBLE)
     }
 }

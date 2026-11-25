@@ -1,0 +1,4 @@
+module home_widget {
+header "home_widget-Swift.h"
+export *
+}

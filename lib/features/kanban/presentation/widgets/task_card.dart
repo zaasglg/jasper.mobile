@@ -1,3 +1,5 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../../core/widgets/task_completion_indicator.dart';
 import '../../../projects/domain/entities/project_task_cover.dart';
 import '../../../projects/domain/entities/project_task_model.dart';
 import '../../../projects/domain/entities/task_assignee_model.dart';
@@ -25,8 +27,10 @@ import '../../../planner/presentation/screens/planner_screen.dart';
 Color _parseTagColor(String? value) => taskLabelColor(value ?? '');
 
 enum TaskCardAction {
-  cover('Обложка', LucideIcons.image),
+  cover('Изменить обложку', LucideIcons.image),
   edit('Редактировать', LucideIcons.pencil),
+  epics('Эпики', LucideIcons.layers3),
+  labels('Метки', LucideIcons.tag),
   duplicate('Дублировать', LucideIcons.copy),
   move('Переместить', LucideIcons.arrowRight),
   schedule('В ежедневник', LucideIcons.calendarPlus),
@@ -52,8 +56,12 @@ class TaskCard extends StatelessWidget {
     this.isUpdating = false,
     this.currentUserId,
     this.boardStyle = false,
+    this.translatedTitle,
+    this.onRestoreOriginal,
   });
 
+  final String? translatedTitle;
+  final VoidCallback? onRestoreOriginal;
   final bool boardStyle;
   final String? currentUserId;
   final ProjectTaskModel task;
@@ -69,21 +77,26 @@ class TaskCard extends StatelessWidget {
       title: task.title.isEmpty ? 'Без названия' : task.title,
       eyebrow: task.displayId.isEmpty ? 'Действия с задачей' : task.displayId,
       groups: [
-        for (final group in const [
+        for (final group in [
           [
+            TaskCardAction.cover,
             TaskCardAction.edit,
-            TaskCardAction.move,
+            TaskCardAction.epics,
+            TaskCardAction.labels,
             TaskCardAction.duplicate,
+            TaskCardAction.move,
+            TaskCardAction.share,
+            TaskCardAction.copyLink,
+            TaskCardAction.translate,
             TaskCardAction.schedule,
           ],
-          [TaskCardAction.cover, TaskCardAction.translate],
-          [TaskCardAction.share, TaskCardAction.copyLink],
-          [TaskCardAction.archive, TaskCardAction.delete],
+          [TaskCardAction.archive],
+          [TaskCardAction.delete],
         ])
           [
             for (final action in group)
               if (onAction != null ||
-                  const {
+                  {
                     TaskCardAction.edit,
                     TaskCardAction.schedule,
                     TaskCardAction.share,
@@ -96,8 +109,9 @@ class TaskCard extends StatelessWidget {
                   enabled: action != TaskCardAction.move || onMove != null,
                   destructive: action == TaskCardAction.delete,
                   muted: action == TaskCardAction.archive,
-                  opensSubmenu: const {
-                    TaskCardAction.cover,
+                  opensSubmenu: {
+                    TaskCardAction.epics,
+                    TaskCardAction.labels,
                     TaskCardAction.move,
                     TaskCardAction.translate,
                   }.contains(action),
@@ -135,7 +149,7 @@ class TaskCard extends StatelessWidget {
             appSnackBar(
               context: context,
               tone: AppSnackBarTone.success,
-              content: Text('Ссылка скопирована'),
+              content: Text(tr(context, 'Ссылка скопирована')),
             ),
           );
         }
@@ -160,8 +174,8 @@ class TaskCard extends StatelessWidget {
             tone: AppSnackBarTone.error,
             content: Text(
               copy
-                  ? 'Не удалось скопировать ссылку.'
-                  : 'Не удалось открыть меню отправки.',
+                  ? tr(context, 'Не удалось скопировать ссылку.')
+                  : tr(context, 'Не удалось открыть меню отправки.'),
             ),
           ),
         );
@@ -202,7 +216,7 @@ class TaskCard extends StatelessWidget {
       onTap: () => context.push('/tasks/${task.id}', extra: task),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: EdgeInsets.all(boardStyle ? 12 : AppSpacing.md),
         decoration: BoxDecoration(
           color: Theme.of(context).brightness == Brightness.dark
               ? colors.surfaceContainerHigh
@@ -225,7 +239,7 @@ class TaskCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             if (cardView.shows(CardField.cover) && task.cover != null)
-              TaskCover(cover: task.cover!),
+              TaskCover(cover: task.cover!, height: boardStyle ? 100 : 120),
             if (boardStyle && cardView.shows(CardField.id))
               Text(
                 task.displayId.isEmpty ? task.id : task.displayId,
@@ -256,7 +270,7 @@ class TaskCard extends StatelessWidget {
                   ),
                   IconButton(
                     key: ValueKey('task-actions-${task.id}'),
-                    tooltip: 'Действия задачи',
+                    tooltip: tr(context, 'Действия задачи'),
                     onPressed: isUpdating ? null : () => _showActions(context),
                     icon: const Icon(
                       LucideIcons.ellipsis,
@@ -279,10 +293,12 @@ class TaskCard extends StatelessWidget {
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
-                    task.title.isEmpty ? 'Без названия' : task.title,
-                    maxLines: 3,
+                    (translatedTitle ?? task.title).isEmpty
+                        ? tr(context, 'Без названия')
+                        : translatedTitle ?? task.title,
+                    maxLines: boardStyle ? 2 : 3,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.manrope(
+                    style: GoogleFonts.inter(
                       fontSize: boardStyle ? BoardStyle.cardTitleSize : 14,
                       height: 1.35,
                       fontWeight: FontWeight.w600,
@@ -293,7 +309,7 @@ class TaskCard extends StatelessWidget {
                 if (boardStyle)
                   IconButton(
                     key: ValueKey('task-actions-${task.id}'),
-                    tooltip: 'Действия задачи',
+                    tooltip: tr(context, 'Действия задачи'),
                     onPressed: isUpdating ? null : () => _showActions(context),
                     icon: const Icon(
                       LucideIcons.ellipsis,
@@ -336,7 +352,7 @@ class TaskCard extends StatelessWidget {
               ),
             ],
             if (hasMetadata) ...[
-              const SizedBox(height: 11),
+              SizedBox(height: boardStyle ? 8 : 11),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -354,20 +370,20 @@ class TaskCard extends StatelessWidget {
                                 LucideIcons.calendarDays,
                                 size: AppIconSizes.standard,
                                 color: overdue
-                                    ? AppColors.error
-                                    : AppColors.muted,
+                                    ? AppColors.of(context).error
+                                    : AppColors.of(context).muted,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 formatRussianTaskDate(task.end!),
-                                style: GoogleFonts.manrope(
+                                style: GoogleFonts.inter(
                                   fontSize: 11.5,
                                   fontWeight: overdue
                                       ? FontWeight.w700
                                       : FontWeight.w500,
                                   color: overdue
-                                      ? AppColors.error
-                                      : AppColors.muted,
+                                      ? AppColors.of(context).error
+                                      : AppColors.of(context).muted,
                                 ),
                               ),
                             ],
@@ -425,6 +441,19 @@ class TaskCard extends StatelessWidget {
                 ],
               ),
             ],
+            if (translatedTitle != null)
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: IconButton(
+                  tooltip: tr(context, 'Показать оригинал'),
+                  onPressed: onRestoreOriginal,
+                  icon: Icon(
+                    LucideIcons.languages,
+                    size: 18,
+                    color: AppColors.of(context).accent,
+                  ),
+                ),
+              ),
             if (cardView.shows(CardField.checklists) &&
                 (task.progress ?? 0) > 0 &&
                 (task.progress ?? 0) < 100) ...<Widget>[
@@ -434,7 +463,7 @@ class TaskCard extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: (task.progress ?? 0) / 100,
                   minHeight: 4,
-                  backgroundColor: AppColors.skeletonTrack,
+                  backgroundColor: AppColors.of(context).skeletonTrack,
                   valueColor: const AlwaysStoppedAnimation<Color>(
                     AppColors.accent,
                   ),
@@ -462,17 +491,22 @@ class _TaskCompletionControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Semantics(
       checked: task.isDone,
-      label: task.isDone ? 'Вернуть задачу в работу' : 'Завершить задачу',
+      label: task.isDone
+          ? tr(context, 'Вернуть задачу в работу')
+          : tr(context, 'Завершить задачу'),
       child: IconButton(
         key: ValueKey('task-completion-${task.id}'),
-        tooltip: task.isDone ? 'Вернуть в работу' : 'Завершить задачу',
+        tooltip: task.isDone
+            ? tr(context, 'Вернуть в работу')
+            : tr(context, 'Завершить задачу'),
         onPressed: isUpdating ? null : onPressed,
         padding: EdgeInsets.zero,
         alignment: Alignment.centerLeft,
         style: IconButton.styleFrom(
+          overlayColor: Colors.transparent,
+          splashFactory: NoSplash.splashFactory,
           minimumSize: Size(
             compact ? 18 : AppSpacing.touchTarget,
             AppSpacing.touchTarget,
@@ -489,30 +523,7 @@ class _TaskCompletionControl extends StatelessWidget {
           minHeight: AppSpacing.touchTarget,
         ),
         visualDensity: VisualDensity.compact,
-        icon: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: 18,
-          height: 18,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: task.isDone ? AppColors.accent : Colors.transparent,
-            border: Border.all(
-              color: task.isDone ? AppColors.accent : colors.outline,
-              width: 1.5,
-            ),
-          ),
-          child: isUpdating
-              ? Padding(
-                  padding: const EdgeInsets.all(3),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: task.isDone ? Colors.white : AppColors.accent,
-                  ),
-                )
-              : task.isDone
-              ? const Icon(LucideIcons.check, size: 12, color: Colors.white)
-              : null,
-        ),
+        icon: TaskCompletionIndicator(completed: task.isDone, busy: isUpdating),
       ),
     );
   }
@@ -535,11 +546,15 @@ class _TaskCardCount extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: AppIconSizes.standard, color: AppColors.muted),
+        Icon(
+          icon,
+          size: AppIconSizes.standard,
+          color: AppColors.of(context).muted,
+        ),
         const SizedBox(width: 4),
         Text(
           count,
-          style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
+          style: TextStyle(fontSize: 11.5, color: AppColors.of(context).muted),
         ),
       ],
     ),
@@ -565,7 +580,7 @@ class _TaskTag extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final foreground = Color.lerp(
       color,
-      dark ? Colors.white : AppColors.ink,
+      dark ? Colors.white : AppColors.of(context).ink,
       dark ? 0.35 : 0.22,
     )!;
     return Tooltip(
@@ -600,7 +615,7 @@ class _TaskTag extends StatelessWidget {
                   text,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.manrope(
+                  style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: foreground,
@@ -636,12 +651,14 @@ class _TaskAvatars extends StatelessWidget {
                 height: 28,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.1 + index * 0.04),
+                  color: AppColors.of(context).canvas,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
+
+                  // Keep a visible separator between overlapping avatars.
                 ),
                 child: UserAvatar(
-                  size: 28,
+                  size: 25,
+                  useForui: true,
                   userId: visible[index].userId,
                   name: visible[index].name,
                   avatarUrl: visible[index].avatarUrl,
@@ -657,7 +674,8 @@ class _TaskAvatars extends StatelessWidget {
 }
 
 class TaskCover extends StatelessWidget {
-  const TaskCover({super.key, required this.cover});
+  const TaskCover({super.key, required this.cover, this.height = 120});
+  final double height;
   final ProjectTaskCover cover;
 
   @override
@@ -699,7 +717,7 @@ class TaskCover extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: SizedBox(height: 120, width: double.infinity, child: image),
+        child: SizedBox(height: height, width: double.infinity, child: image),
       ),
     );
   }

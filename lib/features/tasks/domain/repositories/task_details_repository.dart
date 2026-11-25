@@ -45,6 +45,10 @@ abstract interface class TaskTitleRepository {
   Future<TaskDetailsPayload> updateTitle(String taskId, String title);
 }
 
+abstract interface class TaskStatusRepository {
+  Future<TaskDetailsPayload> updateStatus(String taskId, String status);
+}
+
 abstract interface class TaskAssigneesRepository {
   Future<List<TaskAssigneeModel>> getAssigneeCandidates(String projectId);
   Future<TaskDetailsPayload> updateAssignees(
@@ -113,4 +117,8 @@ abstract interface class TaskResourceCreationRepository {
     String taskId,
     TaskResourceModel resource,
   );
+}
+
+abstract interface class TaskResourceReadRepository {
+  Future<List<TaskResourceModel>> getResources(String taskId);
 }

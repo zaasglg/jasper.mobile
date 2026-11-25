@@ -1,3 +1,5 @@
+import 'dart:convert';
+import '../../chat/data/models/chat_message_model.dart';
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
 import '../../../core/storage/workspace_selection_storage.dart';
@@ -13,15 +15,40 @@ class ActivityEntry extends Equatable {
     this.threadId,
     this.taskId,
     this.createdAt,
+    this.authorId,
+    this.avatarUrl,
   });
   final String id, text, title;
   final String? threadId, taskId;
+  final String? authorId, avatarUrl;
   final DateTime? createdAt;
   factory ActivityEntry.fromJson(Map<String, dynamic> json) {
     final nested = json['message'];
     final message = nested is Map ? Map<String, dynamic>.from(nested) : json;
     final user = json['user'];
     final channel = message['channel'];
+    final rawText = message['text']?.toString() ?? '';
+    final plainText = htmlToPlainText(rawText);
+    // Thread heads, mentions and reactions share the messenger call contract.
+    // Parse only preview fields so unrelated message metadata cannot break the list.
+    final preview = ChatMessageModel.fromJson({
+      'text': rawText,
+      'kind': message['kind'] ?? message['type'],
+    });
+    var callEvent =
+        (message['kind'] ?? message['type'])?.toString().toUpperCase() ==
+        'CALL';
+    if (!callEvent && rawText.trimLeft().startsWith('{')) {
+      try {
+        final payload = jsonDecode(rawText);
+        callEvent =
+            payload is Map &&
+            payload['callId'] is String &&
+            (payload['callId'] as String).trim().isNotEmpty;
+      } on FormatException {
+        // A user's partial JSON remains text unless the message is typed CALL.
+      }
+    }
     return ActivityEntry(
       id: json['id']?.toString() ?? message['threadId']?.toString() ?? '',
       title: [
@@ -29,7 +56,11 @@ class ActivityEntry extends Equatable {
         user is Map ? user['name'] : null,
         channel is Map ? channel['name'] : json['projectName'],
       ].whereType<String>().join(' · '),
-      text: htmlToPlainText(message['text']?.toString() ?? ''),
+      authorId: user is Map ? user['id']?.toString() : null,
+      avatarUrl: user is Map
+          ? (user['avatarUrl'] ?? user['avatar'])?.toString()
+          : null,
+      text: callEvent && preview.isCall ? preview.callHeading : plainText,
       threadId: message['threadId']?.toString(),
       taskId: json['taskId']?.toString(),
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? ''),
@@ -42,6 +73,8 @@ class ActivityEntry extends Equatable {
     'threadId': threadId,
     'taskId': taskId,
     'createdAt': createdAt?.toIso8601String(),
+    'authorId': authorId,
+    'avatarUrl': avatarUrl,
   };
   ActivityEntry copyWith({
     String? id,
@@ -50,6 +83,8 @@ class ActivityEntry extends Equatable {
     String? threadId,
     String? taskId,
     DateTime? createdAt,
+    String? authorId,
+    String? avatarUrl,
   }) => ActivityEntry(
     id: id ?? this.id,
     text: text ?? this.text,
@@ -57,9 +92,20 @@ class ActivityEntry extends Equatable {
     threadId: threadId ?? this.threadId,
     taskId: taskId ?? this.taskId,
     createdAt: createdAt ?? this.createdAt,
+    authorId: authorId ?? this.authorId,
+    avatarUrl: avatarUrl ?? this.avatarUrl,
   );
   @override
-  List<Object?> get props => [id, text, title, threadId, taskId, createdAt];
+  List<Object?> get props => [
+    id,
+    text,
+    title,
+    threadId,
+    taskId,
+    createdAt,
+    authorId,
+    avatarUrl,
+  ];
 }
 
 class ActivityRepository {

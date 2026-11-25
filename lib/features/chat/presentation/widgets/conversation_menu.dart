@@ -1,3 +1,11 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../messenger_list_strings.dart';
+import '../../data/models/channel_info_model.dart';
+import '../../../../core/widgets/user_avatar.dart';
+import '../channel_members_strings.dart';
+import '../../domain/repositories/channel_image_repository.dart';
+import '../channel_photo_strings.dart';
+import 'channel_info_sheet.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -32,34 +40,41 @@ class ConversationMenuButton extends StatefulWidget {
 
 class _ConversationMenuButtonState extends State<ConversationMenuButton> {
   bool _busy = false;
+  bool _loadingMembers = false;
   @override
   Widget build(BuildContext context) => AppActionMenuButton<String>(
     title: widget.conversation.title,
-    tooltip: 'Действия: ${widget.conversation.title}',
+    tooltip: tr(context, "Действия: {p0}", {'p0': widget.conversation.title}),
     enabled: !_busy,
     groups: widget.conversation.isChannel
         ? [
             [
-              const AppMenuAction(
+              if (widget.repository is ChannelImageRepository)
+                AppMenuAction(
+                  value: 'info',
+                  label: ChannelPhotoStrings.of(context).info,
+                  icon: LucideIcons.info,
+                ),
+              AppMenuAction(
                 value: 'rename',
-                label: 'Переименовать',
+                label: tr(context, 'Переименовать'),
                 icon: LucideIcons.pencil,
               ),
-              const AppMenuAction(
+              AppMenuAction(
                 value: 'members',
-                label: 'Участники',
+                label: tr(context, 'Участники'),
                 icon: LucideIcons.users,
               ),
             ],
             [
-              const AppMenuAction(
+              AppMenuAction(
                 value: 'leave',
-                label: 'Покинуть канал',
+                label: tr(context, 'Покинуть канал'),
                 icon: LucideIcons.logOut,
               ),
-              const AppMenuAction(
+              AppMenuAction(
                 value: 'delete',
-                label: 'Удалить канал',
+                label: tr(context, 'Удалить канал'),
                 icon: LucideIcons.trash2,
                 destructive: true,
               ),
@@ -68,29 +83,42 @@ class _ConversationMenuButtonState extends State<ConversationMenuButton> {
         : [
             [
               if (widget.onOpen != null)
-                const AppMenuAction(
+                AppMenuAction(
                   value: 'open',
-                  label: 'Открыть переписку',
+                  label: tr(context, 'Открыть переписку'),
                   icon: LucideIcons.messageCircle,
                 ),
               if (widget.repository is ChatInteractionRepository)
-                const AppMenuAction(
+                AppMenuAction(
                   value: 'storage',
-                  label: 'Кладовка',
+                  label: tr(context, 'Кладовка'),
                   icon: LucideIcons.archive,
                 ),
             ],
             [
               if (widget.repository is ChatThreadActionsRepository)
-                const AppMenuAction(
+                AppMenuAction(
                   value: 'clear',
-                  label: 'Очистить переписку',
+                  label: tr(context, 'Очистить переписку'),
                   icon: LucideIcons.eraser,
+                  destructive: true,
+                ),
+              if (widget.repository is ChatThreadActionsRepository)
+                AppMenuAction(
+                  value: 'delete_chat',
+                  label: MessengerListStrings.of(context).deleteChat,
+                  icon: LucideIcons.trash2,
                   destructive: true,
                 ),
             ],
           ],
     onSelected: _action,
+    child: _loadingMembers
+        ? const SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : null,
   );
   Future<void> _action(String action) async {
     if (_busy) return;
@@ -98,6 +126,14 @@ class _ConversationMenuButtonState extends State<ConversationMenuButton> {
     final item = widget.conversation;
     final repository = widget.repository;
     try {
+      if (action == 'info') {
+        await showChannelInfo(
+          context,
+          item,
+          repository as ChannelImageRepository,
+        );
+        return;
+      }
       if (action == 'open') {
         widget.onOpen?.call();
         return;
@@ -118,11 +154,29 @@ class _ConversationMenuButtonState extends State<ConversationMenuButton> {
         return;
       }
       bool changed = false;
-      if (action == 'clear') {
+      if (action == 'delete_chat') {
+        final strings = MessengerListStrings.of(context);
         if (await showAppConfirmation(
           context,
-          'Очистить переписку?',
-          'Старые сообщения будут скрыты только у вас. Собеседник продолжит их видеть.',
+          strings.deleteChatTitle,
+          strings.deleteChatDescription,
+          confirmLabel: strings.deleteConfirm,
+          destructive: true,
+        )) {
+          if (!mounted) return;
+          await (repository as ChatThreadActionsRepository).deleteConversation(
+            item.threadId,
+          );
+          changed = true;
+        }
+      } else if (action == 'clear') {
+        if (await showAppConfirmation(
+          context,
+          tr(context, 'Очистить переписку?'),
+          tr(
+            context,
+            'Старые сообщения будут скрыты только у вас. Собеседник продолжит их видеть.',
+          ),
           confirmLabel: 'Очистить',
           destructive: true,
         )) {
@@ -148,26 +202,61 @@ class _ConversationMenuButtonState extends State<ConversationMenuButton> {
             changed = true;
           }
         } else if (action == 'members') {
-          final members = await actions.channelMembers(item.id);
+          setState(() => _loadingMembers = true);
+          // Membership candidates come from this workspace, not recent chats.
+          final results = await Future.wait<Object>([
+            repository is ChannelImageRepository
+                ? (repository as ChannelImageRepository).channelInfo(item.id)
+                : actions
+                      .channelMembers(item.id)
+                      .then(
+                        (members) =>
+                            ChannelInfoModel(members: members, canManage: true),
+                      ),
+            repository is ChannelMembersRepository
+                ? (repository as ChannelMembersRepository)
+                      .workspaceChannelCandidates()
+                : Future.value(
+                    widget.chats
+                        .where((e) => !e.isChannel)
+                        .map(
+                          (e) => SpaceMember(
+                            userId: e.id,
+                            name: e.title,
+                            avatarUrl: e.avatarUrl,
+                          ),
+                        )
+                        .toList(),
+                  ),
+          ]);
+          if (mounted) setState(() => _loadingMembers = false);
+          final info = results[0] as ChannelInfoModel;
+          final candidates = results[1] as List<SpaceMember>;
           if (!mounted) return;
-          final ids = await showAppDialog<List<String>>(
+          final saved = await showModalBottomSheet<bool>(
             context: context,
-            builder: (_) => _ChannelMembersDialog(
-              members: members,
-              candidates: widget.chats
-                  .where((e) => !e.isChannel)
-                  .map((e) => SpaceMember(userId: e.id, name: e.title))
-                  .toList(),
+            isScrollControlled: true,
+            useSafeArea: true,
+            showDragHandle: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            builder: (_) => _ChannelMembersSheet(
+              members: info.members,
+              candidates: candidates,
+              canManage: info.canManage,
+              onSave: (ids) => actions.setChannelMembers(item.id, ids),
             ),
           );
           if (!mounted) return;
-          if (ids != null) {
-            await actions.setChannelMembers(item.id, ids);
-            changed = true;
-          }
+          changed = saved == true;
         } else if (await showAppConfirmation(
           context,
-          action == 'delete' ? 'Удалить канал?' : 'Покинуть канал?',
+          action == 'delete'
+              ? tr(context, 'Удалить канал?')
+              : tr(context, 'Покинуть канал?'),
           item.title,
           confirmLabel: action == 'delete' ? 'Удалить' : 'Выйти',
           destructive: action == 'delete',
@@ -191,13 +280,21 @@ class _ConversationMenuButtonState extends State<ConversationMenuButton> {
             content: Text(
               error is ChatException
                   ? error.message
-                  : 'Не удалось выполнить действие. Попробуйте ещё раз.',
+                  : tr(
+                      context,
+                      'Не удалось выполнить действие. Попробуйте ещё раз.',
+                    ),
             ),
           ),
         );
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _loadingMembers = false;
+        });
+      }
     }
   }
 }
@@ -220,17 +317,17 @@ class _ChannelNameDialogState extends State<_ChannelNameDialog> {
 
   @override
   Widget build(BuildContext context) => AppDialog(
-    title: const Text('Название канала'),
+    title: Text(tr(context, 'Название канала')),
     content: AppFormSurface(
       child: TextField(
         controller: _text,
-        decoration: InputDecoration(errorText: _error),
+        decoration: InputDecoration(errorText: trn(context, _error)),
       ),
     ),
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Отмена'),
+        child: Text(tr(context, 'Отмена')),
       ),
       TextButton(
         onPressed: () {
@@ -241,62 +338,271 @@ class _ChannelNameDialogState extends State<_ChannelNameDialog> {
             Navigator.pop(context, name);
           }
         },
-        child: const Text('Сохранить'),
+        child: Text(tr(context, 'Сохранить')),
       ),
     ],
   );
 }
 
-class _ChannelMembersDialog extends StatefulWidget {
-  const _ChannelMembersDialog({
+class _ChannelMembersSheet extends StatefulWidget {
+  const _ChannelMembersSheet({
     required this.members,
     required this.candidates,
+    required this.canManage,
+    required this.onSave,
   });
   final List<SpaceMember> members, candidates;
+  final bool canManage;
+  final Future<void> Function(List<String>) onSave;
   @override
-  State<_ChannelMembersDialog> createState() => _ChannelMembersDialogState();
+  State<_ChannelMembersSheet> createState() => _ChannelMembersSheetState();
 }
 
-class _ChannelMembersDialogState extends State<_ChannelMembersDialog> {
+class _ChannelMembersSheetState extends State<_ChannelMembersSheet> {
   late final _ids = widget.members.map((e) => e.userId).toSet();
+  String _query = '';
+  bool _saving = false;
+  String? _error;
+  Future<void> _save() async {
+    if (_saving || !widget.canManage) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.onSave(_ids.toList());
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error =
+              error is ChatException && !ChannelMembersStrings.of(context).kk
+              ? error.message
+              : ChannelMembersStrings.of(context).saveError;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final people = {
-      for (final user in [...widget.candidates, ...widget.members])
-        user.userId: user,
+    final strings = ChannelMembersStrings.of(context);
+    final people = <String, SpaceMember>{
+      for (final user in widget.candidates) user.userId: user,
     };
-    return AppDialog(
-      title: const Text('Участники канала'),
-      content: SizedBox(
-        width: double.maxFinite,
-        height: 320,
-        child: ListView(
-          children: [
-            for (final user in people.values)
-              CheckboxListTile(
-                title: Text(user.name),
-                value: _ids.contains(user.userId),
-                onChanged: (value) => setState(() {
-                  if (value == true) {
-                    _ids.add(user.userId);
-                  } else {
-                    _ids.remove(user.userId);
-                  }
-                }),
+    for (final member in widget.members) {
+      final candidate = people[member.userId];
+      people[member.userId] = member.copyWith(
+        avatarUrl: member.avatarUrl ?? candidate?.avatarUrl,
+        email: member.email.isNotEmpty ? member.email : candidate?.email,
+      );
+    }
+    final visible =
+        people.values
+            .where(
+              (user) => '${user.name} ${user.email}'.toLowerCase().contains(
+                _query.toLowerCase(),
               ),
-          ],
+            )
+            .toList()
+          ..sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          );
+    return PopScope(
+      canPop: !_saving,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SizedBox(
+          key: const Key('channel-members-sheet'),
+          height: MediaQuery.sizeOf(context).height * .82,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 8, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          strings.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: strings.close,
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, size: 22),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  child: TextField(
+                    key: const Key('channel-members-search'),
+                    enabled: !_saving,
+                    decoration: InputDecoration(
+                      hintText: strings.search,
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      isDense: true,
+                    ),
+                    onChanged: (value) => setState(() => _query = value.trim()),
+                  ),
+                ),
+                Expanded(
+                  child: CustomScrollView(
+                    key: const Key('channel-members-list'),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                '${strings.workspaceMembers} · ${people.length}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              if (!widget.canManage)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    strings.readOnly,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (visible.isEmpty)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(child: Text(strings.empty)),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          sliver: SliverList.builder(
+                            itemCount: visible.length,
+                            itemBuilder: (context, index) {
+                              final user = visible[index];
+                              return CheckboxListTile(
+                                key: ValueKey('channel-member-${user.userId}'),
+                                contentPadding: EdgeInsets.zero,
+                                secondary: UserAvatar(
+                                  size: 34,
+                                  userId: user.userId,
+                                  name: user.name,
+                                  avatarUrl: user.avatarUrl,
+                                ),
+                                title: Text(
+                                  user.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: user.email.isEmpty
+                                    ? null
+                                    : Text(
+                                        user.email,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                value: _ids.contains(user.userId),
+                                onChanged: _saving || !widget.canManage
+                                    ? null
+                                    : (value) => setState(() {
+                                        if (value == true) {
+                                          _ids.add(user.userId);
+                                        } else {
+                                          _ids.remove(user.userId);
+                                        }
+                                      }),
+                              );
+                            },
+                          ),
+                        ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                    ],
+                  ),
+                ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        tr(context, _error!),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  child: Row(
+                    children: [
+                      if (widget.canManage) ...[
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _saving
+                                ? null
+                                : () => Navigator.pop(context),
+                            child: Text(strings.cancel),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: FilledButton(
+                          key: widget.canManage
+                              ? const Key('channel-members-save')
+                              : const Key('channel-members-close'),
+                          onPressed: _saving
+                              ? null
+                              : widget.canManage
+                              ? _save
+                              : () => Navigator.pop(context),
+                          child: _saving
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  widget.canManage
+                                      ? strings.save
+                                      : strings.close,
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Отмена'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, _ids.toList()),
-          child: const Text('Сохранить'),
-        ),
-      ],
     );
   }
 }

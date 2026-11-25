@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import '../../../../core/widgets/app_action_menu.dart';
@@ -279,8 +280,8 @@ class _VoiceComposerState extends State<VoiceComposer>
         if (!voice && (widget.onFiles != null || widget.onVideo != null))
           AppActionMenuButton<String>(
             key: const Key('chat-attachments'),
-            title: 'Прикрепить',
-            tooltip: 'Прикрепить',
+            title: tr(context, 'Прикрепить'),
+            tooltip: tr(context, 'Прикрепить'),
             icon: LucideIcons.paperclip,
             enabled: !blocked,
             onSelected: (value) => value == 'files'
@@ -289,16 +290,16 @@ class _VoiceComposerState extends State<VoiceComposer>
             groups: [
               [
                 if (widget.onFiles != null)
-                  const AppMenuAction(
+                  AppMenuAction(
                     value: 'files',
-                    label: 'Файлы',
+                    label: tr(context, 'Файлы'),
                     icon: LucideIcons.paperclip,
                     opensSubmenu: true,
                   ),
                 if (widget.onVideo != null)
-                  const AppMenuAction(
+                  AppMenuAction(
                     value: 'video',
-                    label: 'Видеозаметка',
+                    label: tr(context, 'Видеозаметка'),
                     icon: LucideIcons.video,
                     opensSubmenu: true,
                   ),
@@ -311,7 +312,7 @@ class _VoiceComposerState extends State<VoiceComposer>
                   children: [
                     IconButton(
                       key: const Key('voice-cancel'),
-                      tooltip: 'Удалить запись',
+                      tooltip: tr(context, 'Удалить запись'),
                       onPressed: blocked ? null : _cancel,
                       icon: const Icon(
                         LucideIcons.trash2,
@@ -333,15 +334,15 @@ class _VoiceComposerState extends State<VoiceComposer>
                     Expanded(
                       child: Text(
                         _held
-                            ? '← Отмена · ↑ Закрепить'
+                            ? tr(context, '← Отмена · ↑ Закрепить')
                             : _recording
-                            ? 'Идёт запись…'
-                            : 'Запись готова',
+                            ? tr(context, 'Идёт запись…')
+                            : tr(context, 'Запись готова'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.muted,
+                          color: AppColors.of(context).muted,
                         ),
                       ),
                     ),
@@ -373,10 +374,10 @@ class _VoiceComposerState extends State<VoiceComposer>
           },
           child: Semantics(
             label: voice
-                ? 'Отправить запись'
+                ? tr(context, 'Отправить запись')
                 : widget.hasText
-                ? 'Отправить сообщение'
-                : 'Записать голосовое сообщение',
+                ? tr(context, 'Отправить сообщение')
+                : tr(context, 'Записать голосовое сообщение'),
             child: IconButton.filled(
               key: Key(
                 voice
@@ -394,7 +395,7 @@ class _VoiceComposerState extends State<VoiceComposer>
                   : _start,
               style: IconButton.styleFrom(
                 backgroundColor: AppColors.accent,
-                disabledBackgroundColor: AppColors.skeleton,
+                disabledBackgroundColor: AppColors.of(context).skeleton,
               ),
               icon: blocked
                   ? const SizedBox(

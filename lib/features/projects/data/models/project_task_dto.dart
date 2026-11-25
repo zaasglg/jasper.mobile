@@ -1,3 +1,4 @@
+import '../../../tasks/domain/entities/task_resource_model.dart';
 import 'dart:convert';
 import 'package:equatable/equatable.dart';
 import '../../../tasks/data/models/task_label_dto.dart';
@@ -28,6 +29,7 @@ class ProjectTaskDto extends Equatable {
     this.commentCount = 0,
     this.fileCount = 0,
     this.resourceCount = 0,
+    this.resources,
     this.checklistCompleted = 0,
     this.checklistTotal = 0,
     this.assignees = const <TaskAssigneeDto>[],
@@ -69,6 +71,18 @@ class ProjectTaskDto extends Equatable {
       resourceCount:
           _parseInt(json['resourcesCount'] ?? json['resourceCount']) ??
           (json['resources'] is List ? (json['resources'] as List).length : 0),
+      resources: json['resources'] is List
+          ? (json['resources'] as List)
+                .map((item) {
+                  if (item is! Map) {
+                    throw const FormatException('Invalid task resource');
+                  }
+                  return TaskResourceModel.fromJson(
+                    Map<String, dynamic>.from(item),
+                  );
+                })
+                .toList(growable: false)
+          : null,
       checklistCompleted: _checklistCompleted(json),
       checklistTotal: _checklistTotal(json),
       assignees: _parseAssignees(json['assignees']),
@@ -97,6 +111,7 @@ class ProjectTaskDto extends Equatable {
   final int commentCount;
   final int fileCount;
   final int resourceCount;
+  final List<TaskResourceModel>? resources;
 
   final int checklistCompleted;
   final int checklistTotal;
@@ -284,6 +299,8 @@ class ProjectTaskDto extends Equatable {
     'commentsCount': commentCount,
     'filesCount': fileCount,
     'resourcesCount': resourceCount,
+    if (resources != null)
+      'resources': resources!.map((r) => r.toJson()).toList(growable: false),
     'checklistCompleted': checklistCompleted,
     'checklistTotal': checklistTotal,
     'assignees': assignees.map((item) => item.toJson()).toList(growable: false),
@@ -312,6 +329,7 @@ class ProjectTaskDto extends Equatable {
     int? commentCount,
     int? fileCount,
     int? resourceCount,
+    List<TaskResourceModel>? resources,
     int? checklistCompleted,
     int? checklistTotal,
     List<TaskAssigneeDto>? assignees,
@@ -339,6 +357,7 @@ class ProjectTaskDto extends Equatable {
       commentCount: commentCount ?? this.commentCount,
       fileCount: fileCount ?? this.fileCount,
       resourceCount: resourceCount ?? this.resourceCount,
+      resources: resources ?? this.resources,
       checklistCompleted: checklistCompleted ?? this.checklistCompleted,
       checklistTotal: checklistTotal ?? this.checklistTotal,
       assignees: assignees ?? this.assignees,
@@ -369,6 +388,7 @@ class ProjectTaskDto extends Equatable {
     commentCount,
     fileCount,
     resourceCount,
+    resources,
     checklistCompleted,
     checklistTotal,
     assignees,
@@ -399,6 +419,7 @@ class ProjectTaskDto extends Equatable {
     commentCount: entity.commentCount,
     fileCount: entity.fileCount,
     resourceCount: entity.resourceCount,
+    resources: entity.resources,
     checklistCompleted: entity.checklistCompleted,
     checklistTotal: entity.checklistTotal,
     assignees: entity.assignees
@@ -430,6 +451,7 @@ class ProjectTaskDto extends Equatable {
     commentCount: commentCount,
     fileCount: fileCount,
     resourceCount: resourceCount,
+    resources: resources,
     checklistCompleted: checklistCompleted,
     checklistTotal: checklistTotal,
     assignees: assignees.map((e) => e.toEntity()).toList(growable: false),

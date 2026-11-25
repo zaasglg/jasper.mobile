@@ -95,7 +95,15 @@ void main() {
         ),
         findsNothing,
       );
-      await tester.tap(find.byTooltip('Поиск в переписке'));
+      expect(find.byType(ConversationSections), findsNothing);
+      await tester.tap(find.byKey(const Key('conversation-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('Кладовка'), findsOneWidget);
+      Navigator.of(tester.element(find.text('Кладовка'))).pop();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('conversation-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Поиск в переписке'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('conversation-search')),
@@ -287,7 +295,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('# общий'), findsOneWidget);
+    expect(find.text('общий'), findsOneWidget);
     expect(find.text('Это начало канала #общий'), findsOneWidget);
 
     await tester.enterText(

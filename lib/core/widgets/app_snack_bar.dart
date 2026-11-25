@@ -112,7 +112,7 @@ class _NoticeContent extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     DefaultTextStyle.merge(
-                      style: GoogleFonts.manrope(
+                      style: GoogleFonts.inter(
                         fontSize: 13,
                         height: 1.45,
                         fontWeight: FontWeight.w600,
@@ -127,7 +127,7 @@ class _NoticeContent extends StatelessWidget {
                         description!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.manrope(
+                        style: GoogleFonts.inter(
                           fontSize: 11,
                           height: 1.4,
                           color: colors.onSurfaceVariant,

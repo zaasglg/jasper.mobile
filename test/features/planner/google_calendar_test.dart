@@ -181,31 +181,24 @@ void main() {
         await tester.binding.setSurfaceSize(size);
         await tester.pumpAndSettle();
         expect(tester.getCenter(sources).dy, tester.getCenter(datePicker).dy);
+        final previous = find.byKey(const Key('planner-previous-day'));
+        final navigationY = tester.getCenter(previous).dy;
         for (final control in [
-          find.byKey(const Key('planner-previous-day')),
-          find.text('Сегодня'),
+          previous,
+          find.byKey(const Key('planner-view-selector')),
           find.byKey(const Key('planner-next-day')),
         ]) {
-          expect(tester.getCenter(control).dy, tester.getCenter(datePicker).dy);
-          expect(
-            tester.getTopLeft(control).dx,
-            greaterThanOrEqualTo(tester.getTopRight(sources).dx),
-          );
+          expect(tester.getCenter(control).dy, navigationY);
+          expect(tester.getTopLeft(control).dx, greaterThanOrEqualTo(0));
+          expect(tester.getTopRight(control).dx, lessThanOrEqualTo(size.width));
         }
-        expect(
-          tester.getTopLeft(datePicker).dx - tester.getTopRight(sources).dx,
-          greaterThanOrEqualTo(8),
-        );
-        expect(
-          tester.getTopLeft(find.byKey(const Key('planner-previous-day'))).dx -
-              tester.getTopRight(datePicker).dx,
-          closeTo(0, 0.01),
-        );
-        if (size.width == 800) {
+        if ((navigationY - tester.getCenter(datePicker).dy).abs() < 1) {
           expect(
-            tester.getTopLeft(datePicker).dx - tester.getTopRight(sources).dx,
-            greaterThan(100),
+            tester.getTopLeft(previous).dx,
+            greaterThanOrEqualTo(tester.getTopRight(datePicker).dx),
           );
+        } else {
+          expect(navigationY, greaterThan(tester.getBottomLeft(datePicker).dy));
         }
         expect(tester.takeException(), isNull);
       }

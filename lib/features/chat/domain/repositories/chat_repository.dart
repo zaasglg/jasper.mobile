@@ -3,8 +3,13 @@ import '../../data/models/chat_conversation_model.dart';
 import '../../data/models/chat_message_model.dart';
 import '../../data/models/chat_interaction_models.dart';
 
+abstract interface class ChannelMembersRepository {
+  Future<List<SpaceMember>> workspaceChannelCandidates();
+}
+
 abstract interface class ChatThreadActionsRepository {
   Future<void> clearConversation(String threadId);
+  Future<void> deleteConversation(String threadId);
 }
 
 abstract interface class ChatRefreshRepository {
@@ -53,6 +58,12 @@ abstract interface class ChatRepository {
     String? mention,
     int? duration,
   });
+}
+
+abstract interface class ChatOutboxRepository {
+  Future<List<ChatMessageModel>> pendingMessages(String threadId);
+  Future<ChatMessageModel> enqueueMessage(String threadId, String text);
+  Future<ChatMessageModel> sendPending(ChatMessageModel message);
 }
 
 class ChatException implements Exception {

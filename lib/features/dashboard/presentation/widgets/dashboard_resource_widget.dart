@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import '../utils/dashboard_options_changes.dart';
 import '../../domain/entities/dashboard_widget_options.dart';
@@ -84,7 +85,9 @@ class ResourceEmptyState extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: AppTypography.title(context)?.copyWith(color: AppColors.ink),
+            style: AppTypography.title(
+              context,
+            )?.copyWith(color: AppColors.of(context).ink),
           ),
           const SizedBox(height: AppSpacing.sm),
           ConstrainedBox(
@@ -94,7 +97,7 @@ class ResourceEmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.body(
                 context,
-              )?.copyWith(color: AppColors.muted, height: 1.4),
+              )?.copyWith(color: AppColors.of(context).muted, height: 1.4),
             ),
           ),
         ],
@@ -148,7 +151,7 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
         appSnackBar(
           context: context,
           tone: AppSnackBarTone.error,
-          content: Text('Не удалось сохранить настройки ресурса'),
+          content: Text(tr(context, 'Не удалось сохранить настройки ресурса')),
         ),
       );
     }
@@ -309,7 +312,7 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
           context: context,
           isScrollControlled: true,
           showDragHandle: true,
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.of(context).canvas,
           builder: (context) => StatefulBuilder(
             builder: (context, setSheet) => SafeArea(
               child: Padding(
@@ -317,8 +320,8 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Метрики',
+                    Text(
+                      tr(context, 'Метрики'),
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
@@ -329,7 +332,7 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
                         child: Column(
                           children: [
                             CheckboxListTile(
-                              title: const Text('Все метрики'),
+                              title: Text(tr(context, 'Все метрики')),
                               value: mode == 'all',
                               onChanged: (value) => setSheet(() {
                                 mode = value == true ? 'all' : 'tasks';
@@ -338,9 +341,9 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
                             ),
                             const Divider(height: 1),
                             if (metrics.isEmpty)
-                              const Padding(
+                              Padding(
                                 padding: EdgeInsets.all(20),
-                                child: Text('Нет пар ресурсов'),
+                                child: Text(tr(context, 'Нет пар ресурсов')),
                               ),
                             for (final metric in metrics)
                               CheckboxListTile(
@@ -379,7 +382,7 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
                         mode: mode,
                         names: selected.toList(),
                       )),
-                      child: const Text('Готово'),
+                      child: Text(tr(context, 'Готово')),
                     ),
                   ],
                 ),
@@ -414,7 +417,7 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.of(context).canvas,
       builder: (context) => StatefulBuilder(
         builder: (context, setSheet) => SafeArea(
           child: Padding(
@@ -423,7 +426,9 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _filter == 'labels' ? 'Метки' : 'Эпики',
+                  _filter == 'labels'
+                      ? tr(context, 'Метки')
+                      : tr(context, 'Эпики'),
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
@@ -435,7 +440,9 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
                       children: [
                         CheckboxListTile(
                           title: Text(
-                            _filter == 'labels' ? 'Все метки' : 'Все эпики',
+                            _filter == 'labels'
+                                ? tr(context, 'Все метки')
+                                : tr(context, 'Все эпики'),
                           ),
                           value: selected.isEmpty,
                           onChanged: (_) => setSheet(selected.clear),
@@ -454,9 +461,9 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
                             ),
                           ),
                         if (entries.isEmpty)
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.all(20),
-                            child: Text('Нет доступных значений'),
+                            child: Text(tr(context, 'Нет доступных значений')),
                           ),
                       ],
                     ),
@@ -464,7 +471,7 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, selected.toList()),
-                  child: const Text('Готово'),
+                  child: Text(tr(context, 'Готово')),
                 ),
               ],
             ),
@@ -512,7 +519,7 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
             name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 10, color: AppColors.muted),
+            style: TextStyle(fontSize: 10, color: AppColors.of(context).muted),
           ),
         ),
       ),
@@ -539,7 +546,7 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.of(context).canvas,
       builder: (_) => DashboardTaskListSheet(
         title: '${pair.planName} / ${pair.factName}',
         tasks: matching,
@@ -675,11 +682,15 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 10, color: AppColors.muted),
+          style: TextStyle(fontSize: 10, color: AppColors.of(context).muted),
         ),
       ),
       const SizedBox(width: 3),
-      const Icon(LucideIcons.chevronDown, size: 12, color: AppColors.muted),
+      Icon(
+        LucideIcons.chevronDown,
+        size: 12,
+        color: AppColors.of(context).muted,
+      ),
     ],
   );
   @override
@@ -730,24 +741,26 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!WidgetCollapseScope.hidesHeading(context)) ...[
+          AppWidgetHeading(
+            icon: LucideIcons.chartNoAxesCombined,
+            title: tr(context, 'Ресурс'),
+          ),
+          const SizedBox(height: 8),
+        ],
         Row(
           children: [
-            const AppWidgetHeading(
-              icon: LucideIcons.chartNoAxesCombined,
-              title: 'Ресурс',
-            ),
-            const SizedBox(width: 9),
             Expanded(
               child: _filter == 'projects'
                   ? DashboardSelector<String>(
                       enabled: !_saving,
-                      tooltip: 'Проект ресурса',
+                      tooltip: tr(context, 'Проект ресурса'),
                       onSelected: (id) => _apply({'resourceProjectId': id}),
                       itemBuilder: (_) => [
                         CheckedPopupMenuItem(
                           value: 'all',
                           checked: project == null,
-                          child: const Text('Все проекты'),
+                          child: Text(tr(context, 'Все проекты')),
                         ),
                         for (final p in flattenDashboardProjects(
                           widget.projects,
@@ -782,7 +795,7 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
             const SizedBox(width: 9),
             DashboardSelector<String>(
               enabled: !_saving,
-              tooltip: 'Отбор ресурсов',
+              tooltip: tr(context, 'Отбор ресурсов'),
               onSelected: (filter) => _apply({'resourceFilterType': filter}),
               itemBuilder: (_) => [
                 for (final entry in {
@@ -811,15 +824,21 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
             ?widget.trailing,
           ],
         ),
-        const Divider(height: AppSpacing.xxs, color: AppColors.border),
+        Divider(height: AppSpacing.xxs, color: AppColors.of(context).border),
         if (items.isEmpty)
           ResourceEmptyState(
             title: _mode == 'tasks'
-                ? 'Нет задач с ресурсами'
-                : 'Нет данных ресурса',
+                ? tr(context, 'Нет задач с ресурсами')
+                : tr(context, 'Нет данных ресурса'),
             description: _projectId == 'all'
-                ? 'Выберите проект или измените фильтры, чтобы увидеть данные.'
-                : 'В выбранном проекте пока нет данных для этих метрик.',
+                ? tr(
+                    context,
+                    'Выберите проект или измените фильтры, чтобы увидеть данные.',
+                  )
+                : tr(
+                    context,
+                    'В выбранном проекте пока нет данных для этих метрик.',
+                  ),
           ),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -853,7 +872,9 @@ class _DashboardResourceWidgetState extends State<DashboardResourceWidget> {
                                     data: items[i].id,
                                     maxSimultaneousDrags: _saving ? 0 : 1,
                                     feedback: Material(
-                                      color: Colors.white,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.surface,
                                       elevation: 2,
                                       borderRadius: BorderRadius.circular(12),
                                       child: SizedBox(

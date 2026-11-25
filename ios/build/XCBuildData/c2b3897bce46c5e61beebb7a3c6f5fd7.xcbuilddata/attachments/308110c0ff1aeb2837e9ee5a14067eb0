@@ -1,0 +1,29 @@
+{
+  "" : {
+    "diagnostics" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/home_widget-primary.dia",
+    "emit-module-dependencies" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/home_widget-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/home_widget-primary-emit-module.dia",
+    "pch" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/home_widget-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/home_widget-primary.swiftdeps"
+  },
+  "/Users/erdaulettojbekov/.pub-cache/hosted/pub.dev/home_widget-0.9.4/ios/home_widget/Sources/home_widget/HomeWidgetBackgroundWorker.swift" : {
+    "const-values" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetBackgroundWorker.swiftconstvalues",
+    "dependencies" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetBackgroundWorker.d",
+    "diagnostics" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetBackgroundWorker.dia",
+    "index-unit-output-path" : "/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetBackgroundWorker.o",
+    "llvm-bc" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetBackgroundWorker.bc",
+    "object" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetBackgroundWorker.o",
+    "swift-dependencies" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetBackgroundWorker.swiftdeps",
+    "swiftmodule" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetBackgroundWorker~partial.swiftmodule"
+  },
+  "/Users/erdaulettojbekov/.pub-cache/hosted/pub.dev/home_widget-0.9.4/ios/home_widget/Sources/home_widget/HomeWidgetPlugin.swift" : {
+    "const-values" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetPlugin.swiftconstvalues",
+    "dependencies" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetPlugin.d",
+    "diagnostics" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetPlugin.dia",
+    "index-unit-output-path" : "/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetPlugin.o",
+    "llvm-bc" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetPlugin.bc",
+    "object" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetPlugin.o",
+    "swift-dependencies" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetPlugin.swiftdeps",
+    "swiftmodule" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/home_widget-0.9.4/build/home_widget.build/Debug-iphonesimulator/home_widget.build/Objects-normal/arm64/HomeWidgetPlugin~partial.swiftmodule"
+  }
+}

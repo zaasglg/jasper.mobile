@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/di/service_locator.dart';
@@ -34,7 +35,7 @@ class _StorageSummaryScreenState extends State<StorageSummaryScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Резюме встречи')),
+    appBar: AppBar(title: Text(tr(context, 'Резюме встречи'))),
     body: FutureBuilder<StorageSummary>(
       future: _future,
       builder: (context, snapshot) {
@@ -46,7 +47,7 @@ class _StorageSummaryScreenState extends State<StorageSummaryScreen> {
                 Text(StorageCubit.errorText(snapshot.error!)),
                 TextButton(
                   onPressed: () => setState(_load),
-                  child: const Text('Повторить'),
+                  child: Text(tr(context, 'Повторить')),
                 ),
               ],
             ),
@@ -118,7 +119,7 @@ class _StorageSummaryScreenState extends State<StorageSummaryScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             Text(
-              summary.number.isEmpty ? 'Встреча' : summary.number,
+              summary.number.isEmpty ? tr(context, 'Встреча') : summary.number,
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
@@ -126,16 +127,16 @@ class _StorageSummaryScreenState extends State<StorageSummaryScreen> {
               '${summary.date.toLocal().toString().substring(0, 16)} · ${summary.authorName}',
             ),
             if (content.duration != null)
-              Text('Длительность: ${content.duration}'),
+              Text(tr(context, "Длительность: {p0}", {'p0': content.duration})),
             heading('Участники'),
             for (final person in people.values)
               Text(StorageCollector.object(person)['name']?.toString() ?? ''),
-            if (people.isEmpty) const Text('Участники не указаны'),
+            if (people.isEmpty) Text(tr(context, 'Участники не указаны')),
             heading('Ключевые решения'),
-            if (decisions.isEmpty) const Text('Нет отмеченных решений'),
+            if (decisions.isEmpty) Text(tr(context, 'Нет отмеченных решений')),
             ...decisions.map(entry),
             heading('Стенограмма'),
-            if (entries.isEmpty) const Text('Нет записей'),
+            if (entries.isEmpty) Text(tr(context, 'Нет записей')),
             ...entries.map(entry),
           ],
         );

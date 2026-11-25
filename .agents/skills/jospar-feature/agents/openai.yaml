@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jospar Feature Agent"
+  short_description: "Builds Flutter features using Jospar architecture"
+  default_prompt: "Implement this Jospar feature using the project architecture and validate it."

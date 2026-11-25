@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import '../../../../core/widgets/app_widget_heading.dart';
 import 'dashboard_expandable_content.dart';
@@ -7,6 +8,44 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import 'dashboard_widget_panel.dart' show dashboardObject, dashboardDone;
+
+abstract final class _TeamTypography {
+  static TextStyle name(BuildContext context) => TextStyle(
+    fontSize: 14,
+    height: 1.35,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.2,
+    color: AppColors.of(context).ink,
+  );
+  static const detail = TextStyle(
+    fontSize: 12,
+    height: 1.4,
+    fontWeight: FontWeight.w400,
+    color: Color(0xFF71717A),
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+  static const column = TextStyle(
+    fontSize: 11,
+    height: 1.3,
+    fontWeight: FontWeight.w500,
+    color: Color(0xFF71717A),
+  );
+  static TextStyle number(BuildContext context) => TextStyle(
+    fontSize: 13,
+    height: 1.3,
+    fontWeight: FontWeight.w600,
+    color: AppColors.of(context).ink,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
+  static TextStyle percentage(BuildContext context) => TextStyle(
+    fontSize: 26,
+    height: 1.1,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.8,
+    color: AppColors.of(context).ink,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
+}
 
 class DashboardTeamWidget extends StatefulWidget {
   const DashboardTeamWidget({
@@ -119,14 +158,31 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
     return ids;
   }
 
+  double _listColumnWidth(BuildContext context, String label, double minimum) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: DefaultTextStyle.of(context).style.merge(_TeamTypography.column),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width + 8;
+    painter.dispose();
+    return width < minimum ? minimum : width.ceilToDouble();
+  }
+
   Widget _avatar(Map<String, dynamic> user, double size) => UserAvatar(
     size: size,
     userId: user['id']?.toString(),
     name: user['name']?.toString() ?? '',
     avatarUrl:
         (user['avatarUrl'] ?? user['avatar_url'] ?? user['avatar']) as String?,
-    backgroundColor: const Color(0xFFF6F6F5),
-    foregroundColor: AppColors.muted,
+    backgroundColor: Theme.of(context).brightness == Brightness.dark
+        ? Theme.of(context).colorScheme.surfaceContainerLow
+        : const Color(0xFFF6F6F5),
+    foregroundColor: AppColors.of(context).muted,
   );
   Widget _badge(int count) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -141,7 +197,13 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
         const SizedBox(width: 4),
         Text(
           '$count',
-          style: const TextStyle(fontSize: 10, color: Colors.white),
+          style: const TextStyle(
+            fontSize: 11,
+            height: 1.2,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
         ),
       ],
     ),
@@ -155,14 +217,14 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
   Widget _metric(IconData icon, String label) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 13, color: AppColors.muted),
+      Icon(icon, size: 13, color: AppColors.of(context).muted),
       const SizedBox(width: 4),
       Flexible(
         child: Text(
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 11, color: AppColors.muted),
+          style: _TeamTypography.detail,
         ),
       ),
     ],
@@ -183,7 +245,9 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
         ? Icon(
             LucideIcons.clock,
             size: 14,
-            color: running ? const Color(0xFF19744C) : AppColors.muted,
+            color: running
+                ? const Color(0xFF19744C)
+                : AppColors.of(context).muted,
           )
         : const SizedBox.shrink();
   }
@@ -196,7 +260,7 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
     final taskId = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.of(context).canvas,
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: SizedBox(
@@ -213,7 +277,9 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Задачи · ${user['name'] ?? 'Участник'}',
+                            tr(context, "Задачи · {p0}", {
+                              'p0': user['name'] ?? 'Участник',
+                            }),
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
@@ -221,10 +287,18 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            '${projects.length} проектов · ${tasks.length} задач · ${tasks.where(_overdue).length} просрочено',
-                            style: const TextStyle(
+                            tr(
+                              context,
+                              "{p0} проектов · {p1} задач · {p2} просрочено",
+                              {
+                                'p0': projects.length,
+                                'p1': tasks.length,
+                                'p2': tasks.where(_overdue).length,
+                              },
+                            ),
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.muted,
+                              color: AppColors.of(context).muted,
                             ),
                           ),
                         ],
@@ -243,10 +317,10 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                   padding: const EdgeInsets.all(20),
                   children: [
                     if (tasks.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.all(24),
                         child: Text(
-                          'Нет назначенных задач',
+                          tr(context, 'Нет назначенных задач'),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -257,10 +331,10 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Text(
                           '${project.name.toUpperCase()} · ${tasks.where((t) => t['projectId'] == project.id).length}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.muted,
+                            color: AppColors.of(context).muted,
                           ),
                         ),
                       ),
@@ -300,10 +374,10 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: Colors.white,
+        color: AppColors.of(context).canvas,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.border),
+          side: BorderSide(color: AppColors.of(context).border),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -318,17 +392,17 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                     Expanded(
                       child: Text(
                         task['displayId']?.toString() ?? '',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.muted,
+                          color: AppColors.of(context).muted,
                         ),
                       ),
                     ),
                     Text(
                       status,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.muted,
+                        color: AppColors.of(context).muted,
                       ),
                     ),
                   ],
@@ -342,7 +416,7 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                           ? LucideIcons.circleCheck
                           : LucideIcons.circle,
                       size: 17,
-                      color: AppColors.muted,
+                      color: AppColors.of(context).muted,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -359,13 +433,13 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                 const SizedBox(height: 12),
                 Text(
                   end == null
-                      ? 'Без срока'
+                      ? tr(context, 'Без срока')
                       : '${_overdue(task) ? 'Просрочено' : 'Срок'} · ${end.day}.${end.month.toString().padLeft(2, '0')}.${end.year}',
                   style: TextStyle(
                     fontSize: 12,
                     color: _overdue(task)
                         ? const Color(0xFFBB291E)
-                        : AppColors.muted,
+                        : AppColors.of(context).muted,
                   ),
                 ),
                 const Padding(
@@ -373,8 +447,16 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                   child: Divider(height: 1),
                 ),
                 Text(
-                  'План: ${plan ~/ 60} ч ${plan % 60} мин · Факт: ${elapsed ~/ 60} ч ${elapsed % 60} мин',
-                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                  tr(context, "План: {p0} ч {p1} мин · Факт: {p2} ч {p3} мин", {
+                    'p0': plan ~/ 60,
+                    'p1': plan % 60,
+                    'p2': elapsed ~/ 60,
+                    'p3': elapsed % 60,
+                  }),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.of(context).muted,
+                  ),
                 ),
               ],
             ),
@@ -390,7 +472,7 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.of(context).canvas,
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) => SafeArea(
           child: Padding(
@@ -398,8 +480,8 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Проекты',
+                Text(
+                  tr(context, 'Проекты'),
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 16),
@@ -408,7 +490,7 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                     child: Column(
                       children: [
                         CheckboxListTile(
-                          title: const Text('Все проекты'),
+                          title: Text(tr(context, 'Все проекты')),
                           selected: selected.isEmpty,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -441,7 +523,7 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: () => Navigator.pop(context, selected),
-                    child: const Text('Готово'),
+                    child: Text(tr(context, 'Готово')),
                   ),
                 ),
               ],
@@ -474,18 +556,30 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
         )
         .toList();
     final visiblePeople = DashboardPreviewScope.limit(context, people);
+    final headingScope = context
+        .dependOnInheritedWidgetOfExactType<WidgetCollapseScope>();
+    if (headingScope?.onMemberCountChanged != null &&
+        headingScope!.memberCount != people.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) headingScope.onMemberCountChanged?.call(people.length);
+      });
+    }
+
     return LayoutBuilder(
       builder: (context, headerConstraints) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (!WidgetCollapseScope.hidesHeading(context)) ...[
+              AppWidgetHeading(
+                icon: LucideIcons.users,
+                title: tr(context, 'Команда'),
+                memberCount: people.length,
+              ),
+              const SizedBox(height: 8),
+            ],
             Row(
               children: [
-                const AppWidgetHeading(
-                  icon: LucideIcons.users,
-                  title: 'Команда',
-                ),
-                const SizedBox(width: 8),
                 Expanded(
                   child: TextButton(
                     onPressed: _filter,
@@ -494,7 +588,7 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                       minimumSize: const Size(0, 36),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       alignment: Alignment.centerLeft,
-                      foregroundColor: AppColors.muted,
+                      foregroundColor: AppColors.of(context).muted,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -502,10 +596,12 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                         Flexible(
                           child: Text(
                             _selected.isEmpty
-                                ? 'Все проекты'
-                                : 'Проекты: ${_selected.length}',
+                                ? tr(context, 'Все проекты')
+                                : tr(context, "Проекты: {p0}", {
+                                    'p0': _selected.length,
+                                  }),
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11),
+                            style: _TeamTypography.detail,
                           ),
                         ),
                         const SizedBox(width: 2),
@@ -517,8 +613,9 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                 Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: const Color(0xFFDEDEDC)),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  padding: const EdgeInsets.all(2),
                   clipBehavior: Clip.antiAlias,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -535,50 +632,38 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                           icon: LucideIcons.circleDashed,
                           label: 'Эффективность',
                         ),
-                      ]) ...[
-                        if (entry.id != 'cards')
-                          Container(
-                            width: 1,
-                            height: 24,
-                            color: const Color(0xFFDEDEDC),
+                      ])
+                        Semantics(
+                          selected: _view == entry.id,
+                          button: true,
+                          label: entry.label,
+                          child: Tooltip(
+                            message: entry.label,
+                            excludeFromSemantics: true,
+                            child: Material(
+                              color: _view == entry.id
+                                  ? AppColors.accent.withValues(alpha: 0.10)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              child: InkWell(
+                                key: ValueKey('team-view-${entry.id}'),
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () => setState(() => _view = entry.id),
+                                child: SizedBox.square(
+                                  dimension: 30,
+                                  child: Icon(
+                                    entry.icon,
+                                    size: 15,
+                                    color: _view == entry.id
+                                        ? AppColors.accent
+                                        : AppColors.of(context).muted,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        IconButton(
-                          tooltip: entry.label,
-                          onPressed: () => setState(() => _view = entry.id),
-                          style: IconButton.styleFrom(
-                            backgroundColor: _view == entry.id
-                                ? const Color(0xFFF5F5F4)
-                                : Colors.transparent,
-                            foregroundColor: const Color(0xFF252537),
-                            minimumSize: const Size(24, 30),
-                            maximumSize: const Size(24, 30),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            padding: EdgeInsets.zero,
-                          ),
-                          icon: Icon(entry.icon, size: 13),
                         ),
-                      ],
                     ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF6F6F5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    headerConstraints.maxWidth < 300
-                        ? '${people.length}'
-                        : '${people.length} чел.',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.muted,
-                    ),
                   ),
                 ),
                 ?widget.trailing,
@@ -586,43 +671,52 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
             ),
             const SizedBox(height: 8),
             if (people.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(24),
-                child: Text('Нет участников', textAlign: TextAlign.center),
+                child: Text(
+                  tr(context, 'Нет участников'),
+                  textAlign: TextAlign.center,
+                ),
               ),
             if (_view == 'list')
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
-                        'Участник',
-                        style: TextStyle(fontSize: 10, color: AppColors.muted),
+                        tr(context, 'Участник'),
+                        style: _TeamTypography.column,
                       ),
                     ),
                     SizedBox(
-                      width: 40,
+                      width: _listColumnWidth(context, 'Проект.', 52),
                       child: Text(
-                        'Проект.',
+                        tr(context, 'Проект.'),
+                        maxLines: 1,
+                        softWrap: false,
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 9, color: AppColors.muted),
+                        style: _TeamTypography.column,
                       ),
                     ),
                     SizedBox(
-                      width: 40,
+                      width: _listColumnWidth(context, 'Задачи', 48),
                       child: Text(
-                        'Задачи',
+                        tr(context, 'Задачи'),
+                        maxLines: 1,
+                        softWrap: false,
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 9, color: AppColors.muted),
+                        style: _TeamTypography.column,
                       ),
                     ),
                     SizedBox(
-                      width: 46,
+                      width: _listColumnWidth(context, 'Проср.', 52),
                       child: Text(
-                        'Проср.',
+                        tr(context, 'Проср.'),
+                        maxLines: 1,
+                        softWrap: false,
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 9, color: AppColors.muted),
+                        style: _TeamTypography.column,
                       ),
                     ),
                   ],
@@ -677,15 +771,13 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
   Widget _person(Map<String, dynamic> user) {
     final tasks = _tasks(user['id'].toString());
     final projects = _memberProjects(user['id'].toString(), tasks);
-    final done = tasks
-        .where((task) => ((task['progress'] as num?) ?? 0) >= 100)
-        .length;
+    final done = tasks.where(dashboardDone).length;
     final overdue = tasks.where(_overdue).length;
     final name = Text(
       user['name']?.toString() ?? 'Участник',
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      style: _TeamTypography.name(context),
     );
     return InkWell(
       onTap: () => _open(user, tasks, projects),
@@ -701,8 +793,8 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    height: 36,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 40),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -713,19 +805,15 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                             user['name']?.toString() ?? 'Участник',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              height: 1.3,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: _TeamTypography.name(context),
                           ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 8),
-                  SizedBox(
-                    height: 32,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
                     child: Wrap(
                       spacing: 9,
                       runSpacing: 4,
@@ -747,13 +835,15 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                     ),
                   ),
                   const SizedBox(height: 5),
-                  SizedBox(
-                    height: 20,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 24),
                     child: Row(
                       children: [
                         if (overdue > 0)
                           Tooltip(
-                            message: 'Просрочено задач: $overdue',
+                            message: tr(context, "Просрочено задач: {p0}", {
+                              'p0': overdue,
+                            }),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 6,
@@ -773,11 +863,15 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    '$overdue проср.',
+                                    tr(context, "{p0} проср.", {'p0': overdue}),
                                     style: const TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 11,
+                                      height: 1.2,
                                       color: Color(0xFFBB291F),
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w600,
+                                      fontFeatures: [
+                                        FontFeature.tabularFigures(),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -806,15 +900,17 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                             strokeWidth: 8,
                             strokeCap: StrokeCap.round,
                             color: const Color(0xFF19744C),
-                            backgroundColor: const Color(0xFFF5F5F4),
+                            backgroundColor:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerLow
+                                : const Color(0xFFF5F5F4),
                           ),
                         ),
                         Text(
                           '${tasks.isEmpty ? 0 : (100 * done / tasks.length).round()}%',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: _TeamTypography.percentage(context),
                         ),
                       ],
                     ),
@@ -830,11 +926,11 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '$done из ${tasks.length} завершено',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.muted,
-                    ),
+                    tr(context, "{p0} из {p1} завершено", {
+                      'p0': done,
+                      'p1': tasks.length,
+                    }),
+                    style: _TeamTypography.detail,
                   ),
                 ],
               )
@@ -882,35 +978,31 @@ class _DashboardTeamWidgetState extends State<DashboardTeamWidget> {
                   ),
                   if (_view == 'list') ...[
                     SizedBox(
-                      width: 40,
+                      width: _listColumnWidth(context, 'Проект.', 52),
                       child: Text(
                         '${projects.length}',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.muted,
-                        ),
+                        style: _TeamTypography.number(context),
                       ),
                     ),
                     SizedBox(
-                      width: 40,
+                      width: _listColumnWidth(context, 'Задачи', 48),
                       child: Text(
                         '${tasks.length}',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.muted,
-                        ),
+                        style: _TeamTypography.number(context),
                       ),
                     ),
                     SizedBox(
-                      width: 46,
+                      width: _listColumnWidth(context, 'Проср.', 52),
                       child: Center(
                         child: overdue > 0
                             ? _badge(overdue)
-                            : const Text(
+                            : Text(
                                 '—',
-                                style: TextStyle(color: AppColors.muted),
+                                style: TextStyle(
+                                  color: AppColors.of(context).muted,
+                                ),
                               ),
                       ),
                     ),

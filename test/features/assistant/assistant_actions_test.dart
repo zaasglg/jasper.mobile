@@ -1,3 +1,4 @@
+import 'package:jospar/features/assistant/domain/entities/assistant_attachment.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
@@ -21,6 +22,73 @@ void main() {
       selection,
     );
   });
+  const file = AssistantAttachment(
+    name: 'plan.csv',
+    mimeType: 'text/csv',
+    size: 21,
+    dataUrl: 'data:text/csv;base64,dGFzayxvd25lcgpBUEksQWxpeWEK',
+  );
+  test(
+    'file extraction preserves draft warnings and never confirms implicitly',
+    () async {
+      server.responses.add({
+        'isTaskDetected': true,
+        'suggestedTask': {'title': 'Обновить API'},
+        'attachmentMessage': 'Прочитана только часть документа',
+        'attachments': [
+          {
+            'name': 'plan.csv',
+            'mimeType': 'text/csv',
+            'size': 21,
+            'status': 'analyzed',
+            'analysisMode': 'text',
+            'truncated': true,
+          },
+        ],
+      });
+      final message = await actions.extractAttachmentMessage(
+        'w',
+        'Создай задачу',
+        [file],
+        [],
+        'p',
+      );
+      expect(message!.draft!.title, 'Обновить API');
+      expect(message.attachments.single.truncated, isTrue);
+      expect(message.attachmentMessage, contains('часть'));
+      expect(server.requests.single.path, 'ai/extract-task');
+      expect(server.requests.single.headers['X-Workspace-Id'], 'w');
+      expect(server.requests.single.data['attachments'], [file.toUploadJson()]);
+    },
+  );
+  test(
+    'unsupported extraction returns a user-facing report without a draft',
+    () async {
+      server.responses.add({
+        'isTaskDetected': false,
+        'attachmentMessage': 'Нужна расшифровка',
+        'attachments': [
+          {
+            'name': 'audio.mp3',
+            'mimeType': 'audio/mpeg',
+            'size': 21,
+            'status': 'unsupported',
+            'reason': 'Нужна расшифровка',
+          },
+        ],
+      });
+      final message = await actions.extractAttachmentMessage(
+        'w',
+        '',
+        [file],
+        [],
+        null,
+      );
+      expect(message!.draft, isNull);
+      expect(message.content, 'Нужна расшифровка');
+      expect(message.attachments.single.status, 'unsupported');
+    },
+  );
   final draft = <String, dynamic>{
     'type': 'task_edit_draft',
     'workspaceId': 'w',

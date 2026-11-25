@@ -1,0 +1,31 @@
+{
+  "repository": "https://github.com/microsoft/fluentui-emoji",
+  "commit": "1ffb34c752ecf5d402f04cfb4b392c77f57c54bc",
+  "license": "MIT",
+  "images": {
+    "thumbs_up.png": "assets/Thumbs up/Default/3D/thumbs_up_3d_default.png",
+    "red_heart.png": "assets/Red heart/3D/red_heart_3d.png",
+    "face_with_tears_of_joy.png": "assets/Face with tears of joy/3D/face_with_tears_of_joy_3d.png",
+    "face_with_open_mouth.png": "assets/Face with open mouth/3D/face_with_open_mouth_3d.png",
+    "crying_face.png": "assets/Crying face/3D/crying_face_3d.png",
+    "folded_hands.png": "assets/Folded hands/Default/3D/folded_hands_3d_default.png",
+    "fire.png": "assets/Fire/3D/fire_3d.png",
+    "check_mark_button.png": "assets/Check mark button/3D/check_mark_button_3d.png",
+    "party_popper.png": "assets/Party popper/3D/party_popper_3d.png",
+    "smiling_face_with_heart-eyes.png": "assets/Smiling face with heart-eyes/3D/smiling_face_with_heart-eyes_3d.png",
+    "clapping_hands.png": "assets/Clapping hands/Default/3D/clapping_hands_3d_default.png",
+    "beaming_face_with_smiling_eyes.png": "assets/Beaming face with smiling eyes/3D/beaming_face_with_smiling_eyes_3d.png",
+    "thinking_face.png": "assets/Thinking face/3D/thinking_face_3d.png",
+    "hundred_points.png": "assets/Hundred points/3D/hundred_points_3d.png",
+    "handshake.png": "assets/Handshake/3D/handshake_3d.png",
+    "eyes.png": "assets/Eyes/3D/eyes_3d.png",
+    "raising_hands.png": "assets/Raising hands/Default/3D/raising_hands_3d_default.png",
+    "purple_heart.png": "assets/Purple heart/3D/purple_heart_3d.png",
+    "flexed_biceps.png": "assets/Flexed biceps/Default/3D/flexed_biceps_3d_default.png",
+    "smiling_face_with_hearts.png": "assets/Smiling face with hearts/3D/smiling_face_with_hearts_3d.png",
+    "hugging_face.png": "assets/Hugging face/3D/hugging_face_3d.png",
+    "smiling_face_with_sunglasses.png": "assets/Smiling face with sunglasses/3D/smiling_face_with_sunglasses_3d.png",
+    "star-struck.png": "assets/Star-struck/3D/star-struck_3d.png",
+    "ok_hand.png": "assets/Ok hand/Default/3D/ok_hand_3d_default.png"
+  }
+}

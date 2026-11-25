@@ -1,3 +1,4 @@
+import '../../domain/entities/column_copy_result.dart';
 import '../../../projects/domain/entities/project_task_model.dart';
 import 'dart:async';
 
@@ -94,7 +95,11 @@ class KanbanCubit extends Cubit<KanbanState> {
     }
   }
 
-  Future<void> load(String projectId, {bool refresh = false}) async {
+  Future<void> load(
+    String projectId, {
+    bool refresh = false,
+    bool Function()? isActive,
+  }) async {
     if (_sessionInvalidated || isClosed || projectId.isEmpty) return;
     if (projectId == state.projectId && state.movingTaskIds.isNotEmpty) {
       _refreshAfterOperations = true;
@@ -140,7 +145,9 @@ class KanbanCubit extends Cubit<KanbanState> {
     }
     try {
       final board = await _repository.loadBoard(projectId);
-      if (isClosed || revision != _loadRevision) return;
+      if (isClosed || revision != _loadRevision || isActive?.call() == false) {
+        return;
+      }
       _cache.write(projectId, board);
       emit(
         state.copyWith(
@@ -154,6 +161,7 @@ class KanbanCubit extends Cubit<KanbanState> {
     } on KanbanException catch (error) {
       if (isClosed ||
           revision != _loadRevision ||
+          isActive?.call() == false ||
           error.message == 'Запрос отменён.') {
         return;
       }
@@ -311,6 +319,11 @@ class KanbanCubit extends Cubit<KanbanState> {
     () => _repository.applyTranslation(task.id, translation),
   );
 
+  void restoreTaskTitle(String taskId) {
+    final titles = {...state.translatedTitles}..remove(taskId);
+    emit(state.copyWith(translatedTitles: titles));
+  }
+
   Future<TaskTranslation?> translateTask(
     ProjectTaskModel task,
     String workspaceId,
@@ -333,7 +346,12 @@ class KanbanCubit extends Cubit<KanbanState> {
         language,
       );
       if (!_isCurrentOperation(operationRevision)) return null;
-      emit(state.copyWith(movingTaskIds: _withoutTask(task.id)));
+      emit(
+        state.copyWith(
+          movingTaskIds: _withoutTask(task.id),
+          translatedTitles: {...state.translatedTitles, task.id: result.title},
+        ),
+      );
       return result;
     } catch (error) {
       if (!_isCurrentOperation(operationRevision)) return null;
@@ -592,6 +610,117 @@ class KanbanCubit extends Cubit<KanbanState> {
         );
       }
       return false;
+    }
+  }
+
+  Object? _columnCopyOperation;
+  bool get supportsColumnCopy => _repository is KanbanColumnCopyRepository;
+
+  Future<ColumnCopyResult> copyColumn(
+    KanbanColumnModel column,
+    String name, {
+    required bool Function() isActive,
+  }) async {
+    const cancelled = ColumnCopyResult(ColumnCopyStatus.cancelled);
+    if (_columnCopyOperation != null) {
+      return const ColumnCopyResult(
+        ColumnCopyStatus.failure,
+        message: 'Копирование уже выполняется. Дождитесь завершения запроса.',
+      );
+    }
+    if (!supportsColumnCopy || _sessionInvalidated || isClosed || !isActive()) {
+      return cancelled;
+    }
+    if (state.columnCopyDenied) {
+      return const ColumnCopyResult(
+        ColumnCopyStatus.forbidden,
+        message: 'Недостаточно прав для копирования колонки. Обновите доску.',
+      );
+    }
+    if (name.trim().isEmpty) {
+      return const ColumnCopyResult(
+        ColumnCopyStatus.failure,
+        message: 'Введите название новой колонки',
+      );
+    }
+    if (!state.columns.any((item) => item.id == column.id && !item.archived)) {
+      return const ColumnCopyResult(
+        ColumnCopyStatus.stale,
+        message: 'Колонка удалена, архивирована или изменена. Обновите доску.',
+      );
+    }
+    final revision = _beginTaskOperation();
+    final projectId = state.projectId;
+    final operation = Object();
+    _columnCopyOperation = operation;
+    bool current() =>
+        _isCurrentOperation(revision) &&
+        state.projectId == projectId &&
+        isActive();
+    try {
+      final copied = await (_repository as KanbanColumnCopyRepository)
+          .copyColumn(columnId: column.id, name: name.trim());
+      if (!current()) return cancelled;
+      _cache.clear();
+      await load(projectId, refresh: true, isActive: current);
+      if (!current()) return cancelled;
+      // Keep the authoritative response visible even if the refresh failed.
+      final columns = state.columns
+          .where((item) => item.id != copied.id)
+          .toList();
+      final sourceIndex = columns.indexWhere((item) => item.id == column.id);
+      columns.insert(
+        sourceIndex < 0 ? columns.length : sourceIndex + 1,
+        copied,
+      );
+      emit(
+        state.copyWith(
+          columns: [
+            for (var i = 0; i < columns.length; i++)
+              columns[i].copyWith(order: i),
+          ],
+        ),
+      );
+      _cache.write(
+        projectId,
+        KanbanBoardData(columns: state.columns, tasks: state.tasks),
+      );
+      notifyTaskChanges();
+      return ColumnCopyResult(ColumnCopyStatus.success, columnId: copied.id);
+    } on KanbanColumnCopyException catch (error) {
+      if (!current()) return cancelled;
+      if (error.statusCode == 403) {
+        emit(state.copyWith(columnCopyDenied: true));
+      }
+      if (error.uncertain || error.statusCode == 403) {
+        _cache.clear();
+        await load(projectId, refresh: true, isActive: current);
+        if (!current()) return cancelled;
+      }
+      return ColumnCopyResult(
+        error.uncertain
+            ? ColumnCopyStatus.uncertain
+            : error.statusCode == 403
+            ? ColumnCopyStatus.forbidden
+            : {404, 409, 410, 412, 422}.contains(error.statusCode)
+            ? ColumnCopyStatus.stale
+            : ColumnCopyStatus.failure,
+        message: error.message,
+      );
+    } catch (_) {
+      if (!current()) return cancelled;
+      _cache.clear();
+      await load(projectId, refresh: true, isActive: current);
+      if (!current()) return cancelled;
+      return const ColumnCopyResult(
+        ColumnCopyStatus.uncertain,
+        message:
+            'Результат копирования неизвестен. Колонка могла быть создана. Обновите доску и проверьте её перед повторным копированием.',
+      );
+    } finally {
+      if (identical(_columnCopyOperation, operation)) {
+        _columnCopyOperation = null;
+      }
     }
   }
 

@@ -43,6 +43,14 @@
             android:exported="false"
             android:stopWithTask="false"
             android:foregroundServiceType="microphone|camera|mediaProjection" />
+        <activity android:name=".InboxQuickAddActivity"
+            android:exported="false"
+            android:taskAffinity="com.jospar.app.capture"
+            android:excludeFromRecents="true"
+            android:theme="@style/InboxCaptureTheme"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -65,6 +73,14 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <receiver android:name=".AssistantWidgetProvider" android:exported="false"
+            android:label="@string/assistant_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/assistant_widget_info" />
+        </receiver>
         <receiver
             android:name=".InboxWidgetProvider"
             android:exported="true">
@@ -74,6 +90,9 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/inbox_widget_info" />
+        </receiver>
+        <receiver android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver" android:exported="false">
+            <intent-filter><action android:name="es.antonborri.home_widget.action.BACKGROUND" /></intent-filter>
         </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

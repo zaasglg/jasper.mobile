@@ -186,6 +186,32 @@ class TaskDetailsCubit extends Cubit<TaskDetailsState> {
     }
   }
 
+  Future<void> updateStatus(String status) async {
+    final task = state.task;
+    final repository = _repository;
+    if (task == null || state.isSaving || task.status == status) return;
+    if (repository is! TaskStatusRepository) {
+      emit(state.copyWith(actionErrorMessage: 'Изменение колонки недоступно.'));
+      return;
+    }
+    emit(state.copyWith(isSaving: true, clearActionError: true));
+    try {
+      final payload = await (repository as TaskStatusRepository).updateStatus(
+        task.id,
+        status,
+      );
+      if (!isClosed && state.task?.id == task.id) _applyPayload(payload);
+    } catch (error) {
+      if (!isClosed && state.task?.id == task.id) {
+        _rollback(
+          error is TaskDetailsException
+              ? error.message
+              : 'Не удалось изменить колонку.',
+        );
+      }
+    }
+  }
+
   Future<({List<TaskLabelModel> shared, List<TaskLabelModel> personal})>
   getLabelCatalog() async {
     final repository = _repository;

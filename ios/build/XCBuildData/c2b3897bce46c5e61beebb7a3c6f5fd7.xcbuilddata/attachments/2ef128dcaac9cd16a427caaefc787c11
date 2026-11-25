@@ -1,0 +1,19 @@
+{
+  "" : {
+    "diagnostics" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework-primary.dia",
+    "emit-module-dependencies" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework-primary-emit-module.dia",
+    "pch" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework-primary.swiftdeps"
+  },
+  "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/Sources/FlutterFramework/FlutterFramework.swift" : {
+    "const-values" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework.swiftconstvalues",
+    "dependencies" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework.d",
+    "diagnostics" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework.dia",
+    "index-unit-output-path" : "/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework.o",
+    "llvm-bc" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework.bc",
+    "object" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework.o",
+    "swift-dependencies" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework.swiftdeps",
+    "swiftmodule" : "/Users/erdaulettojbekov/Developer/jospar/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/build/FlutterFramework.build/Debug-iphonesimulator/FlutterFramework.build/Objects-normal/arm64/FlutterFramework~partial.swiftmodule"
+  }
+}

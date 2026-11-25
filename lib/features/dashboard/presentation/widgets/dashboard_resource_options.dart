@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import '../../domain/entities/dashboard_widget_options.dart';
 import 'dart:convert';
@@ -120,7 +121,7 @@ class _DashboardResourceOptionsState extends State<DashboardResourceOptions> {
       if (available.isEmpty)
         Text(
           empty,
-          style: const TextStyle(fontSize: 12, color: AppColors.muted),
+          style: TextStyle(fontSize: 12, color: AppColors.of(context).muted),
         ),
       for (final item in available.entries)
         CheckboxListTile(
@@ -144,11 +145,20 @@ class _DashboardResourceOptionsState extends State<DashboardResourceOptions> {
       const SizedBox(height: 20),
       DashboardSelectorField<String>(
         initialValue: _filter,
-        decoration: const InputDecoration(labelText: 'Отбор ресурсов'),
-        items: const [
-          DropdownMenuItem(value: 'projects', child: Text('По проектам')),
-          DropdownMenuItem(value: 'labels', child: Text('По меткам')),
-          DropdownMenuItem(value: 'epics', child: Text('По эпикам')),
+        decoration: InputDecoration(labelText: tr(context, 'Отбор ресурсов')),
+        items: [
+          DropdownMenuItem(
+            value: 'projects',
+            child: Text(tr(context, 'По проектам')),
+          ),
+          DropdownMenuItem(
+            value: 'labels',
+            child: Text(tr(context, 'По меткам')),
+          ),
+          DropdownMenuItem(
+            value: 'epics',
+            child: Text(tr(context, 'По эпикам')),
+          ),
         ],
         onChanged: (value) => setState(() {
           _filter = value ?? _filter;
@@ -159,11 +169,20 @@ class _DashboardResourceOptionsState extends State<DashboardResourceOptions> {
       DashboardSelectorField<String>(
         key: ValueKey('resource-mode-${widget.projectId}:$_mode'),
         initialValue: _mode,
-        decoration: const InputDecoration(labelText: 'Показатели'),
-        items: const [
-          DropdownMenuItem(value: 'all', child: Text('Все ресурсы')),
-          DropdownMenuItem(value: 'selected', child: Text('Выбранные ресурсы')),
-          DropdownMenuItem(value: 'tasks', child: Text('Прогресс задач')),
+        decoration: InputDecoration(labelText: tr(context, 'Показатели')),
+        items: [
+          DropdownMenuItem(
+            value: 'all',
+            child: Text(tr(context, 'Все ресурсы')),
+          ),
+          DropdownMenuItem(
+            value: 'selected',
+            child: Text(tr(context, 'Выбранные ресурсы')),
+          ),
+          DropdownMenuItem(
+            value: 'tasks',
+            child: Text(tr(context, 'Прогресс задач')),
+          ),
         ],
         onChanged: (value) => setState(() {
           _mode = value ?? _mode;
@@ -180,7 +199,7 @@ class _DashboardResourceOptionsState extends State<DashboardResourceOptions> {
                   widget.cubit.retryData(_key);
                   setState(_load);
                 },
-                child: const Text('Повторить загрузку фильтров'),
+                child: Text(tr(context, 'Повторить загрузку фильтров')),
               );
             }
             if (!snapshot.hasData) {

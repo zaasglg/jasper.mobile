@@ -1,3 +1,5 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import 'package:forui/forui.dart';
 import '../network/api_constants.dart';
 import 'cached_svg_image.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -25,12 +27,14 @@ class UserAvatar extends StatefulWidget {
     super.key,
     required this.size,
     this.userId,
+    this.useForui = false,
     this.name = '',
     this.avatarUrl,
     this.backgroundColor = AppColors.accent,
     this.foregroundColor = Colors.white,
   });
   final double size;
+  final bool useForui;
   final String? userId;
   final String name;
   final String? avatarUrl;
@@ -149,15 +153,22 @@ class _UserAvatarState extends State<UserAvatar> {
       }
     }
     return Semantics(
-      label: widget.name.isEmpty ? 'Аватар пользователя' : widget.name,
+      label: widget.name.isEmpty
+          ? tr(context, 'Аватар пользователя')
+          : widget.name,
       image: true,
-      child: ClipOval(
-        child: SizedBox(
-          width: widget.size,
-          height: widget.size,
-          child: content,
-        ),
-      ),
+      child: widget.useForui
+          ? FAvatar.raw(
+              size: widget.size,
+              child: SizedBox.expand(child: content),
+            )
+          : ClipOval(
+              child: SizedBox(
+                width: widget.size,
+                height: widget.size,
+                child: content,
+              ),
+            ),
     );
   }
 }

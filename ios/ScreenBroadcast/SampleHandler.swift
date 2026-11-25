@@ -8,7 +8,7 @@
 import ReplayKit
 import OSLog
 
-let broadcastLogger = OSLog(subsystem: "com.jospar.app.ScreenBroadcast", category: "Broadcast")
+let broadcastLogger = OSLog(subsystem: "com.josparbee.app.ScreenBroadcast", category: "Broadcast")
 private enum Constants {
     // the App Group ID value that the app and the broadcast extension targets are setup with. It differs for each app.
     static let appGroupIdentifier = "group.com.jospar.app"

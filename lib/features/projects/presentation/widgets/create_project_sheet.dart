@@ -1,7 +1,11 @@
+import 'package:jospar/core/localization/app_translations.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../domain/entities/project_model.dart';
 import '../../domain/entities/create_project_request.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -20,7 +24,10 @@ const _surface = Color(0xFFFAFAF9);
 const _accent = Color(0xFF6D5FE0);
 const _danger = Color(0xFFB42318);
 
-Future<void> showCreateProjectFlow(BuildContext context) async {
+Future<void> showCreateProjectFlow(
+  BuildContext context, {
+  ProjectModel? parent,
+}) async {
   final workspaceState = context.read<WorkspaceCubit>().state;
   if (workspaceState is! WorkspaceLoaded ||
       workspaceState.selected == null ||
@@ -28,7 +35,11 @@ Future<void> showCreateProjectFlow(BuildContext context) async {
     return;
   }
 
-  final initialWorkspace = workspaceState.selected!;
+  final initialWorkspace = parent == null
+      ? workspaceState.selected!
+      : workspaceState.workspaces.firstWhere(
+          (workspace) => workspace.id == parent.workspaceId,
+        );
   final projectsCubit = context.read<ProjectsCubit>();
   final workspaceCubit = context.read<WorkspaceCubit>();
   final messenger = ScaffoldMessenger.of(context);
@@ -36,7 +47,7 @@ Future<void> showCreateProjectFlow(BuildContext context) async {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.of(context).canvas,
     barrierColor: _ink.withValues(alpha: 0.36),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -44,7 +55,10 @@ Future<void> showCreateProjectFlow(BuildContext context) async {
     builder: (_) => BlocProvider<ProjectsCubit>.value(
       value: projectsCubit,
       child: CreateProjectSheet(
-        workspaces: workspaceState.workspaces,
+        workspaces: parent == null
+            ? workspaceState.workspaces
+            : [initialWorkspace],
+        parent: parent,
         initialWorkspace: initialWorkspace,
       ),
     ),
@@ -62,8 +76,8 @@ Future<void> showCreateProjectFlow(BuildContext context) async {
         context: context,
         tone: AppSnackBarTone.success,
         content: Text(
-          'Проект создан',
-          style: GoogleFonts.manrope(fontWeight: FontWeight.w600),
+          tr(context, 'Проект создан'),
+          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -75,10 +89,12 @@ class CreateProjectSheet extends StatefulWidget {
     super.key,
     required this.workspaces,
     required this.initialWorkspace,
+    this.parent,
   });
 
   final List<WorkspaceModel> workspaces;
   final WorkspaceModel initialWorkspace;
+  final ProjectModel? parent;
 
   @override
   State<CreateProjectSheet> createState() => _CreateProjectSheetState();
@@ -114,6 +130,7 @@ class _CreateProjectSheetState extends State<CreateProjectSheet> {
         name: _nameController.text,
         description: _descriptionController.text,
         workspaceId: _workspace.id,
+        parentId: widget.parent?.id,
         progress: 0,
         isPinned: false,
       ),
@@ -162,6 +179,18 @@ class _CreateProjectSheetState extends State<CreateProjectSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
+                            if (widget.parent != null) ...[
+                              Text(
+                                tr(context, "Подпроект: {p0}", {
+                                  'p0': widget.parent!.name,
+                                }),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: _secondary,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             _LabeledTextField(
                               key: const Key('project_name_field'),
                               controller: _nameController,
@@ -170,13 +199,15 @@ class _CreateProjectSheetState extends State<CreateProjectSheet> {
                               hint: 'Название проекта',
                               enabled: !disabled,
                               textInputAction: TextInputAction.next,
-                              validator: _required('Укажите название'),
+                              validator: _required(
+                                tr(context, 'Укажите название'),
+                              ),
                             ),
                             const SizedBox(height: 16),
                             _WorkspaceField(
                               workspaces: widget.workspaces,
                               selected: _workspace,
-                              enabled: !disabled,
+                              enabled: !disabled && widget.parent == null,
                               onChanged: (workspace) {
                                 if (workspace == null) return;
                                 setState(() => _workspace = workspace);
@@ -193,13 +224,12 @@ class _CreateProjectSheetState extends State<CreateProjectSheet> {
                               maxLines: 4,
                               textInputAction: TextInputAction.newline,
                             ),
-                            const SizedBox(height: 16),
                             if (state.creationError
                                 case final error?) ...<Widget>[
                               const SizedBox(height: 16),
                               _ErrorBanner(message: error),
                             ],
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 20),
                             _FooterActions(
                               isCreating: disabled,
                               onCancel: _close,
@@ -253,8 +283,8 @@ class _SheetHeader extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Text(
-              'Новый проект',
-              style: GoogleFonts.manrope(
+              tr(context, 'Новый проект'),
+              style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: _ink,
@@ -262,7 +292,7 @@ class _SheetHeader extends StatelessWidget {
             ),
           ),
           IconButton.outlined(
-            tooltip: 'Закрыть',
+            tooltip: tr(context, 'Закрыть'),
             onPressed: disabled ? null : onClose,
             style: IconButton.styleFrom(
               minimumSize: const Size.square(44),
@@ -319,7 +349,7 @@ class _LabeledTextField extends StatelessWidget {
           maxLines: maxLines,
           textInputAction: textInputAction,
           validator: validator,
-          style: GoogleFonts.manrope(fontSize: 15, color: _ink),
+          style: GoogleFonts.inter(fontSize: 15, color: _ink),
           decoration: _inputDecoration(hint: hint),
         ),
       ],
@@ -347,7 +377,7 @@ class _FieldLabel extends StatelessWidget {
         ],
       ),
       maxLines: 2,
-      style: GoogleFonts.manrope(
+      style: GoogleFonts.inter(
         fontSize: 13,
         height: 1.35,
         fontWeight: FontWeight.w600,
@@ -378,7 +408,7 @@ class _WorkspaceField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const _FieldLabel(label: 'Рабочее пространство'),
+        _FieldLabel(label: tr(context, 'Рабочее пространство')),
         const SizedBox(height: 7),
         DropdownButtonFormField<WorkspaceModel>(
           key: const Key('project_workspace_dropdown'),
@@ -390,7 +420,7 @@ class _WorkspaceField extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(12),
           dropdownColor: Colors.white,
-          style: GoogleFonts.manrope(fontSize: 15, color: _ink),
+          style: GoogleFonts.inter(fontSize: 15, color: _ink),
           decoration: _inputDecoration(),
           onChanged: enabled ? onChanged : null,
           selectedItemBuilder: (context) => items
@@ -423,7 +453,9 @@ class _WorkspaceOption extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            workspace.name.isEmpty ? 'Без названия' : workspace.name,
+            workspace.name.isEmpty
+                ? tr(context, 'Без названия')
+                : workspace.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -451,7 +483,7 @@ class _WorkspaceMark extends StatelessWidget {
       ),
       child: Text(
         name.isEmpty ? 'W' : name.characters.first.toUpperCase(),
-        style: GoogleFonts.manrope(
+        style: GoogleFonts.inter(
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: Colors.white,
@@ -478,7 +510,7 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Text(
         message,
-        style: GoogleFonts.manrope(fontSize: 13, color: _danger),
+        style: GoogleFonts.inter(fontSize: 13, color: _danger),
       ),
     );
   }
@@ -497,71 +529,90 @@ class _FooterActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final narrow = constraints.maxWidth < 320;
-        final cancel = OutlinedButton(
-          onPressed: isCreating ? null : onCancel,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(118, 52),
-            foregroundColor: _secondary,
-            side: const BorderSide(color: _border),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            textStyle: GoogleFonts.manrope(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          child: const Text('Отмена'),
-        );
-        final submit = FilledButton(
-          key: const Key('submit_project_button'),
-          onPressed: isCreating ? null : onSubmit,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size(184, 52),
-            backgroundColor: _accent,
-            disabledBackgroundColor: _accent.withValues(alpha: 0.55),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            textStyle: GoogleFonts.manrope(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          child: isCreating
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
+    final base = Theme.of(context).brightness == Brightness.dark
+        ? FTheme.neutral.dark.touch
+        : FTheme.neutral.light.touch;
+    return FTheme(
+      data: FThemeData(
+        touch: true,
+        colors: base.colors.copyWith(
+          primary: _accent,
+          primaryForeground: Colors.white,
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final narrow =
+              constraints.maxWidth < 300 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.3;
+          final cancel = SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: FButton(
+              key: const Key('cancel_project_button'),
+              variant: FButtonVariant.outline,
+              onPress: isCreating ? null : onCancel,
+              child: Flexible(
+                child: Text(
+                  tr(context, 'Отмена'),
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
-                )
-              : const Text('Создать проект'),
-        );
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          );
+          final submit = SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: FButton(
+              key: const Key('submit_project_button'),
+              onPress: isCreating ? null : onSubmit,
+              child: isCreating
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Flexible(
+                      child: Text(
+                        tr(context, 'Создать проект'),
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+            ),
+          );
 
-        if (narrow) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          if (narrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                SizedBox(width: double.infinity, child: submit),
+                const SizedBox(height: 10),
+                SizedBox(width: double.infinity, child: cancel),
+              ],
+            );
+          }
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: <Widget>[
-              SizedBox(width: double.infinity, child: submit),
-              const SizedBox(height: 10),
-              SizedBox(width: double.infinity, child: cancel),
+              Expanded(flex: 2, child: cancel),
+              const SizedBox(width: 12),
+              Expanded(flex: 3, child: submit),
             ],
           );
-        }
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: <Widget>[
-            cancel,
-            const SizedBox(width: 10),
-            Flexible(child: submit),
-          ],
-        );
-      },
+        },
+      ),
     );
   }
 }
@@ -577,7 +628,7 @@ InputDecoration _inputDecoration({String? hint}) {
   return InputDecoration(
     hintText: hint,
     counterText: '',
-    hintStyle: GoogleFonts.manrope(color: _muted),
+    hintStyle: GoogleFonts.inter(color: _muted),
     filled: true,
     fillColor: _surface,
     isDense: true,
@@ -588,7 +639,7 @@ InputDecoration _inputDecoration({String? hint}) {
     focusedBorder: border(_accent),
     errorBorder: border(_danger),
     focusedErrorBorder: border(_danger),
-    errorStyle: GoogleFonts.manrope(fontSize: 11, color: _danger),
+    errorStyle: GoogleFonts.inter(fontSize: 11, color: _danger),
   );
 }
 

@@ -38,9 +38,10 @@ void main() {
         .load();
   });
 
-  testWidgets(
-    'short drawer scrolls workspaces and form with settings fixed below',
-    (tester) async {
+  for (final dark in [false, true]) {
+    testWidgets('short drawer keeps form reachable, dark: $dark', (
+      tester,
+    ) async {
       GoogleFonts.config.allowRuntimeFetching = false;
       FlutterSecureStorage.setMockInitialValues(<String, String>{});
       tester.view.physicalSize = const Size(375, 480);
@@ -83,7 +84,7 @@ void main() {
             path: '/projects/:id',
             builder: (context, state) => Scaffold(
               key: scaffoldKey,
-              drawer: AppDrawer(onOpenSettings: () {}),
+              drawer: AppDrawer(onOpenProfile: () {}),
               body: const SizedBox.expand(),
             ),
           ),
@@ -98,7 +99,7 @@ void main() {
           child: RepaintBoundary(
             key: captureKey,
             child: MaterialApp.router(
-              theme: AppTheme.light,
+              theme: dark ? AppTheme.dark : AppTheme.light,
               debugShowCheckedModeBanner: false,
               routerConfig: router,
             ),
@@ -111,7 +112,7 @@ void main() {
       final settingsPosition = tester.getCenter(find.text('Настройки'));
       expect(find.text('Проекты'), findsNothing);
       expect(find.text('Тестовый проект'), findsNothing);
-      expect(find.text('Архивированные воркспейсы'), findsOneWidget);
+      expect(find.text('Архивированные'), findsOneWidget);
       expect(find.text('Создать Workspace'), findsNothing);
       await capture('collapsed-375x480');
       await tester.tap(find.byKey(const Key('drawer-workspace-switcher')));
@@ -129,6 +130,15 @@ void main() {
       final workspacesContent = find.byKey(
         const Key('drawer-workspaces-content'),
       );
+      final colors = AppPalette(dark);
+      final field = tester.widget<TextField>(
+        find.byKey(const Key('workspace-name-field')),
+      );
+      expect(field.decoration!.fillColor, colors.subtleSurface);
+      expect(field.style!.color, colors.ink);
+      final cancel = tester.widget<TextButton>(cancelButton);
+      expect(cancel.style!.backgroundColor!.resolve({}), colors.badgeSurface);
+      expect(cancel.style!.foregroundColor!.resolve({}), colors.ink);
       expect(createButton, findsOneWidget);
       expect(cancelButton, findsOneWidget);
       expect(workspacesContent, findsOneWidget);
@@ -152,12 +162,12 @@ void main() {
       await tester.pumpAndSettle();
       await capture('collapsed-390x844');
       expect(find.text('Проекты'), findsNothing);
-      await tester.tap(find.text('Архивированные воркспейсы'));
+      await tester.tap(find.text('Архивированные'));
       await tester.pumpAndSettle();
       expect(find.text('Нет архивированных workspace'), findsOneWidget);
       expect(tester.takeException(), isNull);
-    },
-  );
+    });
+  }
 }
 
 class _WorkspaceRepo implements WorkspaceRepository {

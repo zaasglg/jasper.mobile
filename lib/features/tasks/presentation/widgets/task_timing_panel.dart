@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
 import 'task_detail_style.dart';
 import '../../../../core/theme/app_icon_sizes.dart';
@@ -71,7 +72,10 @@ class _TaskTimingPanelState extends State<TaskTimingPanel> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: Text('ТАЙМИНГ', style: TaskDetailStyle.label(context)),
+          child: Text(
+            tr(context, 'ТАЙМИНГ'),
+            style: TaskDetailStyle.label(context),
+          ),
         ),
         Material(
           color: TaskDetailStyle.field(context),
@@ -104,10 +108,10 @@ class _TaskTimingPanelState extends State<TaskTimingPanel> {
                                 ),
                               ),
                               const SizedBox(width: 16),
-                              const Icon(
+                              Icon(
                                 Icons.edit_outlined,
                                 size: AppIconSizes.standard,
-                                color: AppColors.muted,
+                                color: AppColors.of(context).muted,
                               ),
                             ],
                           ),
@@ -117,13 +121,17 @@ class _TaskTimingPanelState extends State<TaskTimingPanel> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Tooltip(
-                        message: overtime ? 'Переработка' : 'Затраченное время',
+                        message: overtime
+                            ? tr(context, 'Переработка')
+                            : tr(context, 'Затраченное время'),
                         child: Center(
                           child: Text(
                             summary,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              color: overtime ? AppColors.error : null,
+                              color: overtime
+                                  ? AppColors.of(context).error
+                                  : null,
                             ),
                           ),
                         ),
@@ -142,18 +150,18 @@ class _TaskTimingPanelState extends State<TaskTimingPanel> {
                       child: Text(
                         clock,
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.manrope(
+                        style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                          fontFeatures: [const FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
                     IconButton(
                       key: const Key('task-timer-toggle'),
                       tooltip: running
-                          ? 'Приостановить таймер'
-                          : 'Запустить таймер',
+                          ? tr(context, 'Приостановить таймер')
+                          : tr(context, 'Запустить таймер'),
                       onPressed: state.isSaving || !task.isTimingEnabled
                           ? null
                           : () => widget.cubit.timerAction(
@@ -164,19 +172,19 @@ class _TaskTimingPanelState extends State<TaskTimingPanel> {
                             ? Icons.pause_rounded
                             : Icons.play_arrow_outlined,
                         size: AppIconSizes.standard,
-                        color: AppColors.muted,
+                        color: AppColors.of(context).muted,
                       ),
                     ),
                     IconButton(
                       key: const Key('task-timer-reset'),
-                      tooltip: 'Сбросить таймер',
+                      tooltip: tr(context, 'Сбросить таймер'),
                       onPressed: state.isSaving
                           ? null
                           : () => widget.cubit.timerAction('reset'),
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.restart_alt,
                         size: AppIconSizes.standard,
-                        color: AppColors.muted,
+                        color: AppColors.of(context).muted,
                       ),
                     ),
                   ],

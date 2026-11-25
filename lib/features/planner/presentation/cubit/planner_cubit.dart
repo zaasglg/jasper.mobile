@@ -1,3 +1,6 @@
+import '../../../tasks/data/models/task_detail_model.dart';
+import 'dart:async';
+import '../../domain/repositories/task_icon_repository.dart';
 import '../../../assistant/data/services/assistant_task_changes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/models/planner_item_model.dart';
@@ -6,7 +9,9 @@ import '../../domain/repositories/planner_repository.dart';
 import 'planner_state.dart';
 
 class PlannerCubit extends Cubit<PlannerState> {
-  PlannerCubit(this._repository) : super(const PlannerState()) {
+  PlannerCubit(this._repository, {TaskIconRepository? iconRepository})
+    : _iconRepository = iconRepository,
+      super(const PlannerState()) {
     assistantTaskChanges.addListener(_onTasksChanged);
     plannerChanges.addListener(_onTasksChanged);
   }
@@ -23,6 +28,8 @@ class PlannerCubit extends Cubit<PlannerState> {
   }
 
   final PlannerRepository _repository;
+  final TaskIconRepository? _iconRepository;
+  final _iconsPending = <String>{};
   bool _refreshPending = false;
   int _revision = 0;
   bool _initialized = false;
@@ -48,11 +55,55 @@ class PlannerCubit extends Cubit<PlannerState> {
         return;
       }
       emit(state.copyWith(status: PlannerStatus.success, items: items));
+      unawaited(_loadIcons(items));
     } catch (e) {
       if (isClosed || revision != _revision) {
         return;
       }
       emit(state.copyWith(status: PlannerStatus.failure, error: _message(e)));
+    }
+  }
+
+  Future<void> _loadIcons(List<PlannerItemModel> items) async {
+    final repository = _iconRepository;
+    if (repository == null) return;
+    final titles = items
+        .where((item) => !item.external && item.icon == null)
+        .map((item) => plannerIconTitle(item.title))
+        .where(
+          (title) =>
+              title.isNotEmpty &&
+              !state.taskIcons.containsKey(title) &&
+              !_iconsPending.contains(title),
+        )
+        .toSet()
+        .toList();
+    if (titles.isEmpty) return;
+    _iconsPending.addAll(titles);
+    emit(state.copyWith(iconsLoading: true));
+    try {
+      final icons = await repository.getIcons(titles);
+      if (isClosed) return;
+      final current = state.items
+          .map((item) => plannerIconTitle(item.title))
+          .toSet();
+      emit(
+        state.copyWith(
+          taskIcons: {
+            for (final entry in state.taskIcons.entries)
+              if (current.contains(entry.key)) entry.key: entry.value,
+            for (final entry in icons.entries)
+              if (current.contains(entry.key)) entry.key: entry.value,
+          },
+        ),
+      );
+    } catch (_) {
+      // Decorative icons must never block planning or change task lifecycle.
+    } finally {
+      _iconsPending.removeAll(titles);
+      if (!isClosed) {
+        emit(state.copyWith(iconsLoading: _iconsPending.isNotEmpty));
+      }
     }
   }
 
@@ -86,6 +137,7 @@ class PlannerCubit extends Cubit<PlannerState> {
     required DateTime? scheduledAt,
     DateTime? plannedDate,
     required int durationMinutes,
+    int? reminderMinutes,
   }) async {
     if (item?.external == true) return false;
     if (state.isSaving || state.busyIds.isNotEmpty) {
@@ -111,6 +163,7 @@ class PlannerCubit extends Cubit<PlannerState> {
         await _repository.update(
           item,
           title: item.isStandalone ? title : null,
+          reminderMinutes: reminderMinutes,
           scheduledAt: scheduledAt,
           plannedDate: plannedDate,
           durationMinutes: durationMinutes,
@@ -128,6 +181,36 @@ class PlannerCubit extends Cubit<PlannerState> {
     } finally {
       await _refreshIfPending();
     }
+  }
+
+  Future<bool> updateExtras(
+    PlannerItemModel item, {
+    bool updateIcon = false,
+    String? icon,
+    List<TaskChecklistModel>? checklists,
+  }) async {
+    if (checklists != null && !item.isStandalone) return false;
+    final current = state.items
+        .where((entry) => entry.id == item.id)
+        .firstOrNull;
+    if (current == null) return false;
+    final success = await _mutate(
+      current,
+      () => _repository.updateExtras(
+        item.id,
+        updateIcon: updateIcon,
+        icon: icon,
+        checklists: checklists,
+      ),
+      current.copyWith(
+        icon: updateIcon ? icon : current.icon,
+        checklists: checklists,
+      ),
+    );
+    if (success && updateIcon && icon == null && !isClosed) {
+      unawaited(_loadIcons(state.items));
+    }
+    return success;
   }
 
   Future<void> toggle(PlannerItemModel item) => _mutate(

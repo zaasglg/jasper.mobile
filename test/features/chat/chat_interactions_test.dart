@@ -16,6 +16,9 @@ import 'package:jospar/features/chat/data/thread_typing_controller.dart';
 import 'package:jospar/features/chat/domain/repositories/chat_repository.dart';
 import 'package:jospar/features/chat/presentation/cubit/conversation_cubit.dart';
 import 'package:jospar/features/chat/presentation/widgets/message_interactions.dart';
+import 'package:jospar/features/chat/presentation/widgets/channel_avatar.dart';
+import 'package:jospar/features/chat/presentation/widgets/message_actions.dart';
+import 'package:jospar/core/widgets/user_avatar.dart';
 import 'package:jospar/features/chat/presentation/screens/conversation_screen.dart';
 
 const source = ChatConversationModel(
@@ -244,6 +247,162 @@ void main() {
     repo.readGate!.complete([]);
     await t.pump();
   });
+  for (final expanded in [false, true]) {
+    testWidgets(
+      'long press opens floating reactions and ${expanded ? "plus opens more emoji" : "quick emoji sends immediately"}',
+      (t) async {
+        GoogleFonts.config.allowRuntimeFetching = false;
+        t.view.physicalSize = const Size(320, 568);
+        t.view.devicePixelRatio = 1;
+        addTearDown(t.view.resetPhysicalSize);
+        addTearDown(t.view.resetDevicePixelRatio);
+        final adapter = _Adapter();
+        final cubit = ConversationCubit(repository(adapter), source);
+        await t.runAsync(() => cubit.load());
+        await t.pumpWidget(
+          MaterialApp(
+            home: BlocProvider.value(
+              value: cubit,
+              child: const ConversationScreen(conversation: source),
+            ),
+          ),
+        );
+        await t.pumpAndSettle();
+        expect(
+          t.getTopLeft(find.byKey(const ValueKey('reaction-chip-m-👍'))).dy,
+          lessThan(
+            t.getBottomLeft(find.byKey(const Key('message-bubble-m'))).dy,
+          ),
+        );
+        await t.longPress(find.byKey(const Key('message-bubble-m')));
+        await t.pumpAndSettle();
+        expect(
+          find.byKey(const Key('message-quick-reactions')),
+          findsOneWidget,
+        );
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.text('Ответить'), findsOneWidget);
+        if (expanded) {
+          await t.tap(find.byKey(const Key('message-more-reactions')));
+          await t.pumpAndSettle();
+          expect(find.byType(BottomSheet), findsOneWidget);
+          expect(find.text('Выберите реакцию'), findsOneWidget);
+        }
+        await t.tap(
+          expanded
+              ? find.byKey(const ValueKey('reaction-picker-🎉'))
+              : find.byKey(const ValueKey('message-react-👍')),
+        );
+        await t.pumpAndSettle();
+        if (cubit.state.isSending) {
+          await t.runAsync(() => cubit.stream.firstWhere((s) => !s.isSending));
+        }
+        await t.pumpAndSettle();
+        expect(
+          adapter.requests.where((r) => r.path.endsWith('/react')).last.data,
+          {'emoji': expanded ? '🎉' : '👍'},
+        );
+        expect(find.byKey(const Key('message-quick-reactions')), findsNothing);
+        expect(cubit.state.isSending, isFalse);
+        final previous = cubit.state.messages.single.reactions;
+        await t.longPress(find.byKey(const Key('message-bubble-m')));
+        await t.pumpAndSettle();
+        final writes = adapter.requests
+            .where((r) => r.path.endsWith('/react'))
+            .length;
+        await t.tapAt(const Offset(2, 2));
+        await t.pumpAndSettle();
+        expect(
+          adapter.requests.where((r) => r.path.endsWith('/react')).length,
+          writes,
+        );
+        await t.longPress(find.byKey(const Key('message-bubble-m')));
+        await t.pumpAndSettle();
+        adapter.fail = true;
+        await t.tap(find.byKey(const ValueKey('message-react-❤️')));
+        await t.pumpAndSettle();
+        if (cubit.state.isSending) {
+          await t.runAsync(() => cubit.stream.firstWhere((s) => !s.isSending));
+        }
+        await t.pumpAndSettle();
+        expect(cubit.state.messages.single.reactions, previous);
+        expect(cubit.state.error, isNotNull);
+        await t.longPress(find.byKey(const Key('message-bubble-m')));
+        await t.pumpAndSettle();
+        await t.tap(find.text('Ответить'));
+        await t.pumpAndSettle();
+        expect(cubit.state.replyTo?.id, 'm');
+        expect(t.takeException(), isNull);
+        await t.pumpWidget(const SizedBox.shrink());
+        await cubit.close();
+      },
+    );
+  }
+
+  testWidgets(
+    'single reaction is a compact emoji pill without a redundant count',
+    (t) async {
+      final adapter = _Adapter();
+      final cubit = ConversationCubit(repository(adapter), source);
+      final message = ChatMessageModel.fromJson({
+        ...payload(),
+        'reactions': const [
+          {'emoji': '👍', 'count': 1, 'reacted': true},
+        ],
+      });
+      await t.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          home: BlocProvider.value(
+            value: cubit,
+            child: Scaffold(
+              body: Center(child: MessageReactionBar(message: message)),
+            ),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(find.text('1'), findsNothing);
+      expect(
+        t.getSize(find.byKey(const ValueKey('reaction-chip-m-👍'))).width,
+        lessThan(40),
+      );
+      expect(
+        t.getSize(find.byKey(const ValueKey('reaction-chip-m-👍'))).height,
+        lessThan(32),
+      );
+      final groupedMessage = ChatMessageModel.fromJson({
+        ...payload(),
+        'reactions': const [
+          {'emoji': '👍', 'count': 1, 'reacted': true},
+          {'emoji': '😮', 'count': 2, 'reacted': false},
+        ],
+      });
+      await t.pumpWidget(
+        MaterialApp(
+          home: BlocProvider.value(
+            value: cubit,
+            child: Scaffold(
+              body: Center(child: MessageReactionBar(message: groupedMessage)),
+            ),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+      final first = t.getRect(find.byKey(const ValueKey('reaction-chip-m-👍')));
+      final second = t.getRect(
+        find.byKey(const ValueKey('reaction-chip-m-😮')),
+      );
+      expect(second.left, lessThan(first.right));
+      expect(second.left, greaterThan(first.left));
+      expect(find.byKey(const ValueKey('message-reactions-m')), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox.shrink());
+      await cubit.close();
+    },
+  );
+
   testWidgets('reaction chip toggles using the selected emoji', (t) async {
     final adapter = _Adapter();
     final cubit = ConversationCubit(repository(adapter), source);
@@ -258,7 +417,7 @@ void main() {
         ),
       ),
     );
-    await t.tap(find.text('👍 2'));
+    await t.tap(find.byKey(const ValueKey('reaction-chip-m-👍')));
     await t.pumpAndSettle();
     expect(adapter.requests.last.path, 'messages/m/react');
     expect(adapter.requests.last.data, {'emoji': '👍'});
@@ -277,10 +436,137 @@ void main() {
         ),
       ),
     );
-    await t.tap(find.text('Закреплённые · 1'));
+    await t.tap(find.text('Закреплённые'));
     expect(selected, 'm');
     await t.pumpWidget(const SizedBox());
   });
+  for (final mode in ['audio', 'video']) {
+    testWidgets('$mode call disables copy and forward and never exposes JSON', (
+      t,
+    ) async {
+      final raw = jsonEncode({
+        'callId': 'call',
+        'mode': mode,
+        'status': 'ended',
+      });
+      final adapter = _Adapter()..text = raw;
+      final cubit = ConversationCubit(repository(adapter), source);
+      await t.runAsync(() => cubit.load());
+      final message = cubit.state.messages.single;
+      expect(message.canCopyText, false);
+      expect(message.canEditText, false);
+      expect(message.canForward, false);
+      expect(message.preview, isNot(contains('callId')));
+      final before = adapter.requests.length;
+      expect(await cubit.forward(message, target), false);
+      expect(
+        await cubit.messageAction(message.id, 'edit', text: 'changed'),
+        false,
+      );
+      expect(adapter.requests.length, before);
+      await t.pumpWidget(
+        MaterialApp(
+          home: BlocProvider.value(
+            value: cubit,
+            child: Builder(
+              builder: (context) => Scaffold(
+                body: TextButton(
+                  onPressed: () => showMessageActions(context, message, true),
+                  child: const Text('Actions'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await t.tap(find.text('Actions'));
+      await t.pumpAndSettle();
+      for (final label in ['Копировать текст', 'Переслать']) {
+        final tile = find.ancestor(
+          of: find.text(label),
+          matching: find.byType(ListTile),
+        );
+        expect(t.widget<ListTile>(tile).enabled, false);
+        expect(t.widget<ListTile>(tile).onTap, isNull);
+      }
+      expect(find.text('Редактировать'), findsNothing);
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox());
+      await cubit.close();
+    });
+  }
+  test('only ordinary nonempty text can be copied and edited', () {
+    expect(ChatMessageModel.fromJson(payload()).canCopyText, true);
+    expect(ChatMessageModel.fromJson(payload(text: ' ')).canCopyText, false);
+    for (final kind in ['AUDIO', 'VIDEO_MSG', 'FILE', 'POLL']) {
+      final message = ChatMessageModel.fromJson({...payload(), 'kind': kind});
+      expect(message.canCopyText, false);
+      expect(message.canEditText, false);
+      expect(message.canForward, true);
+    }
+  });
+  testWidgets(
+    'forward sheet groups channels, nests children and shows avatars',
+    (t) async {
+      t.view.physicalSize = const Size(390, 844);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.resetPhysicalSize);
+      addTearDown(t.view.resetDevicePixelRatio);
+      final adapter = _Adapter()
+        ..channels = [
+          {'id': 'child', 'name': 'Подканал Alpha', 'parentId': 'parent'},
+          {'id': 'parent', 'name': 'Команда'},
+        ]
+        ..users = [
+          {'id': 'person', 'name': 'Сотрудник'},
+        ];
+      final cubit = ConversationCubit(repository(adapter), source);
+      await t.pumpWidget(
+        MaterialApp(
+          home: BlocProvider.value(
+            value: cubit,
+            child: Builder(
+              builder: (context) => Scaffold(
+                body: TextButton(
+                  onPressed: () => showForwardMessage(
+                    context,
+                    ChatMessageModel.fromJson(payload()),
+                  ),
+                  child: const Text('Forward'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await t.tap(find.text('Forward'));
+      await t.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.byType(ChannelAvatar), findsNWidgets(2));
+      expect(find.byType(UserAvatar), findsOneWidget);
+      expect(find.text('Каналы'), findsOneWidget);
+      expect(find.text('Личные сообщения'), findsOneWidget);
+      final parent = find.byKey(const ValueKey('forward-target-parent'));
+      final child = find.byKey(const ValueKey('forward-target-child'));
+      expect(t.getTopLeft(child).dy, greaterThan(t.getTopLeft(parent).dy));
+      expect(t.getTopLeft(child).dx, greaterThan(t.getTopLeft(parent).dx));
+      expect(find.text('Подканал · Команда'), findsOneWidget);
+      await t.enterText(find.byType(TextField), 'Alpha');
+      await t.pumpAndSettle();
+      expect(parent, findsOneWidget);
+      expect(child, findsOneWidget);
+      expect(find.text('Сотрудник'), findsNothing);
+      await t.enterText(find.byType(TextField), 'не существует');
+      await t.pumpAndSettle();
+      expect(find.text('Чаты не найдены'), findsOneWidget);
+      await t.tap(find.byTooltip('Отмена'));
+      await t.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox());
+      await cubit.close();
+    },
+  );
   testWidgets('forward dialog keeps target available after a rejected send', (
     t,
   ) async {
@@ -319,7 +605,7 @@ void main() {
     expect(find.text('Переслать сообщение'), findsOneWidget);
     expect(cubit.state.isSending, false);
     expect(cubit.state.error, isNotNull);
-    await t.tap(find.text('Отмена'));
+    await t.tap(find.byTooltip('Отмена'));
     await t.pumpAndSettle();
     await t.pumpWidget(const SizedBox());
     await cubit.close();
@@ -358,6 +644,10 @@ class _Adapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   bool fail = false;
   String text = 'Сообщение';
+  List<Map<String, dynamic>> channels = [
+    {'id': 'other', 'name': 'Другой чат'},
+  ];
+  List<Map<String, dynamic>> users = [];
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -378,11 +668,10 @@ class _Adapter implements HttpClientAdapter {
     if (options.path == 'users/me') {
       result = {'id': 'me'};
     } else if (options.path == 'channels') {
-      result = [
-        {'id': 'other', 'name': 'Другой чат'},
-      ];
-    } else if (options.path == 'users/messenger-candidates' ||
-        options.path == 'messages/threads') {
+      result = channels;
+    } else if (options.path == 'users/messenger-candidates') {
+      result = users;
+    } else if (options.path == 'messages/threads') {
       result = [];
     } else if (options.path == 'messages/typing') {
       result = options.method == 'GET'

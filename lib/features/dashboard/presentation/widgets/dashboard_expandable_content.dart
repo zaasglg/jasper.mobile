@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
@@ -63,7 +64,9 @@ class _DashboardExpandableContentState
               _expanded ? Icons.expand_less : Icons.expand_more,
               size: 18,
             ),
-            label: Text(_expanded ? 'Свернуть' : 'Показать всё'),
+            label: Text(
+              _expanded ? tr(context, 'Свернуть') : tr(context, 'Показать всё'),
+            ),
             style: TextButton.styleFrom(
               minimumSize: const Size(0, 44),
               textStyle: const TextStyle(

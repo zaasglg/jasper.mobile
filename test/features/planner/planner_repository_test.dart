@@ -25,6 +25,7 @@ void main() {
       expect(adapter.requests.last.data, {
         'title': 'План',
         'scheduledAt': '2026-10-10T04:00:00.000Z',
+        'hasTime': true,
         'durationMinutes': 45,
       });
       await repo.update(

@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../../projects/domain/entities/project_model.dart';
 import '../../../projects/domain/entities/project_task_model.dart';
 import 'package:dio/dio.dart';
@@ -327,8 +328,8 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Переместить задачу',
-                            style: GoogleFonts.manrope(
+                            tr(context, 'Переместить задачу'),
+                            style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                             ),
@@ -338,9 +339,9 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                             widget.task.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.manrope(
+                            style: GoogleFonts.inter(
                               fontSize: 12,
-                              color: AppColors.muted,
+                              color: AppColors.of(context).muted,
                             ),
                           ),
                         ],
@@ -358,7 +359,7 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                     children: [
                       AppFormField(
                         key: const Key('move-workspace-field'),
-                        label: 'Рабочее пространство',
+                        label: tr(context, 'Рабочее пространство'),
                         child: DropdownButtonFormField<String>(
                           key: ValueKey('move-workspace-$_workspaceId'),
                           initialValue: _workspaceId,
@@ -384,7 +385,7 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                       const SizedBox(height: 12),
                       AppFormField(
                         key: const Key('move-project-field'),
-                        label: 'Проект',
+                        label: tr(context, 'Проект'),
                         child: DropdownButtonFormField<String>(
                           key: ValueKey((
                             'move-project',
@@ -397,8 +398,8 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                           menuMaxHeight: 320,
                           hint: Text(
                             _loadingProjects
-                                ? 'Загрузка проектов…'
-                                : 'Выберите проект',
+                                ? tr(context, 'Загрузка проектов…')
+                                : tr(context, 'Выберите проект'),
                           ),
                           items: [
                             for (final item in _projects)
@@ -431,33 +432,36 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                       if (!_loadingProjects &&
                           _projects.isEmpty &&
                           _loadError == null)
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.only(top: 12),
                           child: Text(
-                            'В этом пространстве нет доступных проектов.',
+                            tr(
+                              context,
+                              'В этом пространстве нет доступных проектов.',
+                            ),
                           ),
                         ),
                       const SizedBox(height: 16),
                       Text(
-                        'В какую колонку?',
-                        style: GoogleFonts.manrope(
+                        tr(context, 'В какую колонку?'),
+                        style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 8),
                       if (_projectId == null)
-                        const Text(
-                          'Сначала выберите проект.',
-                          style: TextStyle(color: AppColors.muted),
+                        Text(
+                          tr(context, 'Сначала выберите проект.'),
+                          style: TextStyle(color: AppColors.of(context).muted),
                         ),
                       if (_projectId != null &&
                           !_loadingColumns &&
                           columns.isEmpty &&
                           _loadError == null)
-                        const Text(
-                          'В проекте нет доступных колонок.',
-                          style: TextStyle(color: AppColors.muted),
+                        Text(
+                          tr(context, 'В проекте нет доступных колонок.'),
+                          style: TextStyle(color: AppColors.of(context).muted),
                         ),
                       for (final item in columns)
                         Padding(
@@ -471,7 +475,7 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                               side: BorderSide(
                                 color: item == column
                                     ? AppColors.accent.withValues(alpha: .4)
-                                    : AppColors.border,
+                                    : AppColors.of(context).border,
                               ),
                             ),
                             child: ListTile(
@@ -483,12 +487,12 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                                 LucideIcons.columns3,
                                 color: item == column
                                     ? AppColors.accent
-                                    : AppColors.muted,
+                                    : AppColors.of(context).muted,
                                 size: 20,
                               ),
                               title: Text(
                                 item.name,
-                                style: GoogleFonts.manrope(
+                                style: GoogleFonts.inter(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -497,7 +501,7 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                                   _local &&
                                       item.statusMap.toUpperCase() ==
                                           currentTask?.status.toUpperCase()
-                                  ? const Text('Текущая колонка')
+                                  ? Text(tr(context, 'Текущая колонка'))
                                   : null,
                               trailing: Icon(
                                 item == column
@@ -506,7 +510,7 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                                 size: 20,
                                 color: item == column
                                     ? AppColors.accent
-                                    : AppColors.muted,
+                                    : AppColors.of(context).muted,
                               ),
                               onTap: _saving
                                   ? null
@@ -521,7 +525,7 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                       if (column != null) ...[
                         const SizedBox(height: 6),
                         AppFormField(
-                          label: 'Позиция',
+                          label: tr(context, 'Позиция'),
                           child: _local
                               ? DropdownButtonFormField<int>(
                                   key: ValueKey((_status, count, _position)),
@@ -544,14 +548,18 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                                   key: ValueKey(('move-position', _projectId)),
                                   initialValue: _append,
                                   isExpanded: true,
-                                  items: const [
+                                  items: [
                                     DropdownMenuItem(
                                       value: true,
-                                      child: Text('В конец колонки'),
+                                      child: Text(
+                                        tr(context, 'В конец колонки'),
+                                      ),
                                     ),
                                     DropdownMenuItem(
                                       value: false,
-                                      child: Text('В начало колонки'),
+                                      child: Text(
+                                        tr(context, 'В начало колонки'),
+                                      ),
                                     ),
                                   ],
                                   onChanged: _saving
@@ -566,10 +574,13 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                       if (!_local && _projectId != null) ...[
                         const SizedBox(height: 12),
                         Text(
-                          'При смене проекта связи с эпиками будут убраны. Исполнители без доступа к новому проекту будут сняты.',
-                          style: GoogleFonts.manrope(
+                          tr(
+                            context,
+                            'При смене проекта связи с эпиками будут убраны. Исполнители без доступа к новому проекту будут сняты.',
+                          ),
+                          style: GoogleFonts.inter(
                             fontSize: 12,
-                            color: AppColors.muted,
+                            color: AppColors.of(context).muted,
                             height: 1.5,
                           ),
                         ),
@@ -602,10 +613,12 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
                             )
                           : Text(
                               !available
-                                  ? 'Задача больше недоступна'
+                                  ? tr(context, 'Задача больше недоступна')
                                   : column == null
-                                  ? 'Выберите колонку'
-                                  : 'Перенести в «${column.name}»',
+                                  ? tr(context, 'Выберите колонку')
+                                  : tr(context, "Перенести в «{p0}»", {
+                                      'p0': column.name,
+                                    }),
                               maxLines: 2,
                               textAlign: TextAlign.center,
                             ),
@@ -629,13 +642,16 @@ class _TaskMoveSheetState extends State<TaskMoveSheet> {
           Expanded(
             child: Text(
               text,
-              style: GoogleFonts.manrope(fontSize: 12, color: AppColors.error),
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: AppColors.of(context).error,
+              ),
             ),
           ),
           if (retry)
             TextButton(
               onPressed: _saving ? null : _retry,
-              child: const Text('Повторить'),
+              child: Text(tr(context, 'Повторить')),
             ),
         ],
       ),

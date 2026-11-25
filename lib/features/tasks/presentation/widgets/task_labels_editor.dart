@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../data/models/task_label_dto.dart';
 import '../../domain/utils/task_label_utils.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/theme/app_ui_tokens.dart';
 import '../../../../core/theme/task_label_color.dart';
+import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/widgets/app_color_picker.dart';
 import '../../../../core/widgets/app_form_surface.dart';
 import '../../domain/entities/task_label_model.dart';
@@ -174,14 +176,14 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Не удалось загрузить метки.'),
+                  Text(tr(context, 'Не удалось загрузить метки.')),
                   TextButton(
                     onPressed: () => setState(() {
                       _future = context
                           .read<TaskDetailsCubit>()
                           .getLabelCatalog();
                     }),
-                    child: const Text('Повторить'),
+                    child: Text(tr(context, 'Повторить')),
                   ),
                 ],
               ),
@@ -204,40 +206,44 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
                 children: [
                   Row(
                     children: [
-                      IconButton(
-                        tooltip: 'Назад к меткам',
-                        onPressed: busy ? null : _back,
-                        icon: const Icon(LucideIcons.arrowLeft),
+                      AppBackButton(
+                        tooltip: tr(context, 'Назад к меткам'),
+                        enabled: !busy,
+                        onPressed: _back,
                       ),
                       Expanded(
                         child: Text(
-                          _editing == null ? 'Новая метка' : 'Изменить метку',
+                          _editing == null
+                              ? tr(context, 'Новая метка')
+                              : tr(context, 'Изменить метку'),
                           style: AppTypography.title(context),
                         ),
                       ),
                     ],
                   ),
                   Text(
-                    _personalForm! ? 'Личная метка' : 'Метка проекта',
+                    _personalForm!
+                        ? tr(context, 'Личная метка')
+                        : tr(context, 'Метка проекта'),
                     style: AppTypography.caption(context),
                   ),
                   const SizedBox(height: AppSpacing.smMd),
                   AppFormField(
-                    label: 'Название',
+                    label: tr(context, 'Название'),
                     child: TextField(
                       key: const Key('label_name'),
                       controller: _name,
                       enabled: !busy,
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
-                        errorText: _error,
+                        errorText: trn(context, _error),
                         errorMaxLines: 4,
                       ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   AppFormField(
-                    label: 'Цвет',
+                    label: tr(context, 'Цвет'),
                     child: AppColorPicker(
                       value: _color,
                       enabled: !busy,
@@ -251,11 +257,15 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
                     children: [
                       TextButton(
                         onPressed: busy ? null : _back,
-                        child: const Text('Отмена'),
+                        child: Text(tr(context, 'Отмена')),
                       ),
                       FilledButton(
                         onPressed: busy ? null : () => _save(remote),
-                        child: Text(busy ? 'Сохранение…' : 'Сохранить'),
+                        child: Text(
+                          busy
+                              ? tr(context, 'Сохранение…')
+                              : tr(context, 'Сохранить'),
+                        ),
                       ),
                     ],
                   ),
@@ -275,18 +285,23 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
             children: [
               for (final personal in [false, true]) ...[
                 Text(
-                  personal ? 'Личные метки' : 'Метки проекта',
+                  personal
+                      ? tr(context, 'Личные метки')
+                      : tr(context, 'Метки проекта'),
                   style: AppTypography.title(context),
                 ),
                 if (personal && (state.currentUser?.id.isEmpty ?? true))
-                  const Text(
-                    'Не удалось определить текущего пользователя. Откройте задачу повторно.',
+                  Text(
+                    tr(
+                      context,
+                      'Не удалось определить текущего пользователя. Откройте задачу повторно.',
+                    ),
                   )
                 else ...[
                   if (_catalog(remote, personal).isEmpty)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                      child: Text('Нет меток. Создайте новую.'),
+                      child: Text(tr(context, 'Нет меток. Создайте новую.')),
                     ),
                   for (final label in _catalog(remote, personal))
                     Row(
@@ -333,7 +348,7 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
                           ),
                         ),
                         IconButton(
-                          tooltip: 'Изменить метку',
+                          tooltip: tr(context, 'Изменить метку'),
                           onPressed: busy
                               ? null
                               : () => _openForm(personal, label),
@@ -349,7 +364,7 @@ class _TaskLabelsEditorState extends State<TaskLabelsEditor> {
                     ),
                     onPressed: busy ? null : () => _openForm(personal),
                     icon: const Icon(LucideIcons.plus),
-                    label: const Text('Добавить метку'),
+                    label: Text(tr(context, 'Добавить метку')),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.sm),

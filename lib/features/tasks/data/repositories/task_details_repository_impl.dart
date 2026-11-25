@@ -15,11 +15,13 @@ class TaskDetailsRepositoryImpl
     implements
         TaskDetailsRepository,
         TaskResourceCreationRepository,
+        TaskResourceReadRepository,
         TaskLabelCatalogRepository,
         TaskDatesRepository,
         TaskResourceOperationsRepository,
         TaskAdvancedRepository,
         TaskTitleRepository,
+        TaskStatusRepository,
         TaskExtrasRepository,
         ProjectEpicCreationRepository,
         TaskAssigneesRepository,
@@ -28,6 +30,44 @@ class TaskDetailsRepositoryImpl
   const TaskDetailsRepositoryImpl(this._dio);
 
   final Dio _dio;
+
+  @override
+  Future<List<TaskResourceModel>> getResources(String taskId) async {
+    try {
+      dynamic data = (await _dio.get<dynamic>(
+        'tasks/${Uri.encodeComponent(taskId)}/resources',
+      )).data;
+      if (data is Map) data = data['data'] ?? data['items'];
+      if (data is Map) data = data['items'];
+      if (data is! List || data.any((item) => item is! Map)) {
+        throw const FormatException('Invalid task resources');
+      }
+      return data
+          .map(
+            (item) => TaskResourceModel.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
+          .toList(growable: false);
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 403) {
+        throw const TaskDetailsException(
+          'Недостаточно прав для просмотра ресурсов',
+        );
+      }
+      throw const TaskDetailsException(
+        'Не удалось загрузить ресурсы. Повторите попытку.',
+      );
+    } catch (_) {
+      throw const TaskDetailsException(
+        'Не удалось загрузить ресурсы. Повторите попытку.',
+      );
+    }
+  }
+
+  @override
+  Future<TaskDetailsPayload> updateStatus(String taskId, String status) =>
+      _patch(taskId, {'status': status});
 
   @override
   Future<void> createEpic({

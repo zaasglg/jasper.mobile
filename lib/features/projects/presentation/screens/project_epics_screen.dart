@@ -1,6 +1,8 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../../domain/entities/project_task_model.dart';
 import '../../domain/entities/task_epic_model.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -100,17 +102,17 @@ class _ProjectEpicsScreenState extends State<ProjectEpicsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Эпики проекта'),
+      title: Text(tr(context, 'Эпики проекта')),
       actions: [
         IconButton(
           key: const Key('epics-add'),
-          tooltip: 'Создать эпик',
+          tooltip: tr(context, 'Создать эпик'),
           onPressed: () => setState(() => _creating = true),
           icon: const Icon(LucideIcons.plus),
         ),
         IconButton(
           key: const Key('epics-refresh'),
-          tooltip: 'Обновить',
+          tooltip: tr(context, 'Обновить'),
           onPressed: _refresh,
           icon: const Icon(LucideIcons.refreshCw),
         ),
@@ -143,12 +145,12 @@ class _ProjectEpicsScreenState extends State<ProjectEpicsScreen> {
               controller: _search,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
-                hintText: 'Поиск эпиков',
+                hintText: tr(context, 'Поиск эпиков'),
                 prefixIcon: const Icon(LucideIcons.search),
                 suffixIcon: _search.text.isEmpty
                     ? null
                     : IconButton(
-                        tooltip: 'Очистить поиск',
+                        tooltip: tr(context, 'Очистить поиск'),
                         onPressed: () => setState(_search.clear),
                         icon: const Icon(LucideIcons.x),
                       ),
@@ -158,24 +160,41 @@ class _ProjectEpicsScreenState extends State<ProjectEpicsScreen> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: Row(
-              children: [
+            child: CupertinoSlidingSegmentedControl<_EpicFilter>(
+              proportionalWidth: true,
+              groupValue: _filter,
+              onValueChanged: (value) {
+                if (value != null) setState(() => _filter = value);
+              },
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
+              thumbColor: Theme.of(context).colorScheme.surface,
+              children: {
                 for (final filter in _EpicFilter.values)
-                  Padding(
-                    padding: const EdgeInsets.only(right: AppSpacing.sm),
-                    child: ChoiceChip(
-                      key: ValueKey('epics-filter-${filter.name}'),
-                      label: Text(switch (filter) {
-                        _EpicFilter.all => 'Все',
-                        _EpicFilter.withTasks => 'С задачами',
-                        _EpicFilter.empty => 'Без задач',
-                        _EpicFilter.completed => 'Завершённые',
-                      }),
-                      selected: filter == _filter,
-                      onSelected: (_) => setState(() => _filter = filter),
+                  filter: Padding(
+                    key: ValueKey('epics-filter-${filter.name}'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
+                    ),
+                    child: Text(
+                      switch (filter) {
+                        _EpicFilter.all => tr(context, 'Все'),
+                        _EpicFilter.withTasks => tr(context, 'С задачами'),
+                        _EpicFilter.empty => tr(context, 'Без задач'),
+                        _EpicFilter.completed => tr(context, 'Завершённые'),
+                      },
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: filter == _filter
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
                     ),
                   ),
-              ],
+              },
             ),
           ),
           Expanded(
@@ -190,10 +209,10 @@ class _ProjectEpicsScreenState extends State<ProjectEpicsScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('Не удалось загрузить эпики'),
+                        Text(tr(context, 'Не удалось загрузить эпики')),
                         TextButton(
                           onPressed: _refresh,
-                          child: const Text('Повторить'),
+                          child: Text(tr(context, 'Повторить')),
                         ),
                       ],
                     ),
@@ -231,8 +250,8 @@ class _ProjectEpicsScreenState extends State<ProjectEpicsScreen> {
                   return Center(
                     child: Text(
                       epics.isEmpty
-                          ? 'В проекте пока нет эпиков'
-                          : 'По выбранным фильтрам эпиков нет',
+                          ? tr(context, 'В проекте пока нет эпиков')
+                          : tr(context, 'По выбранным фильтрам эпиков нет'),
                     ),
                   );
                 }
@@ -261,8 +280,15 @@ class _ProjectEpicsScreenState extends State<ProjectEpicsScreen> {
             ),
           ),
           if (widget.boardCubit != null || _selected.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+              ),
               child: Row(
                 children: [
                   Expanded(
@@ -271,20 +297,24 @@ class _ProjectEpicsScreenState extends State<ProjectEpicsScreen> {
                       onPressed: () => context.pop(),
                       child: Text(
                         _selected.isEmpty
-                            ? 'Показать все задачи'
-                            : 'Показать на доске (${_selected.length})',
+                            ? tr(context, 'Показать все задачи')
+                            : tr(context, "Показать на доске ({p0})", {
+                                'p0': _selected.length,
+                              }),
                       ),
                     ),
                   ),
-                  TextButton(
+                  const SizedBox(width: 8),
+                  IconButton(
                     key: const Key('epics-clear-selection'),
+                    tooltip: tr(context, 'Сбросить выбор'),
                     onPressed: _selected.isEmpty
                         ? null
                         : () {
                             setState(_selected.clear);
                             _syncFilter();
                           },
-                    child: const Text('Сбросить'),
+                    icon: const Icon(LucideIcons.filterX, size: 20),
                   ),
                 ],
               ),
@@ -372,7 +402,9 @@ class _EpicCreationFormState extends State<_EpicCreationForm> {
           textCapitalization: TextCapitalization.sentences,
           onChanged: (_) => setState(() {}),
           onSubmitted: (_) => _save(),
-          decoration: const InputDecoration(hintText: 'Название эпика...'),
+          decoration: InputDecoration(
+            hintText: tr(context, 'Название эпика...'),
+          ),
         ),
         const SizedBox(height: AppSpacing.smMd),
         AppColorPicker(
@@ -385,7 +417,7 @@ class _EpicCreationFormState extends State<_EpicCreationForm> {
           Padding(
             padding: const EdgeInsets.only(top: AppSpacing.sm),
             child: Text(
-              _error!,
+              tr(context, _error!),
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
@@ -395,12 +427,16 @@ class _EpicCreationFormState extends State<_EpicCreationForm> {
             FilledButton(
               key: const Key('epic-create-submit'),
               onPressed: _saving || _name.text.trim().isEmpty ? null : _save,
-              child: Text(_saving ? 'Создание...' : 'Создать эпик'),
+              child: Text(
+                _saving
+                    ? tr(context, 'Создание...')
+                    : tr(context, 'Создать эпик'),
+              ),
             ),
             const SizedBox(width: AppSpacing.sm),
             IconButton(
               key: const Key('epic-create-cancel'),
-              tooltip: 'Отмена',
+              tooltip: tr(context, 'Отмена'),
               onPressed: _saving ? null : widget.onCancel,
               icon: const Icon(LucideIcons.x),
             ),
@@ -428,44 +464,68 @@ class _EpicTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final completed = tasks.where((task) => task.isDone).length;
-    return ListTileTheme(
-      horizontalTitleGap: AppSpacing.sm,
-      minLeadingWidth: AppSpacing.touchTarget,
-      child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        childrenPadding: const EdgeInsets.only(
-          left: AppSpacing.touchTarget + AppSpacing.sm,
-        ),
-        expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-        leading: Checkbox(
-          key: ValueKey('epic-filter-${epic.id}'),
-          semanticLabel: 'Фильтровать по эпику ${epic.name}',
-          value: selected,
-          onChanged: (value) => onSelected(value ?? false),
-        ),
-        title: Text(
-          epic.name,
-          style: AppTypography.title(
-            context,
-          )?.copyWith(color: taskLabelColor(epic.color)),
-        ),
-        subtitle: Text(
-          tasks.isEmpty
-              ? 'Нет связанных задач'
-              : 'Завершено $completed из ${tasks.length} задач',
-        ),
-        children: [
-          for (final task in tasks)
-            ListTile(
-              leading: Icon(
-                task.isDone ? LucideIcons.circleCheck : LucideIcons.circle,
-              ),
-              title: Text(task.title),
-              subtitle: task.displayId.isEmpty ? null : Text(task.displayId),
-              trailing: const Icon(LucideIcons.chevronRight),
-              onTap: () => context.push('/tasks/${task.id}', extra: task),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: ListTileTheme(
+          horizontalTitleGap: AppSpacing.sm,
+          minLeadingWidth: AppSpacing.touchTarget,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 4,
             ),
-        ],
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            onTap: () => onSelected(!selected),
+            leading: Checkbox(
+              key: ValueKey('epic-filter-${epic.id}'),
+              semanticLabel: 'Фильтровать по эпику ${epic.name}',
+              value: selected,
+              onChanged: (value) => onSelected(value ?? false),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: taskLabelColor(epic.color),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    epic.name.trim().isEmpty
+                        ? tr(context, 'Без названия')
+                        : epic.name,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            subtitle: Text(
+              tasks.isEmpty
+                  ? tr(context, 'Нет связанных задач')
+                  : tr(context, "Завершено {p0} из {p1} задач", {
+                      'p0': completed,
+                      'p1': tasks.length,
+                    }),
+            ),
+          ),
+        ),
       ),
     );
   }

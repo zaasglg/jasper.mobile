@@ -1,3 +1,4 @@
+import '../../../tasks/data/models/task_detail_model.dart';
 import 'package:dio/dio.dart';
 import '../../domain/repositories/planner_repository.dart';
 import '../../domain/utils/planner_dates.dart';
@@ -72,13 +73,13 @@ class PlannerRepositoryImpl implements PlannerRepository {
   }) => _request(() async {
     _validateDay(scheduledAt, plannedDate);
     final response = await _dio.post<dynamic>(
-      scheduledAt == null
-          ? 'project-planner/account/day-tasks'
-          : 'project-planner/account/tasks',
+      'project-planner/account/tasks',
       data: {
         'title': title.trim(),
-        'scheduledAt': scheduledAt?.toUtc().toIso8601String(),
-        if (plannedDate != null) 'plannedDate': plannerDayString(plannedDate),
+        'scheduledAt': (scheduledAt ?? plannerDate(plannedDate!))
+            .toUtc()
+            .toIso8601String(),
+        'hasTime': scheduledAt != null,
         'durationMinutes': durationMinutes,
       },
     );
@@ -98,23 +99,25 @@ class PlannerRepositoryImpl implements PlannerRepository {
     DateTime? plannedDate,
     int? durationMinutes,
     bool? completed,
+    int? reminderMinutes,
   }) => _request(() async {
     // Older servers forward linked completion to the source task. Use a distinct
     // route so an outdated server rejects the write instead of closing a task.
     final independentCompletion = completed != null && !item.isStandalone;
     try {
       await _dio.patch<dynamic>(
-        'project-planner/items/${Uri.encodeComponent(item.id)}${independentCompletion
-            ? '/completion'
-            : plannedDate != null
-            ? '/schedule'
-            : ''}',
+        'project-planner/items/${Uri.encodeComponent(item.id)}${independentCompletion ? '/completion' : ''}',
         data: {
           'title': ?title,
-          if (scheduledAt != null || plannedDate != null) 'scheduledAt': scheduledAt?.toUtc().toIso8601String(),
-          if (plannedDate != null) 'plannedDate': plannerDayString(plannedDate),
+          if (scheduledAt != null || plannedDate != null) ...{
+            'scheduledAt': (scheduledAt ?? plannerDate(plannedDate!))
+                .toUtc()
+                .toIso8601String(),
+            'hasTime': scheduledAt != null,
+          },
           'durationMinutes': ?durationMinutes,
           'completed': ?completed,
+          'reminderMinutes': ?reminderMinutes,
         },
       );
     } on DioException catch (error) {
@@ -123,14 +126,52 @@ class PlannerRepositoryImpl implements PlannerRepository {
           'Не удалось сохранить отметку. Нужен обновлённый сервер ежедневника или запись больше недоступна.',
         );
       }
-      if (plannedDate != null && error.response?.statusCode == 404) {
-        throw const PlannerException(
-          'Сервер пока не поддерживает план без времени или запись недоступна. Требуется обновление сервера.',
-        );
-      }
       rethrow;
     }
   });
+
+  @override
+  Future<void> updateExtras(
+    String itemId, {
+    bool updateIcon = false,
+    String? icon,
+    List<TaskChecklistModel>? checklists,
+  }) => _request(() async {
+    await _dio.patch<dynamic>(
+      'project-planner/items/${Uri.encodeComponent(itemId)}',
+      data: {
+        if (updateIcon) 'icon': icon,
+        if (checklists != null)
+          'checklists': checklists.map(_checklistPayload).toList(),
+      },
+    );
+  });
+
+  // Planner DTOs validate an optional dueDate as a string when present.
+  // Task models serialize absent dates as null, which this endpoint rejects.
+  static Map<String, dynamic> _checklistItemPayload(
+    TaskChecklistItemModel item,
+  ) => {
+    'id': item.id,
+    'text': item.text,
+    'done': item.done,
+    if (item.dueDate != null) 'dueDate': item.dueDate!.toIso8601String(),
+    'assigneeIds': item.assigneeIds,
+  };
+
+  static Map<String, dynamic> _checklistPayload(TaskChecklistModel list) => {
+    'id': list.id,
+    'name': list.name,
+    'items': list.items.map(_checklistItemPayload).toList(),
+    'sections': [
+      for (final section in list.sections)
+        {
+          'id': section.id,
+          'name': section.name,
+          'items': section.items.map(_checklistItemPayload).toList(),
+        },
+    ],
+  };
 
   @override
   Future<void> remove(String itemId) async {

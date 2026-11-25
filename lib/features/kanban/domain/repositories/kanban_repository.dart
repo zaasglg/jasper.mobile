@@ -70,6 +70,22 @@ abstract interface class KanbanRepository {
   Future<void> deleteColumn(String columnId);
 }
 
+abstract interface class KanbanColumnCopyRepository {
+  Future<KanbanColumnModel> copyColumn({
+    required String columnId,
+    required String name,
+  });
+}
+
+class KanbanColumnCopyException extends KanbanException {
+  const KanbanColumnCopyException(
+    super.message, {
+    super.statusCode,
+    this.uncertain = false,
+  });
+  final bool uncertain;
+}
+
 class KanbanException implements Exception {
   const KanbanException(this.message, {this.statusCode});
 

@@ -77,13 +77,6 @@ class DashboardWidgetDefinition extends Equatable {
       duplicable: true,
       rows: 20,
     ),
-    DashboardWidgetDefinition(
-      'task-map',
-      'Карта',
-      'Местоположения задач',
-      duplicable: true,
-      rows: 20,
-    ),
   ];
   static DashboardWidgetDefinition? find(String id) {
     for (final value in all) {

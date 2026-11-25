@@ -1,3 +1,4 @@
+import 'package:jospar/core/localization/app_translations.dart';
 import '../theme/task_label_color.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -136,7 +137,7 @@ class _AppColorPickerState extends State<AppColorPicker> {
                     }
 
                     return Semantics(
-                      label: 'Насыщенность и яркость цвета',
+                      label: tr(context, 'Насыщенность и яркость цвета'),
                       child: GestureDetector(
                         onTapDown: widget.enabled
                             ? (event) => update(event.localPosition)
