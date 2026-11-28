@@ -6,7 +6,8 @@ import 'package:dio/dio.dart';
 
 import '../../domain/repositories/project_repository.dart';
 
-class ProjectRepositoryImpl implements ProjectRepository {
+class ProjectRepositoryImpl
+    implements ProjectRepository, ScopedProjectRepository {
   const ProjectRepositoryImpl(this._dio);
 
   final Dio _dio;
@@ -63,9 +64,20 @@ class ProjectRepositoryImpl implements ProjectRepository {
   }
 
   @override
-  Future<List<ProjectModel>> getProjects() async {
+  Future<List<ProjectModel>> getProjects() => _getProjects();
+
+  @override
+  Future<List<ProjectModel>> getProjectsInWorkspace(String workspaceId) =>
+      _getProjects(workspaceId);
+
+  Future<List<ProjectModel>> _getProjects([String? workspaceId]) async {
     try {
-      final response = await _dio.get<dynamic>('projects');
+      final response = await _dio.get<dynamic>(
+        'projects',
+        options: workspaceId == null
+            ? null
+            : Options(headers: {'X-Workspace-Id': workspaceId}),
+      );
       final items = _unwrapList(response.data);
       return items
           .whereType<Map>()

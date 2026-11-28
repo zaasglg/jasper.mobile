@@ -63,15 +63,31 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
       final results = await Future.wait<dynamic>([
         _repository.getWorkspaces(),
         _selectionStorage.read(),
+        _selectionStorage.readScope(),
       ]);
       if (isClosed) return;
       final workspaces = results[0] as List<WorkspaceModel>;
       final savedId = results[1] as String?;
+      final savedScope = results[2] as List<String>?;
       final latest = state;
       final selectedId = latest is WorkspaceLoaded
           ? latest.selected?.id
           : savedId;
-      final selected = _findSelected(workspaces, selectedId);
+      var selected = _findSelected(workspaces, selectedId);
+      final previousScope = latest is WorkspaceLoaded
+          ? latest.effectiveSelectedIds
+          : savedScope?.toSet() ?? <String>{};
+      final isAll = latest is WorkspaceLoaded
+          ? latest.allSelected
+          : savedScope?.isEmpty == true;
+      final availableScope = workspaces
+          .where((w) => previousScope.contains(w.id))
+          .toList();
+      if (!isAll &&
+          availableScope.isNotEmpty &&
+          !previousScope.contains(selected?.id)) {
+        selected = availableScope.first;
+      }
       final selectionRevision = _selectionRevision;
       if (selected == null) {
         await _writeSelection(null);
@@ -80,21 +96,41 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
       }
       if (isClosed) return;
       final current = state;
-      final effectiveSelection =
+      var effectiveSelection =
           selectionRevision != _selectionRevision && current is WorkspaceLoaded
           ? _findSelected(workspaces, current.selected?.id)
           : selected;
+      final allSelected = current is WorkspaceLoaded
+          ? current.allSelected
+          : savedScope?.isEmpty == true;
+      final scope =
+          (current is WorkspaceLoaded
+                  ? current.effectiveSelectedIds
+                  : savedScope?.toSet() ?? <String>{})
+              .intersection(workspaces.map((w) => w.id).toSet());
+      if (scope.isEmpty && effectiveSelection != null) {
+        scope.add(effectiveSelection.id);
+      }
+      if (!allSelected &&
+          scope.isNotEmpty &&
+          !scope.contains(effectiveSelection?.id)) {
+        effectiveSelection = workspaces.firstWhere((w) => scope.contains(w.id));
+      }
       emit(
         current is WorkspaceLoaded
             ? current.copyWith(
                 workspaces: workspaces,
                 selected: effectiveSelection,
+                selectedIds: Set.unmodifiable(scope),
+                allSelected: allSelected,
                 isRefreshing: false,
                 refreshError: null,
               )
             : WorkspaceLoaded(
                 workspaces: workspaces,
                 selected: effectiveSelection,
+                selectedIds: Set.unmodifiable(scope),
+                allSelected: allSelected,
               ),
       );
       if (current is WorkspaceLoaded && current.hasLoadedArchived) {
@@ -152,7 +188,9 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
     final current = state;
     if (isClosed ||
         current is! WorkspaceLoaded ||
-        current.selected?.id == workspace.id) {
+        current.selected?.id == workspace.id &&
+            current.effectiveSelectedIds.length == 1 &&
+            !current.allSelected) {
       return;
     }
     if (!current.workspaces.any((item) => item.id == workspace.id)) return;
@@ -161,8 +199,15 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
       (item) => item.id == workspace.id,
     );
     final revision = ++_selectionRevision;
-    final write = _writeSelection(workspace.id);
-    emit(current.copyWith(selected: selected, creationError: null));
+    final write = _writeScope(workspace.id, {workspace.id});
+    emit(
+      current.copyWith(
+        selected: selected,
+        selectedIds: {selected.id},
+        allSelected: false,
+        creationError: null,
+      ),
+    );
     try {
       await write;
       final latest = state;
@@ -177,12 +222,111 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
       if (!isClosed &&
           revision == _selectionRevision &&
           latest is WorkspaceLoaded) {
+        final restored = current.effectiveSelectedIds.intersection(
+          latest.workspaces.map((w) => w.id).toSet(),
+        );
+        final selected = _findSelected(latest.workspaces, current.selected?.id);
+        if (restored.isEmpty && selected != null) restored.add(selected.id);
+        final rollback = selected == null
+            ? _writeSelection(null)
+            : _writeScope(selected.id, restored, all: current.allSelected);
         emit(
           latest.copyWith(
-            selected: _findSelected(latest.workspaces, current.selected?.id),
+            selected: selected,
+            selectedIds: Set.unmodifiable(restored),
+            allSelected: current.allSelected,
             refreshError: 'Не удалось сохранить выбор workspace.',
           ),
         );
+        try {
+          await rollback;
+        } catch (_) {}
+      }
+    }
+  }
+
+  Future<void> _writeScope(String id, Set<String> ids, {bool all = false}) {
+    final primary = _writeSelection(id);
+    final result = _selectionWrites.then((_) async {
+      await primary;
+      await _selectionStorage.saveScope(all ? const [] : ids);
+    });
+    _selectionWrites = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return result;
+  }
+
+  Future<void> toggle(WorkspaceModel workspace) async {
+    final current = state;
+    if (current is! WorkspaceLoaded ||
+        !current.workspaces.any((w) => w.id == workspace.id)) {
+      return;
+    }
+    final ids = {...current.effectiveSelectedIds};
+    if (ids.contains(workspace.id)) {
+      if (ids.length == 1) return;
+      ids.remove(workspace.id);
+    } else {
+      ids.add(workspace.id);
+    }
+    await _changeScope(current, ids, all: false);
+  }
+
+  Future<void> selectAll() async {
+    final current = state;
+    if (current is! WorkspaceLoaded || current.workspaces.isEmpty) return;
+    await _changeScope(
+      current,
+      current.workspaces.map((w) => w.id).toSet(),
+      all: true,
+    );
+  }
+
+  Future<void> _changeScope(
+    WorkspaceLoaded current,
+    Set<String> ids, {
+    required bool all,
+  }) async {
+    final primary = ids.contains(current.selected?.id)
+        ? current.selected!
+        : current.workspaces.firstWhere((w) => ids.contains(w.id));
+    final revision = ++_selectionRevision;
+    final write = _writeScope(primary.id, ids, all: all);
+    emit(
+      current.copyWith(
+        selected: primary,
+        selectedIds: Set.unmodifiable(ids),
+        allSelected: all,
+        refreshError: null,
+      ),
+    );
+    try {
+      await write;
+    } catch (_) {
+      final latest = state;
+      if (!isClosed &&
+          revision == _selectionRevision &&
+          latest is WorkspaceLoaded) {
+        final restored = current.effectiveSelectedIds.intersection(
+          latest.workspaces.map((w) => w.id).toSet(),
+        );
+        final selected = _findSelected(latest.workspaces, current.selected?.id);
+        if (restored.isEmpty && selected != null) restored.add(selected.id);
+        emit(
+          latest.copyWith(
+            selected: selected,
+            selectedIds: restored,
+            allSelected: current.allSelected,
+            refreshError: 'Не удалось сохранить выбор workspace.',
+          ),
+        );
+        if (selected != null) {
+          try {
+            await _writeScope(selected.id, restored, all: current.allSelected);
+          } catch (_) {}
+        }
       }
     }
   }

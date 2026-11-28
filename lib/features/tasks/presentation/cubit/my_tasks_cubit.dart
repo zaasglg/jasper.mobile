@@ -52,21 +52,27 @@ class MyTasksCubit extends Cubit<MyTasksState> {
     required String userId,
     required List<ProjectModel> projects,
   }) async {
-    if (userId.isEmpty) return;
+    if (isClosed || userId.isEmpty) return;
     final configurationKey = '$userId:${_allProjectIds(projects).join(',')}';
-    if (_configurationKey == configurationKey) return;
+    final availableIds = projects.map((project) => project.id).toSet();
+    final selectedIds = state.selectedProjectIds.intersection(availableIds);
+    final scopeIds = _scopeIds(projects, selectedIds);
+    if (_configurationKey == configurationKey &&
+        _sameSet(selectedIds, state.selectedProjectIds) &&
+        _sameSet(scopeIds, state.selectedScopeProjectIds)) {
+      emit(state.copyWith(projects: List<ProjectModel>.unmodifiable(projects)));
+      return;
+    }
     _configurationKey = configurationKey;
     _userId = userId;
 
-    final availableIds = projects.map((project) => project.id).toSet();
-    final selectedIds = state.selectedProjectIds.intersection(availableIds);
     emit(
       state.copyWith(
         projects: List<ProjectModel>.unmodifiable(projects),
         tasks: const <ProjectTaskModel>[],
         columnsByProjectId: const <String, List<KanbanColumnModel>>{},
         selectedProjectIds: selectedIds,
-        selectedScopeProjectIds: _scopeIds(projects, selectedIds),
+        selectedScopeProjectIds: scopeIds,
       ),
     );
     await refresh(showLoading: true);

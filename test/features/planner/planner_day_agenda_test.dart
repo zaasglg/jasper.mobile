@@ -79,6 +79,51 @@ Future<void> _show(
 
 void main() {
   testWidgets(
+    'isolated task uses full width after an earlier overlapping pair',
+    (tester) async {
+      await _show(tester, [
+        _task('first', 9),
+        _task('second', 9),
+        _task('alone', 12),
+      ]);
+      Positioned position(String id) =>
+          tester.widget<Positioned>(find.byKey(ValueKey('planner-agenda-$id')));
+      final first = position('first');
+      final second = position('second');
+      final alone = position('alone');
+      expect(first.width, second.width);
+      expect(second.left, closeTo(first.left! + first.width!, .01));
+      expect(alone.left, first.left);
+      expect(alone.width, closeTo(first.width! * 2, .01));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'overlap chains retain columns and a task at the end boundary expands',
+    (tester) async {
+      await _show(tester, [
+        _task('long', 9, duration: 180),
+        _task('inside-first', 10),
+        _task('inside-second', 11),
+        _task('at-boundary', 12),
+      ]);
+      Positioned position(String id) =>
+          tester.widget<Positioned>(find.byKey(ValueKey('planner-agenda-$id')));
+      final long = position('long');
+      final first = position('inside-first');
+      final second = position('inside-second');
+      final boundary = position('at-boundary');
+      expect(first.width, long.width);
+      expect(second.width, long.width);
+      expect(second.left, first.left);
+      expect(boundary.left, long.left);
+      expect(boundary.width, closeTo(long.width! * 2, .01));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'timed drag scrolls at the finger edge and cancellation never saves',
     (tester) async {
       var drops = 0;
@@ -410,10 +455,7 @@ void main() {
 
     expect(time, findsOneWidget);
     expect(tester.widget<Text>(time).data, '08:00');
-    expect(
-      tester.getTopLeft(time).dy,
-      lessThan(tester.getTopLeft(title).dy),
-    );
+    expect(tester.getTopLeft(time).dy, lessThan(tester.getTopLeft(title).dy));
     expect(tester.takeException(), isNull);
   });
 

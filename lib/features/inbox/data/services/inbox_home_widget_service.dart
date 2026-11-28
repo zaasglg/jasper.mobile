@@ -30,7 +30,7 @@ Future<void> inboxWidgetAction(Uri? uri) async {
 
 /// Keeps the native Android/iOS home-screen widget in sync with Inbox.
 abstract final class InboxHomeWidgetService {
-  static const String appGroupId = 'group.com.jospar.app';
+  static const String appGroupId = 'group.com.josparbee.app';
   static const String androidProvider = 'com.jospar.app.InboxWidgetProvider';
   static const String iOSWidgetKind = 'InboxHomeWidget';
 

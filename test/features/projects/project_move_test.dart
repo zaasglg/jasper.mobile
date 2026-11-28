@@ -82,6 +82,48 @@ class Repository implements ProjectRepository {
 }
 
 void main() {
+  test(
+    'moving in a secondary workspace preserves the primary and scope',
+    () async {
+      final repository = Repository()
+        ..projects = [
+          project('primary', workspace: 'A'),
+          project('source', workspace: 'B'),
+          project('target', workspace: 'B'),
+        ];
+      final cubit = ProjectsCubit(repository);
+      addTearDown(cubit.close);
+      await cubit.loadForWorkspaces({'A', 'B'}, primaryId: 'A');
+      final observedWorkspaces = <String?>[];
+      final subscription = cubit.stream.listen(
+        (state) => observedWorkspaces.add(state.workspaceId),
+      );
+      addTearDown(subscription.cancel);
+
+      final result = await cubit.moveProject(
+        'source',
+        projectMove(
+          project('source', workspace: 'B'),
+          project('target', workspace: 'B'),
+          'after',
+        )!,
+      );
+
+      expect(result, isNull);
+      expect(cubit.state.workspaceId, 'A');
+      expect(observedWorkspaces, everyElement('A'));
+      expect(cubit.workspaceIds, {'A', 'B'});
+      expect(cubit.state.projects.map((p) => p.id), [
+        'primary',
+        'target',
+        'source',
+      ]);
+      expect(repository.moves.single.$2.workspaceId, 'B');
+      expect(repository.loads, 2);
+      expect(cubit.state.isMoving, isFalse);
+    },
+  );
+
   test('matches web inside, sibling, root and depth restrictions', () {
     final a = project('a');
     final c = project('c', parent: 'b');

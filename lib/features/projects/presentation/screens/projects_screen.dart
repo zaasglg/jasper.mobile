@@ -1,5 +1,4 @@
 import 'package:jospar/core/localization/app_translations.dart';
-import '../../../../core/widgets/app_dialog.dart';
 import '../widgets/project_drag.dart';
 import '../utils/project_tree.dart';
 import '../../domain/entities/project_model.dart';
@@ -59,6 +58,45 @@ class ProjectsScreen extends StatelessWidget {
             pageActions: [
               _ProjectPressFeedback(
                 enabled: workspace != null,
+                child: IconButton(
+                  tooltip: tr(context, 'Архив проектов'),
+                  onPressed: workspace == null
+                      ? null
+                      : () async {
+                          final cubit = context.read<ProjectsCubit>();
+                          await context.push(
+                            '/archives/projects?workspaceId=${Uri.encodeQueryComponent(workspace.id)}',
+                          );
+                          await cubit.loadForWorkspace(
+                            workspace.id,
+                            refresh: true,
+                          );
+                        },
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size.square(40),
+                    minimumSize: const Size.square(40),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: EdgeInsets.zero,
+                    backgroundColor: isDark
+                        ? Theme.of(context).colorScheme.surfaceContainerLow
+                        : Colors.white,
+                    foregroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant,
+                    side: BorderSide(color: _border(context)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(
+                    LucideIcons.archive,
+                    size: AppIconSizes.standard,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _ProjectPressFeedback(
+                enabled: workspace != null,
                 child: FilledButton.icon(
                   key: const Key('create_project_button'),
                   onPressed: workspace == null
@@ -90,13 +128,6 @@ class ProjectsScreen extends StatelessWidget {
               : _ProjectsBody(
                   workspace: workspace,
                   onCreate: () => showCreateProjectFlow(context),
-                  onOpenArchive: () async {
-                    final cubit = context.read<ProjectsCubit>();
-                    await context.push(
-                      '/archives/projects?workspaceId=${Uri.encodeQueryComponent(workspace.id)}',
-                    );
-                    await cubit.loadForWorkspace(workspace.id, refresh: true);
-                  },
                 ),
         );
       },
@@ -105,15 +136,10 @@ class ProjectsScreen extends StatelessWidget {
 }
 
 class _ProjectsBody extends StatefulWidget {
-  const _ProjectsBody({
-    required this.workspace,
-    required this.onCreate,
-    required this.onOpenArchive,
-  });
+  const _ProjectsBody({required this.workspace, required this.onCreate});
 
   final WorkspaceModel workspace;
   final VoidCallback onCreate;
-  final VoidCallback onOpenArchive;
 
   @override
   State<_ProjectsBody> createState() => _ProjectsBodyState();
@@ -165,7 +191,6 @@ class _ProjectsBodyState extends State<_ProjectsBody> {
               listView: _listView,
               onSearchChanged: (_) => setState(() {}),
               onClear: () => setState(_search.clear),
-              onOpenArchive: widget.onOpenArchive,
               onViewChanged: (value) => setState(() => _listView = value),
             ),
             if (state.errorMessage != null && state.projects.isNotEmpty)
@@ -379,7 +404,6 @@ class _ProjectsToolbar extends StatelessWidget {
     required this.listView,
     required this.onSearchChanged,
     required this.onClear,
-    required this.onOpenArchive,
     required this.onViewChanged,
   });
 
@@ -388,7 +412,6 @@ class _ProjectsToolbar extends StatelessWidget {
   final bool listView;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClear;
-  final VoidCallback onOpenArchive;
   final ValueChanged<bool> onViewChanged;
 
   @override
@@ -488,20 +511,8 @@ class _ProjectsToolbar extends StatelessWidget {
     final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          tooltip: tr(context, 'Архив проектов'),
-          onPressed: onOpenArchive,
-          style: IconButton.styleFrom(
-            fixedSize: const Size.square(38),
-            minimumSize: const Size.square(38),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            padding: EdgeInsets.zero,
-            foregroundColor: colors.onSurfaceVariant,
-          ),
-          icon: const Icon(LucideIcons.archive, size: AppIconSizes.standard),
-        ),
         for (final list in [false, true]) ...[
-          const SizedBox(width: 4),
+          if (list) const SizedBox(width: 4),
           IconButton(
             key: Key(list ? 'projects-list-view' : 'projects-card-view'),
             tooltip: list ? tr(context, 'Список') : tr(context, 'Карточки'),
@@ -593,7 +604,7 @@ class _ProjectGroup extends StatefulWidget {
 }
 
 class _ProjectGroupState extends State<_ProjectGroup> {
-  bool _expanded = true;
+  bool _expanded = false;
 
   @override
   void didUpdateWidget(covariant _ProjectGroup oldWidget) {
@@ -610,9 +621,6 @@ class _ProjectGroupState extends State<_ProjectGroup> {
                 sub.progress)
             .clamp(0, 100)
             .round();
-    final progressColor = progress == 100
-        ? AppColors.of(context).success
-        : _accent;
     if (!widget.compact) {
       return ProjectDrag(
         key: _dragPreviewKey(context, sub.id),
@@ -639,7 +647,7 @@ class _ProjectGroupState extends State<_ProjectGroup> {
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Icon(
-                            LucideIcons.hash,
+                            LucideIcons.cornerDownRight,
                             size: 14,
                             color: colors.onSurfaceVariant,
                           ),
@@ -658,35 +666,25 @@ class _ProjectGroupState extends State<_ProjectGroup> {
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 20),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: LinearProgressIndicator(
-                              value: progress / 100,
-                              minHeight: 3,
-                              borderRadius: BorderRadius.circular(4),
-                              color: progressColor,
-                              backgroundColor: colors.outlineVariant.withValues(
-                                alpha: .45,
-                              ),
-                            ),
-                          ),
+                        if (progress == 0) ...[
                           const SizedBox(width: 8),
-                          Text(
-                            '$progress%',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              color: colors.onSurfaceVariant,
-                            ),
+                          const SizedBox(
+                            width: 24,
+                            child: _ProjectProgress(progress: 0, small: true),
                           ),
                         ],
-                      ),
+                      ],
                     ),
+                    if (progress > 0) ...[
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 20),
+                        child: _ProjectProgress(
+                          progress: progress.toDouble(),
+                          small: true,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -717,7 +715,7 @@ class _ProjectGroupState extends State<_ProjectGroup> {
                 child: Row(
                   children: [
                     Icon(
-                      LucideIcons.hash,
+                      LucideIcons.cornerDownRight,
                       size: 14,
                       color: colors.onSurfaceVariant,
                     ),
@@ -736,29 +734,10 @@ class _ProjectGroupState extends State<_ProjectGroup> {
                     ),
                     const SizedBox(width: 8),
                     SizedBox(
-                      width: 36,
-                      child: LinearProgressIndicator(
-                        value: progress / 100,
-                        minHeight: 3,
-                        borderRadius: BorderRadius.circular(4),
-                        color: progressColor,
-                        backgroundColor: colors.outlineVariant.withValues(
-                          alpha: .45,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 30,
-                      child: Text(
-                        '$progress%',
-                        textAlign: TextAlign.right,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          fontFeatures: [const FontFeature.tabularFigures()],
-                          color: colors.onSurfaceVariant,
-                        ),
+                      width: progress > 0 ? 68 : 30,
+                      child: _ProjectProgress(
+                        progress: progress.toDouble(),
+                        small: true,
                       ),
                     ),
                   ],
@@ -777,118 +756,79 @@ class _ProjectGroupState extends State<_ProjectGroup> {
     final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final count = projectDescendants(widget.project).length;
-    final add = IconButton(
-      key: Key('add-subproject-${widget.project.id}'),
-      tooltip: tr(context, 'Добавить подпроект'),
-      onPressed: () => showCreateProjectFlow(context, parent: widget.project),
-      icon: const Icon(LucideIcons.plus, size: 18),
-      style: IconButton.styleFrom(
-        foregroundColor: colors.onSurfaceVariant,
-        minimumSize: const Size.square(36),
-        maximumSize: const Size.square(36),
-        padding: EdgeInsets.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-    );
-    final section = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Divider(height: 1, color: colors.outlineVariant.withValues(alpha: .5)),
-        if (count == 0)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: Key('add-subproject-${widget.project.id}'),
-              onPressed: () =>
-                  showCreateProjectFlow(context, parent: widget.project),
-              icon: const Icon(LucideIcons.plus, size: 16),
-              label: Text(tr(context, 'Добавить подпроект')),
-              style: TextButton.styleFrom(
-                foregroundColor: colors.onSurfaceVariant,
-                minimumSize: const Size(0, 48),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                textStyle: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          )
-        else ...[
-          Row(
+    final Widget section = count == 0
+        ? const SizedBox.shrink()
+        : Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Semantics(
-                  expanded: _expanded,
-                  child: InkWell(
-                    key: Key('toggle-subprojects-${widget.project.id}'),
-                    overlayColor: const WidgetStatePropertyAll(
-                      Colors.transparent,
+              Divider(
+                height: 1,
+                color: colors.outlineVariant.withValues(alpha: .5),
+              ),
+              Semantics(
+                expanded: _expanded,
+                child: InkWell(
+                  key: Key('toggle-subprojects-${widget.project.id}'),
+                  overlayColor: const WidgetStatePropertyAll(
+                    Colors.transparent,
+                  ),
+                  hoverColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  focusColor: Colors.transparent,
+                  splashColor: Colors.transparent,
+                  splashFactory: NoSplash.splashFactory,
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
                     ),
-                    hoverColor: Colors.transparent,
-                    highlightColor: Colors.transparent,
-                    focusColor: Colors.transparent,
-                    splashColor: Colors.transparent,
-                    splashFactory: NoSplash.splashFactory,
-                    onTap: () => setState(() => _expanded = !_expanded),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _expanded
-                                ? LucideIcons.chevronDown
-                                : LucideIcons.chevronRight,
-                            size: 16,
-                            color: colors.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              tr(context, 'Подпроекты'),
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '$count',
+                    child: Row(
+                      children: [
+                        Icon(
+                          _expanded
+                              ? LucideIcons.chevronDown
+                              : LucideIcons.chevronRight,
+                          size: 16,
+                          color: colors.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            tr(context, 'Подпроекты'),
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
                               fontSize: 11,
+                              fontWeight: FontWeight.w500,
                               color: colors.onSurfaceVariant,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '· $count',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-              add,
+              if (_expanded)
+                for (final sub in widget.project.children) _subproject(sub, 0),
             ],
-          ),
-          if (_expanded)
-            for (final sub in widget.project.children) _subproject(sub, 0),
-        ],
-      ],
-    );
+          );
     final cover =
         _projectCovers[_projectCoverSeed(widget.project.id) %
             _projectCovers.length];
     final tabColor = dark
         ? Color.alphaBlend(
-            cover.ink.withValues(alpha: widget.compact ? .06 : .18),
+            cover.ink.withValues(alpha: .18),
             colors.surfaceContainerLow,
           )
-        : widget.compact
-        ? Color.lerp(Colors.white, cover.base, .24)!
         : cover.base;
     return Material(
       color: dark ? colors.surfaceContainerLow : Colors.white,
@@ -959,9 +899,6 @@ class _ProjectRow extends StatelessWidget {
     final iconBg = isDark
         ? cover.ink.withValues(alpha: .18)
         : Colors.white.withValues(alpha: .82);
-    final progressColor = progress == 100
-        ? AppColors.of(context).success
-        : _accent;
     return Semantics(
       button: true,
       label: tr(context, "{p0}, выполнено {p1} процентов", {
@@ -1011,6 +948,7 @@ class _ProjectRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _ProjectWorkspaceLabel(project: project),
                     Text(
                       project.name.trim().isEmpty
                           ? tr(context, 'Без названия')
@@ -1025,43 +963,8 @@ class _ProjectRow extends StatelessWidget {
                         color: colorScheme.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            tr(context, 'Выполнено'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w500,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          '${progress.round()}%',
-                          style: GoogleFonts.inter(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: progressColor,
-                            fontFeatures: [const FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    LinearProgressIndicator(
-                      value: progress / 100,
-                      minHeight: 5,
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                      backgroundColor: isDark
-                          ? colorScheme.surfaceContainerHighest
-                          : AppColors.of(context).outgoingMessage,
-                      color: progressColor,
-                    ),
+                    const SizedBox(height: 12),
+                    _ProjectProgress(progress: progress),
                   ],
                 ),
               ),
@@ -1071,6 +974,113 @@ class _ProjectRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProjectProgress extends StatelessWidget {
+  const _ProjectProgress({required this.progress, this.small = false});
+
+  final double progress;
+  final bool small;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final color = progress == 100
+        ? AppColors.of(context).success
+        : progress == 0
+        ? colors.onSurfaceVariant
+        : _accent;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        if (progress > 0) ...[
+          Expanded(
+            child: LinearProgressIndicator(
+              value: progress / 100,
+              minHeight: small ? 3 : 4,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              color: color,
+              backgroundColor: color.withValues(alpha: .12),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Text(
+          '${progress.round()}%',
+          style: GoogleFonts.inter(
+            fontSize: small ? 10 : 12,
+            fontWeight: progress > 0 ? FontWeight.w600 : FontWeight.w400,
+            fontFeatures: [const FontFeature.tabularFigures()],
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProjectWorkspaceLabel extends StatelessWidget {
+  const _ProjectWorkspaceLabel({required this.project});
+
+  final ProjectModel project;
+
+  @override
+  Widget build(BuildContext context) =>
+      BlocBuilder<WorkspaceCubit, WorkspaceState>(
+        builder: (context, state) {
+          if (state is! WorkspaceLoaded ||
+              state.effectiveSelectedIds.length < 2) {
+            return const SizedBox.shrink();
+          }
+          final workspace = state.workspaces
+              .where((w) => w.id == project.workspaceId)
+              .firstOrNull;
+          if (workspace == null) return const SizedBox.shrink();
+          final name = workspace.name.trim().isEmpty
+              ? tr(context, 'Без названия')
+              : workspace.name;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Tooltip(
+              message: name,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(
+                        int.tryParse(
+                              (workspace.color ?? '').replaceFirst('#', ''),
+                              radix: 16,
+                            )?.toUnsigned(32) ??
+                            0x6D5FE0,
+                      ).withAlpha(255),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      name,
+                      key: Key('project-workspace-${project.id}'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        height: 1.3,
+                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
 }
 
 class _ProjectQuickActions extends StatelessWidget {
@@ -1098,6 +1108,8 @@ class _ProjectQuickActions extends StatelessWidget {
           cubit.state.isCreating,
     );
     final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final palette = AppColors.of(context);
     final actions = [
       (
         id: 'edit',
@@ -1123,55 +1135,49 @@ class _ProjectQuickActions extends StatelessWidget {
           );
         },
       ),
-      (
-        id: 'archive',
-        label: 'Архивировать проект',
-        icon: LucideIcons.archive,
-        run: () async {
-          final cubit = context.read<ProjectsCubit>();
-          if (!await showAppConfirmation(
-                context,
-                tr(context, 'Архивировать проект?'),
-                tr(context, "«{p0}» можно будет восстановить из архива.", {
-                  'p0': project.name,
-                }),
-                confirmLabel: 'Архивировать',
-                destructive: false,
-              ) ||
-              !context.mounted) {
-            return;
-          }
-          await _run(context, () => cubit.archiveProject(project.id));
-        },
-      ),
     ];
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (final action in actions)
-          SizedBox(
-            width: 30,
-            height: 44,
-            child: IconButton(
-              key: Key('project-${action.id}-${project.id}'),
-              tooltip: action.label,
-              onPressed: busy ? null : action.run,
-              padding: EdgeInsets.zero,
-              style: IconButton.styleFrom(
-                minimumSize: const Size(30, 44),
-                foregroundColor: action.id == 'pin' && project.isPinned
-                    ? _accent
-                    : colors.onSurfaceVariant,
-                backgroundColor: action.id == 'pin' && project.isPinned
-                    ? _accent.withValues(alpha: .1)
-                    : Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+        for (var i = 0; i < actions.length; i++) ...[
+          if (i > 0) const SizedBox(width: 6),
+          Builder(
+            builder: (context) {
+              final action = actions[i];
+              final isPinned = action.id == 'pin' && project.isPinned;
+              return IconButton(
+                key: Key('project-${action.id}-${project.id}'),
+                tooltip: action.label,
+                onPressed: busy ? null : action.run,
+                padding: EdgeInsets.zero,
+                style: IconButton.styleFrom(
+                  fixedSize: const Size.square(30),
+                  minimumSize: const Size.square(30),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: isPinned ? _accent : colors.onSurfaceVariant,
+                  backgroundColor: isPinned
+                      ? palette.outgoingMessage
+                      : (isDark
+                            ? colors.surfaceContainerHighest.withValues(
+                                alpha: .6,
+                              )
+                            : Colors.white.withValues(alpha: .86)),
+                  side: BorderSide(
+                    color: isPinned
+                        ? _accent.withValues(alpha: .28)
+                        : (isDark
+                              ? Colors.white.withValues(alpha: .08)
+                              : Colors.black.withValues(alpha: .06)),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9),
+                  ),
                 ),
-              ),
-              icon: Icon(action.icon, size: 16),
-            ),
+                icon: Icon(action.icon, size: 15),
+              );
+            },
           ),
+        ],
       ],
     );
   }
@@ -1239,17 +1245,14 @@ class _CompactProjectRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final progressColor = progress == 100
-        ? AppColors.of(context).success
-        : _accent;
     final seed = _projectCoverSeed(project.id);
     final cover = _projectCovers[seed % _projectCovers.length];
     final background = isDark
         ? Color.alphaBlend(
-            cover.ink.withValues(alpha: .06),
+            cover.ink.withValues(alpha: .18),
             colorScheme.surfaceContainerLow,
           )
-        : Color.lerp(Colors.white, cover.base, .24)!;
+        : cover.base;
 
     return _ProjectPressFeedback(
       pressedScale: .99,
@@ -1279,14 +1282,16 @@ class _CompactProjectRow extends StatelessWidget {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: isDark
-                            ? colorScheme.surfaceContainerHigh
-                            : _accent.withValues(alpha: .06),
+                            ? cover.ink.withValues(alpha: .18)
+                            : Colors.white.withValues(alpha: .82),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         LucideIcons.folder,
                         size: 18,
-                        color: _accent,
+                        color: isDark
+                            ? Color.lerp(cover.ink, Colors.white, .4)!
+                            : cover.ink,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -1295,6 +1300,7 @@ class _CompactProjectRow extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          _ProjectWorkspaceLabel(project: project),
                           Text(
                             project.name.trim().isEmpty
                                 ? tr(context, 'Без названия')
@@ -1312,29 +1318,8 @@ class _CompactProjectRow extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     SizedBox(
-                      width: 48,
-                      child: Column(
-                        children: [
-                          Text(
-                            '${progress.round()}%',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: progressColor,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          LinearProgressIndicator(
-                            value: progress / 100,
-                            minHeight: 3,
-                            borderRadius: BorderRadius.circular(AppRadius.pill),
-                            color: progressColor,
-                            backgroundColor: isDark
-                                ? colorScheme.surfaceContainerHighest
-                                : _accent.withValues(alpha: 0.14),
-                          ),
-                        ],
-                      ),
+                      width: 76,
+                      child: _ProjectProgress(progress: progress, small: true),
                     ),
                     const SizedBox(width: 10),
                     _ProjectQuickActions(project: project),

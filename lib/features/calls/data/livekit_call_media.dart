@@ -3,6 +3,7 @@
 // ignore: implementation_imports
 import 'package:livekit_client/src/managers/broadcast_manager.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'call_background_service.dart';
@@ -14,6 +15,29 @@ import '../domain/entities/call_connection.dart';
 class LiveKitCallMedia extends CallMedia {
   LiveKitCallMedia({this.beforeCapture});
   final Future<void> Function()? beforeCapture;
+  final _protocolEvents = StreamController<Map<String, dynamic>>.broadcast();
+  @override
+  Stream<Map<String, dynamic>> get protocolEvents => _protocolEvents.stream;
+  @override
+  String get localIdentity => room?.localParticipant?.identity ?? '';
+  @override
+  Map<String, String> get protocolParticipants => {
+    if (room?.localParticipant case final participant?)
+      participant.identity: participant.name,
+    for (final participant
+        in room?.remoteParticipants.values ?? <RemoteParticipant>[])
+      participant.identity: participant.name,
+  };
+  @override
+  Future<void> publishProtocol(Map<String, dynamic> message) async {
+    final participant = room?.localParticipant;
+    if (participant == null) throw const CallException('Звонок уже завершён.');
+    await participant.publishData(
+      utf8.encode(jsonEncode(message)),
+      reliable: true,
+    );
+  }
+
   Room? room;
   LocalAudioTrack? _audio;
   LocalVideoTrack? _video;
@@ -84,6 +108,17 @@ class LiveKitCallMedia extends CallMedia {
     BroadcastManager().shouldPublishTrack = true;
     current.addListener(_changed);
     _events = current.createListener()
+      ..on<DataReceivedEvent>((event) {
+        if (event.data.length > 65536 || event.participant == null) return;
+        try {
+          final raw = jsonDecode(utf8.decode(event.data));
+          if (raw is! Map<String, dynamic>) return;
+          // Sender identity comes from LiveKit, never from untrusted JSON.
+          _protocolEvents.add({...raw, 'userId': event.participant!.identity});
+        } catch (_) {
+          /* Ignore unrelated or malformed data-channel messages. */
+        }
+      })
       ..on<RoomDisconnectedEvent>((event) {
         _ended = true;
         notifyListeners();
@@ -195,6 +230,7 @@ class LiveKitCallMedia extends CallMedia {
   @override
   void dispose() {
     if (_broadcastObserved) BroadcastManager().removeListener(_onBroadcast);
+    unawaited(_protocolEvents.close());
     super.dispose();
   }
 

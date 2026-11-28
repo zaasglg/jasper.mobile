@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class WorkspaceSelectionStorage {
@@ -33,7 +35,26 @@ class WorkspaceSelectionStorage {
     return _storage.write(key: _selectedWorkspaceKey, value: workspaceId);
   }
 
-  Future<void> clear() => _storage.delete(key: _selectedWorkspaceKey);
+  Future<List<String>?> readScope() async {
+    final raw = await _storage.read(key: 'selected_workspace_scope');
+    if (raw == null) return null;
+    try {
+      final value = jsonDecode(raw);
+      return value is List ? value.whereType<String>().toList() : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<void> saveScope(Iterable<String> ids) => _storage.write(
+    key: 'selected_workspace_scope',
+    value: jsonEncode(ids.toList()),
+  );
+
+  Future<void> clear() async {
+    await _storage.delete(key: _selectedWorkspaceKey);
+    await _storage.delete(key: 'selected_workspace_scope');
+  }
 }
 
 class _PendingSelection {

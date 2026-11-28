@@ -38,6 +38,83 @@ void main() {
     end: null,
   );
 
+  for (final detach in [false, true]) {
+    test(
+      'tree changes refresh the parent filter with unchanged ID order (detach: $detach)',
+      () async {
+        final repository = _TasksRepository([
+          _task('root-task', 'root'),
+          _task('child-task', 'child'),
+        ]);
+        final cubit = MyTasksCubit(
+          repository: repository,
+          fieldsStorage: _FieldsStorage(),
+        );
+        addTearDown(cubit.close);
+        final detached = [root.copyWith(children: []), child, other];
+        const nested = [root, other];
+        await cubit.configure(
+          userId: 'user',
+          projects: detach ? nested : detached,
+        );
+        await cubit.selectProjects({'root'});
+        final loads = repository.requestedScopes.length;
+        final delayed = Completer<List<ProjectTaskModel>>();
+        repository.nextLoad = delayed;
+        final refreshing = cubit.refresh();
+
+        await cubit.configure(
+          userId: 'user',
+          projects: detach ? detached : nested,
+        );
+
+        final expectedScope = detach ? {'root'} : {'root', 'child'};
+        expect(cubit.state.selectedProjectIds, {'root'});
+        expect(cubit.state.selectedScopeProjectIds, expectedScope);
+        expect(repository.requestedScopes.last, unorderedEquals(expectedScope));
+        expect(repository.requestedScopes.length, loads + 2);
+        final expectedTasks = detach
+            ? ['root-task']
+            : ['root-task', 'child-task'];
+        expect(cubit.state.tasks.map((task) => task.id), expectedTasks);
+        delayed.complete([_task('stale', 'root')]);
+        await refreshing;
+        expect(cubit.state.tasks.map((task) => task.id), expectedTasks);
+      },
+    );
+  }
+
+  test('renaming projects updates metadata without reloading tasks', () async {
+    final repository = _TasksRepository([
+      _task('root-task', 'root'),
+      _task('child-task', 'child'),
+    ]);
+    final cubit = MyTasksCubit(
+      repository: repository,
+      fieldsStorage: _FieldsStorage(),
+    );
+    addTearDown(cubit.close);
+    await cubit.configure(userId: 'user', projects: const [root, other]);
+    await cubit.selectProjects({'root'});
+    final before = cubit.state;
+    final loads = repository.requestedScopes.length;
+    final renamed = root.copyWith(
+      name: 'Renamed root',
+      children: [child.copyWith(name: 'Renamed child')],
+    );
+
+    await cubit.configure(userId: 'user', projects: [renamed, other]);
+
+    expect(cubit.state.projects.first.name, 'Renamed root');
+    expect(cubit.state.projects.first.children.single.name, 'Renamed child');
+    expect(cubit.state.tasks, same(before.tasks));
+    expect(cubit.state.columnsByProjectId, same(before.columnsByProjectId));
+    expect(cubit.state.selectedProjectIds, {'root'});
+    expect(cubit.state.selectedScopeProjectIds, {'root', 'child'});
+    expect(cubit.state.status, MyTasksStatus.success);
+    expect(repository.requestedScopes.length, loads);
+  });
+
   test('filters on the server with parent and child project ids', () async {
     final repository = _TasksRepository(<ProjectTaskModel>[
       _task('root-task', 'root'),

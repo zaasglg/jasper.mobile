@@ -1,3 +1,4 @@
+import 'package:jospar/features/assistant/data/services/assistant_task_changes.dart';
 import 'package:jospar/features/projects/domain/entities/project_task_model.dart';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -9,91 +10,82 @@ import 'package:jospar/features/planner/domain/repositories/planner_repository.d
 import 'package:jospar/features/planner/presentation/cubit/planner_cubit.dart';
 
 void main() {
-  test(
-    'updates planner entries without changing linked project or inbox tasks',
-    () async {
-      final adapter = _Adapter();
-      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/'))
-        ..httpClientAdapter = adapter;
-      final repo = PlannerRepositoryImpl(dio);
-      await repo.create(
-        title: ' План ',
-        scheduledAt: DateTime.utc(2026, 10, 10, 4),
-        durationMinutes: 45,
-      );
-      expect(adapter.requests.last.path, 'project-planner/account/tasks');
-      expect(adapter.requests.last.data, {
-        'title': 'План',
-        'scheduledAt': '2026-10-10T04:00:00.000Z',
-        'hasTime': true,
-        'durationMinutes': 45,
-      });
-      await repo.update(
-        const PlannerItemModel(id: 'standalone', title: 'Plan'),
-        completed: true,
-      );
-      expect(adapter.requests.last.path, 'project-planner/items/standalone');
-      expect(adapter.requests.last.data, {'completed': true});
-      await repo.update(
-        const PlannerItemModel(
-          id: 'item',
-          title: 'Task',
-          taskId: 'task',
-          task: ProjectTaskModel(id: 'task', projectId: 'p', status: 'DONE'),
-        ),
-        completed: false,
-      );
-      expect(
-        adapter.requests.last.path,
-        'project-planner/items/item/completion',
-      );
-      expect(adapter.requests.last.data, {'completed': false});
-      await repo.update(
-        const PlannerItemModel(
-          id: 'inbox-item',
-          title: 'Inbox',
-          inboxTaskId: 'inbox',
-        ),
-        completed: true,
-      );
-      expect(
-        adapter.requests.last.path,
-        'project-planner/items/inbox-item/completion',
-      );
-      expect(adapter.requests.last.data, {'completed': true});
-      expect(
-        adapter.requests.any((r) => r.path.startsWith('project-tasks/')),
-        isFalse,
-      );
-      await repo.addTask(
+  test('completion uses the same endpoints and payloads as the web', () async {
+    final adapter = _Adapter();
+    final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/'))
+      ..httpClientAdapter = adapter;
+    final repo = PlannerRepositoryImpl(dio);
+    await repo.create(
+      title: ' План ',
+      scheduledAt: DateTime.utc(2026, 10, 10, 4),
+      durationMinutes: 45,
+    );
+    expect(adapter.requests.last.path, 'project-planner/account/tasks');
+    expect(adapter.requests.last.data, {
+      'title': 'План',
+      'scheduledAt': '2026-10-10T04:00:00.000Z',
+      'hasTime': true,
+      'durationMinutes': 45,
+    });
+    await repo.update(
+      const PlannerItemModel(id: 'standalone', title: 'Plan'),
+      completed: true,
+    );
+    expect(adapter.requests.last.path, 'project-planner/items/standalone');
+    expect(adapter.requests.last.data, {'completed': true});
+    await repo.update(
+      const PlannerItemModel(
+        id: 'item',
+        title: 'Task',
+        taskId: 'task',
+        task: ProjectTaskModel(id: 'task', projectId: 'p', status: 'DONE'),
+      ),
+      completed: false,
+    );
+    expect(adapter.requests.last.path, 'project-tasks/task');
+    expect(adapter.requests.last.data, {'progress': 0});
+    await repo.update(
+      const PlannerItemModel(
+        id: 'inbox-item',
+        title: 'Inbox',
         inboxTaskId: 'inbox',
-        scheduledAt: DateTime.utc(2026, 10, 10, 4),
-        durationMinutes: 30,
-      );
-      expect(adapter.requests.last.path, 'project-planner/account/inbox-tasks');
-      expect((adapter.requests.last.data as Map)['inboxTaskId'], 'inbox');
-      await repo.addTask(
-        projectId: 'original-project',
-        taskId: 'original-task',
-        scheduledAt: DateTime.utc(2026, 10, 10, 4),
-        durationMinutes: 30,
-      );
-      expect(
-        adapter.requests.last.path,
-        'project-planner/original-project/tasks',
-      );
-      expect(adapter.requests.last.data, {
-        'taskId': 'original-task',
-        'scheduledAt': '2026-10-10T04:00:00.000Z',
-        'durationMinutes': 30,
-      });
-      await repo.remove('item');
-      expect(adapter.requests.last.method, 'DELETE');
-      expect(adapter.requests.last.path, 'project-planner/items/item');
-    },
-  );
+      ),
+      completed: true,
+    );
+    expect(adapter.requests.last.path, 'project-planner/items/inbox-item');
+    expect(adapter.requests.last.data, {'completed': true});
+    expect(
+      adapter.requests.any((r) => r.path.startsWith('project-tasks/')),
+      isTrue,
+    );
+    await repo.addTask(
+      inboxTaskId: 'inbox',
+      scheduledAt: DateTime.utc(2026, 10, 10, 4),
+      durationMinutes: 30,
+    );
+    expect(adapter.requests.last.path, 'project-planner/account/inbox-tasks');
+    expect((adapter.requests.last.data as Map)['inboxTaskId'], 'inbox');
+    await repo.addTask(
+      projectId: 'original-project',
+      taskId: 'original-task',
+      scheduledAt: DateTime.utc(2026, 10, 10, 4),
+      durationMinutes: 30,
+    );
+    expect(
+      adapter.requests.last.path,
+      'project-planner/original-project/tasks',
+    );
+    expect(adapter.requests.last.data, {
+      'taskId': 'original-task',
+      'scheduledAt': '2026-10-10T04:00:00.000Z',
+      'durationMinutes': 30,
+    });
+    await repo.remove('item');
+    expect(adapter.requests.last.method, 'DELETE');
+    expect(adapter.requests.last.path, 'project-planner/items/item');
+  });
   test(
-    'old server cannot turn a planner check into project completion',
+    'missing source task reports failure without an alternate completion request',
     () async {
       final adapter = _Adapter()..status = 404;
       final repo = PlannerRepositoryImpl(Dio()..httpClientAdapter = adapter);
@@ -106,95 +98,178 @@ void main() {
           isA<PlannerException>().having(
             (e) => e.message,
             'message',
-            contains('обновлённый сервер'),
+            contains('Не удалось обновить ежедневник'),
           ),
         ),
       );
+      expect(adapter.requests.single.path, 'project-tasks/task');
+    },
+  );
+  test(
+    'linked completion follows source state while archive stays on planner entry',
+    () async {
+      final adapter = _Adapter()
+        ..response = (_) => [
+          {
+            'id': 'planned',
+            'completed': true,
+            'task': {
+              'id': 'task',
+              'projectId': 'p',
+              'progress': 0,
+              'archived': true,
+            },
+          },
+          {
+            'id': 'unfinished',
+            'completed': false,
+            'task': {
+              'id': 'done-task',
+              'projectId': 'p',
+              'status': 'DONE',
+              'progress': 100,
+            },
+          },
+          {
+            'id': 'inbox-plan',
+            'completed': false,
+            'inboxTaskId': 'inbox',
+            'inboxTask': {
+              'id': 'inbox',
+              'detail': {'completed': true},
+              'archived': true,
+            },
+          },
+          {'id': 'archived-plan', 'archived': true},
+        ];
+      final repo = PlannerRepositoryImpl(Dio()..httpClientAdapter = adapter);
+      final items = await repo.load();
+      expect(items.map((item) => item.id), [
+        'planned',
+        'unfinished',
+        'inbox-plan',
+      ]);
+      expect(items.map((item) => item.completed), [false, true, true]);
+      expect(items.map((item) => item.archived), everyElement(false));
+    },
+  );
+
+  test(
+    'project completion follows the web after reload and can be undone',
+    () async {
+      var sourceDone = false;
+      final adapter = _Adapter()
+        ..response = (request) {
+          if (request.method == 'PATCH') {
+            expect(request.path, 'project-tasks/task');
+            sourceDone = (request.data as Map)['progress'] == 100;
+            return {};
+          }
+          return [
+            {
+              'id': 'slot',
+              'completed': false,
+              'taskId': 'task',
+              'task': {
+                'id': 'task',
+                'projectId': 'project',
+                'title': 'Source',
+                'progress': sourceDone ? 100 : 0,
+              },
+            },
+          ];
+        };
+      final cubit = PlannerCubit(
+        PlannerRepositoryImpl(Dio()..httpClientAdapter = adapter),
+      );
+      addTearDown(cubit.close);
+      await cubit.initialize();
+      await cubit.toggle(cubit.state.items.single);
+      await cubit.refresh();
+      expect(sourceDone, isTrue);
+      expect(cubit.state.items.single.completed, isTrue);
+      await cubit.toggle(cubit.state.items.single);
+      await cubit.refresh();
+      expect(sourceDone, isFalse);
+      expect(cubit.state.items.single.completed, isFalse);
       expect(
-        adapter.requests.single.path,
-        'project-planner/items/item/completion',
+        adapter.requests.where((r) => r.path.endsWith('/completion')),
+        isEmpty,
       );
     },
   );
-  test('linked task status and archive do not replace planner state', () async {
-    final adapter = _Adapter()
-      ..response = (_) => [
-        {
-          'id': 'planned',
-          'completed': true,
-          'task': {
-            'id': 'task',
-            'projectId': 'p',
-            'progress': 0,
-            'archived': true,
-          },
-        },
-        {
-          'id': 'unfinished',
-          'completed': false,
-          'task': {'id': 'done-task', 'projectId': 'p', 'status': 'DONE'},
-        },
-        {
-          'id': 'inbox-plan',
-          'completed': false,
-          'inboxTaskId': 'inbox',
-          'inboxTask': {'id': 'inbox', 'completed': true, 'archived': true},
-        },
-        {'id': 'archived-plan', 'archived': true},
-      ];
-    final repo = PlannerRepositoryImpl(Dio()..httpClientAdapter = adapter);
-    final items = await repo.load();
-    expect(items.map((item) => item.id), [
-      'planned',
-      'unfinished',
-      'inbox-plan',
-    ]);
-    expect(items.map((item) => item.completed), [true, false, false]);
-    expect(items.map((item) => item.archived), everyElement(false));
-  });
 
-  test('planner completion survives reloads and source task changes', () async {
-    var plannedCompleted = false;
-    var sourceDone = false;
-    final adapter = _Adapter()
-      ..response = (request) {
-        if (request.method == 'PATCH') {
-          expect(request.path, 'project-planner/items/slot/completion');
-          plannedCompleted = (request.data as Map)['completed'] as bool;
-          return {};
-        }
-        return [
-          {
-            'id': 'slot',
-            'completed': plannedCompleted,
-            'task': {
-              'id': 'task',
-              'projectId': 'project',
-              'title': 'Source',
-              'progress': sourceDone ? 100 : 0,
-              'status': sourceDone ? 'DONE' : 'TODO',
-              'archived': sourceDone,
+  test(
+    'Inbox completion uses planner item ID and survives a source-backed reload',
+    () async {
+      var done = false;
+      final adapter = _Adapter()
+        ..response = (request) {
+          if (request.method == 'PATCH') {
+            expect(request.path, 'project-planner/items/inbox-slot');
+            done = (request.data as Map)['completed'] as bool;
+            return {};
+          }
+          return [
+            {
+              'id': 'inbox-slot',
+              'completed': false,
+              'inboxTaskId': 'source-inbox',
+              'inboxTask': {
+                'id': 'source-inbox',
+                'title': 'Inbox',
+                'detail': {'completed': done},
+              },
             },
-          },
-        ];
-      };
-    final cubit = PlannerCubit(
-      PlannerRepositoryImpl(Dio()..httpClientAdapter = adapter),
+          ];
+        };
+      final cubit = PlannerCubit(
+        PlannerRepositoryImpl(Dio()..httpClientAdapter = adapter),
+      );
+      addTearDown(cubit.close);
+      await cubit.initialize();
+      for (final expected in [true, false]) {
+        await cubit.toggle(cubit.state.items.single);
+        await cubit.refresh();
+        expect(cubit.state.items.single.completed, expected);
+      }
+      expect(
+        adapter.requests.where((r) => r.path.endsWith('/completion')),
+        isEmpty,
+      );
+    },
+  );
+
+  for (final status in [200, 403]) {
+    test(
+      'project completion invalidates consumers only on success ($status)',
+      () async {
+        final adapter = _Adapter()
+          ..response = (_) => [
+            {
+              'id': 'entry',
+              'taskId': 'source',
+              'task': {'id': 'source', 'projectId': 'p', 'progress': 0},
+            },
+          ];
+        final cubit = PlannerCubit(
+          PlannerRepositoryImpl(Dio()..httpClientAdapter = adapter),
+        );
+        addTearDown(cubit.close);
+        await cubit.initialize();
+        var changes = 0;
+        void changed() => changes++;
+        assistantTaskChanges.addListener(changed);
+        addTearDown(() => assistantTaskChanges.removeListener(changed));
+        adapter.status = status;
+        await cubit.toggle(cubit.state.items.single);
+        expect(changes, status == 200 ? 1 : 0);
+        expect(cubit.state.items.single.completed, status == 200);
+        expect(cubit.state.items.single.task!.isDone, status == 200);
+        expect(cubit.state.busyIds, isEmpty);
+      },
     );
-    addTearDown(cubit.close);
-    await cubit.initialize();
-    await cubit.toggle(cubit.state.items.single);
-    await cubit.refresh();
-    expect(cubit.state.items.single.completed, isTrue);
-    expect(cubit.state.items.single.task!.isDone, isFalse);
-    sourceDone = true;
-    await cubit.refresh();
-    await cubit.toggle(cubit.state.items.single);
-    await cubit.refresh();
-    expect(cubit.state.items.single.completed, isFalse);
-    expect(cubit.state.items.single.task!.isDone, isTrue);
-    expect(cubit.state.items.single.archived, isFalse);
-  });
+  }
 
   for (final archived in [false, true]) {
     test('rejects repeated full planner pages (archived: $archived)', () async {

@@ -21,6 +21,8 @@ final class WorkspaceLoaded extends WorkspaceState {
   const WorkspaceLoaded({
     required this.workspaces,
     required this.selected,
+    this.selectedIds,
+    this.allSelected = false,
     this.isCreating = false,
     this.creationError,
     this.isRefreshing = false,
@@ -33,6 +35,14 @@ final class WorkspaceLoaded extends WorkspaceState {
 
   final List<WorkspaceModel> workspaces;
   final WorkspaceModel? selected;
+  final Set<String>? selectedIds;
+  final bool allSelected;
+  Set<String> get effectiveSelectedIds => allSelected
+      ? workspaces.map((w) => w.id).toSet()
+      : selectedIds ?? {if (selected != null) selected!.id};
+  bool get areAllSelected =>
+      workspaces.isNotEmpty && effectiveSelectedIds.length == workspaces.length;
+
   final bool isCreating;
   final String? creationError;
   final bool isRefreshing;
@@ -44,6 +54,8 @@ final class WorkspaceLoaded extends WorkspaceState {
   WorkspaceLoaded copyWith({
     List<WorkspaceModel>? workspaces,
     Object? selected = _unset,
+    Set<String>? selectedIds,
+    bool? allSelected,
     bool? isCreating,
     Object? creationError = _unset,
     bool? isRefreshing,
@@ -58,6 +70,8 @@ final class WorkspaceLoaded extends WorkspaceState {
       selected: identical(selected, _unset)
           ? this.selected
           : selected as WorkspaceModel?,
+      selectedIds: selectedIds ?? this.selectedIds,
+      allSelected: allSelected ?? this.allSelected,
       isCreating: isCreating ?? this.isCreating,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       refreshError: identical(refreshError, _unset)
@@ -79,6 +93,8 @@ final class WorkspaceLoaded extends WorkspaceState {
   List<Object?> get props => <Object?>[
     workspaces,
     selected,
+    selectedIds,
+    allSelected,
     isCreating,
     creationError,
     isRefreshing,

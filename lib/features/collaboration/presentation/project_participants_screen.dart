@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/di/service_locator.dart';
@@ -69,14 +70,33 @@ class _ParticipantsBody extends StatelessWidget {
             ),
           );
           final canAdd = state.canManage && !state.loading && !state.saving;
+          final colors = AppColors.of(context);
+          final isDark = Theme.of(context).brightness == Brightness.dark;
           return Scaffold(
+            backgroundColor: isDark ? colors.canvas : const Color(0xFFF8F9FC),
             appBar: AppBar(
+              backgroundColor: isDark ? colors.canvas : Colors.white,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
               title: Text(
                 tr(context, 'Участники'),
-                style: AppTypography.title(context),
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: colors.ink,
+                ),
               ),
               centerTitle: true,
               leading: AppBackButton(onPressed: () => context.pop()),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: isDark ? colors.border : const Color(0xFFEBEFF5),
+                ),
+              ),
             ),
             floatingActionButton: !state.canManage
                 ? null
@@ -238,43 +258,30 @@ class _ParticipantsBody extends StatelessWidget {
     ProjectParticipantsCubit cubit,
     SpaceMember member,
   ) async {
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: Text(member.name),
-                subtitle: Text(tr(context, 'Роль в этом проекте')),
-              ),
-              for (final role in cubit.state.rolesFor(member))
-                ListTile(
-                  title: Text(memberRoleLabel(role)),
-                  trailing: role == member.role
-                      ? const Icon(
-                          LucideIcons.check,
-                          size: AppIconSizes.standard,
-                        )
-                      : null,
-                  onTap: () => Navigator.pop(context, role),
-                ),
-              if (cubit.state.canRemove(member))
-                ListTile(
-                  leading: const Icon(
-                    LucideIcons.userMinus,
-                    size: AppIconSizes.standard,
-                  ),
-                  title: Text(tr(context, 'Удалить из проекта')),
-                  onTap: () => Navigator.pop(context, 'remove'),
-                ),
-            ],
-          ),
-        ),
-      ),
+    final selected = await showAppActionMenu<String>(
+      context,
+      title: member.name.isEmpty ? member.email : member.name,
+      eyebrow: 'Роль в этом проекте',
+      groups: [
+        [
+          for (final role in cubit.state.rolesFor(member))
+            AppMenuAction(
+              value: role,
+              label: memberRoleLabel(role),
+              icon: LucideIcons.shield,
+              selected: role == member.role,
+            ),
+        ],
+        if (cubit.state.canRemove(member))
+          [
+            AppMenuAction(
+              value: 'remove',
+              label: 'Удалить из проекта',
+              icon: LucideIcons.userMinus,
+              destructive: true,
+            ),
+          ],
+      ],
     );
     if (selected == null || !context.mounted || !cubit.state.canEdit(member)) {
       return;
@@ -671,7 +678,11 @@ class _ProjectLinkState extends State<_ProjectLink> {
     final enabled = !_busy && widget.enabled;
     final canShare = enabled && _error == null && widget.roles.contains(_role);
     final theme = Theme.of(context);
-    final border = BorderSide(color: theme.colorScheme.outlineVariant);
+    final colors = AppColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final border = BorderSide(
+      color: isDark ? colors.border : const Color(0xFFE8EAF0),
+    );
     final controlShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AppRadius.md),
       side: border,
@@ -682,28 +693,44 @@ class _ProjectLinkState extends State<_ProjectLink> {
         children: [
           Row(
             children: [
-              Icon(
-                LucideIcons.link,
-                size: AppIconSizes.standard,
-                color: theme.colorScheme.primary,
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.outgoingMessage,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(LucideIcons.link, size: 18, color: colors.accent),
               ),
-              const SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  tr(context, 'Ссылка на доску'),
-                  style: AppTypography.title(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      tr(context, 'Ссылка на доску'),
+                      style: GoogleFonts.inter(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w700,
+                        color: colors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      tr(context, 'Для проекта и подпроектов'),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: colors.muted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               if (_link != null && _error == null)
                 const ParticipantBadge('Активна', accent: true),
             ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            tr(context, 'Для проекта и подпроектов'),
-            style: AppTypography.caption(
-              context,
-            )?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.md),
           if (_busy) const LinearProgressIndicator(),

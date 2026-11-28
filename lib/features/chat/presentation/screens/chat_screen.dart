@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_floating_action_button_location.dart';
 import 'package:jospar/core/localization/app_translations.dart';
 import 'dart:math' as math;
 import '../../../../core/widgets/app_action_menu.dart';
@@ -67,6 +68,7 @@ class _ChatScreenState extends State<ChatScreen>
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: const DashboardAppBar(),
+      floatingActionButtonLocation: AppFloatingActionButtonLocation(context),
       floatingActionButton: FloatingActionButton(
         key: const Key('messenger-compose'),
         tooltip: strings.newChat,

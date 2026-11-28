@@ -101,32 +101,32 @@ class PlannerRepositoryImpl implements PlannerRepository {
     bool? completed,
     int? reminderMinutes,
   }) => _request(() async {
-    // Older servers forward linked completion to the source task. Use a distinct
-    // route so an outdated server rejects the write instead of closing a task.
-    final independentCompletion = completed != null && !item.isStandalone;
-    try {
+    final linkedProjectCompletion = completed != null && item.taskId != null;
+    final data = <String, dynamic>{
+      'title': ?title,
+      if (scheduledAt != null || plannedDate != null) ...{
+        'scheduledAt': (scheduledAt ?? plannerDate(plannedDate!))
+            .toUtc()
+            .toIso8601String(),
+        'hasTime': scheduledAt != null,
+      },
+      'durationMinutes': ?durationMinutes,
+      if (!linkedProjectCompletion) 'completed': ?completed,
+      'reminderMinutes': ?reminderMinutes,
+    };
+    // Match web: project completion updates source progress; personal and
+    // Inbox completion uses the ordinary planner item endpoint.
+    if (!linkedProjectCompletion || data.isNotEmpty) {
       await _dio.patch<dynamic>(
-        'project-planner/items/${Uri.encodeComponent(item.id)}${independentCompletion ? '/completion' : ''}',
-        data: {
-          'title': ?title,
-          if (scheduledAt != null || plannedDate != null) ...{
-            'scheduledAt': (scheduledAt ?? plannerDate(plannedDate!))
-                .toUtc()
-                .toIso8601String(),
-            'hasTime': scheduledAt != null,
-          },
-          'durationMinutes': ?durationMinutes,
-          'completed': ?completed,
-          'reminderMinutes': ?reminderMinutes,
-        },
+        'project-planner/items/${Uri.encodeComponent(item.id)}',
+        data: data,
       );
-    } on DioException catch (error) {
-      if (independentCompletion && error.response?.statusCode == 404) {
-        throw const PlannerException(
-          'Не удалось сохранить отметку. Нужен обновлённый сервер ежедневника или запись больше недоступна.',
-        );
-      }
-      rethrow;
+    }
+    if (linkedProjectCompletion) {
+      await _dio.patch<dynamic>(
+        'project-tasks/${Uri.encodeComponent(item.taskId!)}',
+        data: {'progress': completed ? 100 : 0},
+      );
     }
   });
 

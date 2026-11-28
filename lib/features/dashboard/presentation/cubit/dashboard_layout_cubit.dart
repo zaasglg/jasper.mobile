@@ -1,3 +1,5 @@
+import '../../domain/scoped_dashboard_repository.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/dashboard_options_changes.dart';
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
@@ -65,8 +67,12 @@ class DashboardLayoutState extends Equatable {
 }
 
 class DashboardLayoutCubit extends Cubit<DashboardLayoutState> {
-  DashboardLayoutCubit(this.repository) : super(const DashboardLayoutState());
-  final DashboardRepository repository;
+  DashboardLayoutCubit(this._repository) : super(const DashboardLayoutState());
+  final DashboardRepository _repository;
+  List<String> _workspaceIds = [];
+  DashboardRepository get repository => _workspaceIds.length > 1
+      ? ScopedDashboardRepository(_repository, _workspaceIds)
+      : _repository;
   CancelToken? _loadToken;
   int _generation = 0;
   final Map<String, Future<dynamic>> _data = {};
@@ -79,8 +85,19 @@ class DashboardLayoutCubit extends Cubit<DashboardLayoutState> {
     String userId,
     String workspaceId, {
     bool refresh = false,
+    Iterable<String>? workspaceIds,
   }) async {
+    final ids =
+        (workspaceIds ??
+                (_workspaceIds.contains(workspaceId)
+                    ? _workspaceIds
+                    : [workspaceId]))
+            .toList()
+          ..sort();
+    final scopeChanged = !listEquals(ids, _workspaceIds);
+    _workspaceIds = ids;
     if (!refresh &&
+        !scopeChanged &&
         state.userId == userId &&
         state.workspaceId == workspaceId) {
       return;

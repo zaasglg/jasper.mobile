@@ -236,7 +236,7 @@ void main() {
   });
 
   testWidgets(
-    'selecting workspace from Forui switcher reloads projects and leaves old details',
+    'multiple workspace selection reloads combined projects and leaves old details',
     (tester) async {
       GoogleFonts.config.allowRuntimeFetching = false;
       FlutterSecureStorage.setMockInitialValues({});
@@ -322,10 +322,16 @@ void main() {
       await tester.tap(find.text('Продажи'));
       await tester.pumpAndSettle();
 
-      expect((workspace.state as WorkspaceLoaded).selected?.id, 'two');
-      expect(await selectionStorage.read(), 'two');
-      expect(projects.state.workspaceId, 'two');
-      expect(projects.state.projects.single.id, 'new');
+      expect((workspace.state as WorkspaceLoaded).effectiveSelectedIds, {
+        'one',
+        'two',
+      });
+      expect(await selectionStorage.read(), 'one');
+      expect(projects.state.workspaceId, 'one');
+      expect(
+        projects.state.projects.map((p) => p.id),
+        unorderedEquals(['old', 'new']),
+      );
       expect(router.routeInformationProvider.value.uri.path, '/projects');
       expect(MainShell.scaffoldKey.currentState!.isDrawerOpen, isFalse);
       expect(find.text('Проект продаж'), findsOneWidget);

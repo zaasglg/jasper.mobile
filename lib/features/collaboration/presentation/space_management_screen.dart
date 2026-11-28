@@ -14,7 +14,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/theme/app_icon_sizes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/dashboard_surface.dart';
 import '../../../core/widgets/app_action_menu.dart';
+import '../../../core/widgets/app_back_button.dart';
 import '../../../core/widgets/app_form_surface.dart';
 import '../domain/entities/managed_space.dart';
 import '../domain/entities/space_kind.dart';
@@ -56,21 +58,40 @@ class _ManagementBody extends StatelessWidget {
     builder: (context, state) {
       final cubit = context.read<CollaborationCubit>();
       final space = state.space;
+      final colors = AppColors.of(context);
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final dividerColor = isDark ? colors.border : const Color(0xFFF1F5F9);
       return Scaffold(
-        backgroundColor: cubit.kind == SpaceKind.project
-            ? Theme.of(context).colorScheme.surfaceContainerLow
-            : null,
+        backgroundColor: isDark ? colors.canvas : const Color(0xFFF8F9FC),
         appBar: AppBar(
+          backgroundColor: isDark ? colors.canvas : Colors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: const AppBackButton(),
           title: Text(
             tr(context, "Настройки {p0}", {
               'p0': cubit.kind == SpaceKind.project ? 'проекта' : 'workspace',
             }),
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: colors.ink,
+            ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: isDark ? colors.border : const Color(0xFFEBEFF5),
+            ),
           ),
         ),
         body: space == null
             ? Center(
                 child: state.loading
-                    ? const CircularProgressIndicator()
+                    ? CircularProgressIndicator(color: colors.accent)
                     : TextButton(
                         onPressed: cubit.load,
                         child: Text(tr(context, 'Повторить загрузку')),
@@ -80,49 +101,72 @@ class _ManagementBody extends StatelessWidget {
                 top: false,
                 child: AppFormSurface(
                   child: ListView(
-                    padding: const EdgeInsets.all(AppSpacing.mdLg),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.md,
+                      AppSpacing.md,
+                      AppSpacing.xl,
+                    ),
                     children: [
                       if (state.loading || state.saving)
-                        const LinearProgressIndicator(minHeight: 2),
-                      _SettingsSection(
-                        enabled: cubit.kind == SpaceKind.project,
-                        child: _SpaceFields(
-                          key: ValueKey(space),
-                          space: space,
-                          kind: cubit.kind,
-                          saving: state.saving,
-                          onSave: (changes) => cubit.run(
-                            () => cubit.repository.updateSpace(
-                              cubit.kind,
-                              cubit.id,
-                              changes,
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: LinearProgressIndicator(
+                            minHeight: 2,
+                            color: colors.accent,
+                          ),
+                        ),
+                      _SettingsSectionLabel(
+                        text: tr(
+                          context,
+                          cubit.kind == SpaceKind.project
+                              ? 'Основные данные'
+                              : 'Основные настройки',
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      _SettingsCard(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: _SpaceFields(
+                            key: ValueKey(space),
+                            space: space,
+                            kind: cubit.kind,
+                            saving: state.saving,
+                            onSave: (changes) => cubit.run(
+                              () => cubit.repository.updateSpace(
+                                cubit.kind,
+                                cubit.id,
+                                changes,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      if (cubit.kind == SpaceKind.project)
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: AppSpacing.xs,
+                      const SizedBox(height: AppSpacing.mdLg),
+                      if (cubit.kind == SpaceKind.project) ...[
+                        _SettingsSectionLabel(text: tr(context, 'Доступ')),
+                        const SizedBox(height: AppSpacing.sm),
+                        _SettingsCard(
+                          child: _ActionTile(
+                            icon: LucideIcons.users,
+                            iconColor: colors.accent,
+                            iconBg: colors.outgoingMessage,
+                            title: tr(context, 'Участники'),
+                            subtitle: tr(
+                              context,
+                              "Пользователей с доступом: {p0}",
+                              {'p0': state.members.length},
+                            ),
+                            onTap: () async {
+                              await context.push(
+                                '/projects/${cubit.id}/participants',
+                              );
+                              if (!cubit.isClosed) await cubit.load();
+                            },
                           ),
-                          leading: const Icon(LucideIcons.users),
-                          title: Text(tr(context, 'Участники')),
-                          subtitle: Text(
-                            tr(context, "Пользователей с доступом: {p0}", {
-                              'p0': state.members.length,
-                            }),
-                          ),
-                          trailing: const Icon(LucideIcons.chevronRight),
-                          onTap: () async {
-                            await context.push(
-                              '/projects/${cubit.id}/participants',
-                            );
-                            if (!cubit.isClosed) await cubit.load();
-                          },
-                        )
-                      else ...[
+                        ),
+                      ] else ...[
                         Row(
                           children: [
                             Expanded(
@@ -222,34 +266,20 @@ class _ManagementBody extends StatelessWidget {
                                 ),
                         ),
                       ],
-                      const SizedBox(height: 24),
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          left: AppSpacing.md,
-                          bottom: AppSpacing.sm,
-                        ),
-                        child: Text(
-                          tr(context, 'Управление'),
-                          style: AppTypography.caption(context)?.copyWith(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      _ManagementActionsGroup(
+                      const SizedBox(height: AppSpacing.mdLg),
+                      _SettingsSectionLabel(text: tr(context, 'Управление')),
+                      const SizedBox(height: AppSpacing.sm),
+                      _SettingsCard(
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.md,
-                                vertical: AppSpacing.xs,
-                              ),
-                              leading: const Icon(
-                                LucideIcons.archive,
-                                size: AppIconSizes.standard,
-                              ),
-                              title: Text(tr(context, 'Архивировать')),
+                            _ActionTile(
+                              icon: LucideIcons.archive,
+                              iconColor: colors.ink,
+                              iconBg: isDark
+                                  ? colors.badgeSurface
+                                  : const Color(0xFFF1F3F8),
+                              title: tr(context, 'Архивировать'),
                               onTap: state.saving
                                   ? null
                                   : () async {
@@ -279,27 +309,20 @@ class _ManagementBody extends StatelessWidget {
                                       }
                                     },
                             ),
-                            const Divider(
+                            Divider(
                               height: 1,
-                              indent: AppSpacing.touchTarget + AppSpacing.md,
-                              endIndent: AppSpacing.md,
+                              thickness: 1,
+                              color: dividerColor,
                             ),
-                            ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.md,
-                                vertical: AppSpacing.xs,
+                            _ActionTile(
+                              icon: LucideIcons.trash2,
+                              iconColor: colors.error,
+                              iconBg: colors.error.withValues(
+                                alpha: isDark ? 0.2 : 0.1,
                               ),
-                              leading: Icon(
-                                LucideIcons.trash2,
-                                size: AppIconSizes.standard,
-                                color: AppColors.of(context).error,
-                              ),
-                              title: Text(
-                                tr(context, 'Удалить'),
-                                style: TextStyle(
-                                  color: AppColors.of(context).error,
-                                ),
-                              ),
+                              title: tr(context, 'Удалить'),
+                              titleColor: colors.error,
+                              chevronColor: colors.error.withValues(alpha: 0.7),
                               onTap: state.saving
                                   ? null
                                   : () async {
@@ -480,16 +503,68 @@ class _SpaceFieldsState extends State<_SpaceFields> {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          secondary: const Icon(LucideIcons.pin, size: AppIconSizes.standard),
-          title: Text(tr(context, 'Закрепить проект')),
-          subtitle: Text(tr(context, 'Показывать в начале списка')),
-          value: _pinned,
-          activeTrackColor: AppColors.accent,
-          onChanged: widget.saving
-              ? null
-              : (value) => setState(() => _pinned = value),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.of(context).subtleSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.of(context).border
+                  : const Color(0xFFE8EAF0),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.of(context).outgoingMessage,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  LucideIcons.pin,
+                  size: 17,
+                  color: AppColors.of(context).accent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      tr(context, 'Закрепить проект'),
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.of(context).ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      tr(context, 'Показывать в начале списка'),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: AppColors.of(context).muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Switch.adaptive(
+                value: _pinned,
+                activeTrackColor: AppColors.accent,
+                onChanged: widget.saving
+                    ? null
+                    : (value) => setState(() => _pinned = value),
+              ),
+            ],
+          ),
         ),
       ] else ...[
         const SizedBox(height: 16),
@@ -639,23 +714,59 @@ class _SpaceFieldsState extends State<_SpaceFields> {
   }
 }
 
-class _SettingsSection extends StatelessWidget {
-  const _SettingsSection({required this.child, required this.enabled});
-  final Widget child;
-  final bool enabled;
+class _SettingsSectionLabel extends StatelessWidget {
+  const _SettingsSectionLabel({required this.text});
+
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    if (!enabled) return child;
+    final colors = AppColors.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 600),
-        child: Material(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          clipBehavior: Clip.antiAlias,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text(
+            text.toUpperCase(),
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.65,
+              color: colors.muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: isDark ? colors.subtleSurface : DashboardSurface.background,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: isDark ? colors.border : DashboardSurface.border,
+            ),
+            boxShadow: isDark ? const [] : DashboardSurface.shadows,
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            clipBehavior: Clip.antiAlias,
             child: child,
           ),
         ),
@@ -664,21 +775,82 @@ class _SettingsSection extends StatelessWidget {
   }
 }
 
-class _ManagementActionsGroup extends StatelessWidget {
-  const _ManagementActionsGroup({required this.child});
-  final Widget child;
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.title,
+    this.subtitle,
+    this.titleColor,
+    this.chevronColor,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String title;
+  final String? subtitle;
+  final Color? titleColor;
+  final Color? chevronColor;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.surfaceContainerLowest,
-    borderRadius: BorderRadius.circular(AppRadius.lg),
-    clipBehavior: Clip.antiAlias,
-    child: ListTileTheme(
-      data: ListTileTheme.of(context).copyWith(
-        shape: const RoundedRectangleBorder(),
-        tileColor: Colors.transparent,
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: titleColor ?? colors.ink,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        color: colors.muted,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              LucideIcons.chevronRight,
+              size: 18,
+              color: chevronColor ?? colors.muted.withValues(alpha: 0.7),
+            ),
+          ],
+        ),
       ),
-      child: child,
-    ),
-  );
+    );
+  }
 }

@@ -317,10 +317,25 @@ class _PlannerDayAgendaState extends State<PlannerDayAgenda> {
             ? scale.height
             : math.max(scale.height, _resizeEndY + 32);
         _scale = scale;
-        // Overlapping tasks share horizontal space; the time mapping stays common.
+        // Only tasks in the same overlapping time group share columns.
         final ends = <DateTime>[];
         final lanes = <String, int>{};
+        final columnCounts = <String, int>{};
+        final group = <PlannerItemModel>[];
+        DateTime? groupEnd;
+        void finishGroup() {
+          for (final item in group) {
+            columnCounts[item.id] = math.max(1, ends.length);
+          }
+          group.clear();
+          ends.clear();
+          groupEnd = null;
+        }
+
         for (final item in sorted) {
+          if (groupEnd != null && !item.scheduledAt!.isBefore(groupEnd!)) {
+            finishGroup();
+          }
           var lane = ends.indexWhere((end) => !end.isAfter(item.scheduledAt!));
           if (lane < 0) {
             lane = ends.length;
@@ -330,9 +345,14 @@ class _PlannerDayAgendaState extends State<PlannerDayAgenda> {
             Duration(minutes: item.durationMinutes.clamp(15, 1440)),
           );
           lanes[item.id] = lane;
+          group.add(item);
+          if (groupEnd == null || ends[lane].isAfter(groupEnd!)) {
+            groupEnd = ends[lane];
+          }
         }
-        final count = math.max(1, ends.length);
-        final width = math.max(1.0, (box.maxWidth - 44) / count);
+        finishGroup();
+        double columnWidth(PlannerItemModel item) =>
+            math.max(1.0, (box.maxWidth - 44) / columnCounts[item.id]!);
         return DragTarget<PlannerItemModel>(
           onWillAcceptWithDetails: (details) => _canSchedule(details.data),
           onMove: _move,
@@ -494,8 +514,8 @@ class _PlannerDayAgendaState extends State<PlannerDayAgenda> {
                       Positioned(
                         key: ValueKey('planner-agenda-${item.id}'),
                         top: scale.toY(_minutes(item)) + 2,
-                        left: 44 + lanes[item.id]! * width,
-                        width: width,
+                        left: 44 + lanes[item.id]! * columnWidth(item),
+                        width: columnWidth(item),
                         height: math.max(
                           28,
                           endY(item) - scale.toY(_minutes(item)) - 4,

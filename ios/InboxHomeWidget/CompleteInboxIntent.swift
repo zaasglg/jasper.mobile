@@ -12,7 +12,7 @@ struct CompleteInboxIntent: AppIntent {
         components.scheme = "jospar"
         components.host = "complete"
         components.queryItems = [URLQueryItem(name: "id", value: taskId)]
-        await HomeWidgetBackgroundWorker.run(url: components.url, appGroup: "group.com.jospar.app")
+        await HomeWidgetBackgroundWorker.run(url: components.url, appGroup: "group.com.josparbee.app")
         return .result()
     }
 }

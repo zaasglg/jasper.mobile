@@ -213,11 +213,20 @@ class PlannerCubit extends Cubit<PlannerState> {
     return success;
   }
 
-  Future<void> toggle(PlannerItemModel item) => _mutate(
-    item,
-    () => _repository.update(item, completed: !item.completed),
-    item.copyWith(completed: !item.completed),
-  );
+  Future<void> toggle(PlannerItemModel item) async {
+    final saved = await _mutate(
+      item,
+      () => _repository.update(item, completed: !item.completed),
+      item.copyWith(completed: !item.completed),
+    );
+    if (saved && item.taskId != null && !isClosed) {
+      // Refresh cached project consumers after changing their source task.
+      assistantTaskChanges.removeListener(_onTasksChanged);
+      notifyAssistantTaskChanges();
+      if (!isClosed) assistantTaskChanges.addListener(_onTasksChanged);
+    }
+  }
+
   Future<bool> remove(PlannerItemModel item) async {
     if (isClosed ||
         item.external ||

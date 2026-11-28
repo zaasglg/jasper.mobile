@@ -123,6 +123,7 @@ class _DashboardCoordinatorState extends State<_DashboardCoordinator>
     context.read<DashboardLayoutCubit>().configure(
       profileState.profile.id,
       projectsState.workspaceId!,
+      workspaceIds: context.read<ProjectsCubit>().workspaceIds,
     );
     context.read<MyTasksCubit>().configure(
       userId: profileState.profile.id,
@@ -189,229 +190,238 @@ class _DashboardView extends StatelessWidget {
         onPopInvokedWithResult: (didPop, result) {
           if (!didPop && state.editing) cubit.cancelEdit();
         },
-        child: Scaffold(
-          backgroundColor: AppColors.of(context).canvas,
-          appBar: const DashboardAppBar(),
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              BlocBuilder<ProfileCubit, ProfileState>(
-                buildWhen: (previous, current) => current is ProfileLoaded,
-                builder: (context, profile) => DashboardWelcomeHeader(
-                  onEdit:
-                      state.layout == null ||
-                          state.loading ||
-                          state.editing ||
-                          state.saving ||
-                          state.readOnly
-                      ? null
-                      : cubit.enterEdit,
-                  onCreate: state.saving
-                      ? null
-                      : () async {
-                          final uri = Uri(
-                            path: '/tasks/new',
-                            queryParameters: state.workspaceId.isEmpty
-                                ? null
-                                : {'workspaceId': state.workspaceId},
-                          );
-                          final created = await context
-                              .push<TaskCreationResult>(uri.toString());
-                          if (!context.mounted || created == null) return;
-                          cubit.refreshContent();
-                          context.read<MyTasksCubit>().refresh();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            appSnackBar(
-                              context: context,
-                              tone: created.orderWarning
-                                  ? AppSnackBarTone.info
-                                  : AppSnackBarTone.success,
-                              content: Text(
-                                created.orderWarning
-                                    ? tr(
-                                        context,
-                                        'Задача создана. Не удалось обновить её порядок в колонке',
-                                      )
-                                    : tr(context, 'Задача создана'),
-                              ),
-                            ),
-                          );
-                        },
-                  name:
-                      profile is ProfileLoaded &&
-                          profile.profile.name.isNotEmpty
-                      ? profile.profile.name
-                      : 'Пользователь',
-                ),
-              ),
-              if (state.workspaceId.isNotEmpty &&
-                  sl.isRegistered<DailyQuoteRepository>())
-                DashboardDailyQuote(
-                  key: ValueKey('quote-${state.userId}-${state.workspaceId}'),
-                  repository: sl<DailyQuoteRepository>(),
-                  workspaceId: state.workspaceId,
-                ),
-              if (state.editing)
-                DashboardEditToolbar(
-                  saving: state.saving,
-                  onCancel: cubit.cancelEdit,
-                  onSave: cubit.save,
-                  onAdd: () => showDashboardWidgetPicker(context, cubit),
-                  onReset: () => confirmDashboardReset(context, cubit),
-                ),
-              if (state.loading || state.saving)
-                const LinearProgressIndicator(minHeight: 2),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.of(context).canvas,
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: state.layout == null && state.error != null
-                      ? Center(
-                          child: TextButton(
-                            onPressed: () => cubit.configure(
-                              state.userId,
-                              state.workspaceId,
-                              refresh: true,
-                            ),
-                            child: Text(
-                              tr(context, 'Повторить загрузку дашборда'),
-                            ),
-                          ),
-                        )
-                      : state.layout == null
-                      ? ListView(
-                          padding: EdgeInsets.zero,
-                          children: [
-                            for (var i = 0; i < 3; i++) ...[
-                              if (i > 0)
-                                Divider(
-                                  height: 1,
-                                  color: Theme.of(context).dividerColor,
-                                ),
-                              const DashboardWidgetSkeleton(),
-                            ],
-                          ],
-                        )
-                      : state.editing
-                      ? ReorderableListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                          buildDefaultDragHandles: false,
-                          onReorderItem: cubit.reorder,
-                          itemCount: slots.length,
-                          footer: slots.isEmpty
-                              ? Padding(
-                                  padding: EdgeInsets.all(30),
-                                  child: Text(
-                                    tr(context, 'Добавьте первый виджет'),
-                                  ),
-                                )
-                              : null,
-                          itemBuilder: (context, index) => Padding(
-                            key: ValueKey(slots[index].instanceId),
-                            padding: const EdgeInsets.only(bottom: 14),
-                            child: Material(
-                              color: AppColors.of(context).canvas,
-                              borderRadius: BorderRadius.circular(16),
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Column(
-                                  children: [
-                                    DashboardEditActions(
-                                      slot: slots[index],
-                                      cubit: cubit,
-                                      projects: projects,
-                                      index: index,
-                                      count: slots.length,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : RefreshIndicator(
-                          onRefresh: () async {
-                            await cubit.configure(
-                              state.userId,
-                              state.workspaceId,
-                              refresh: true,
+        child: MediaQuery.removePadding(
+          context: context,
+          removeBottom: true,
+          child: Scaffold(
+            backgroundColor: AppColors.of(context).canvas,
+            appBar: const DashboardAppBar(),
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                BlocBuilder<ProfileCubit, ProfileState>(
+                  buildWhen: (previous, current) => current is ProfileLoaded,
+                  builder: (context, profile) => DashboardWelcomeHeader(
+                    onEdit:
+                        state.layout == null ||
+                            state.loading ||
+                            state.editing ||
+                            state.saving ||
+                            state.readOnly
+                        ? null
+                        : cubit.enterEdit,
+                    onCreate: state.saving
+                        ? null
+                        : () async {
+                            final uri = Uri(
+                              path: '/tasks/new',
+                              queryParameters: state.workspaceId.isEmpty
+                                  ? null
+                                  : {'workspaceId': state.workspaceId},
                             );
-                            if (context.mounted) {
-                              await context.read<MyTasksCubit>().refresh();
-                            }
+                            final created = await context
+                                .push<TaskCreationResult>(uri.toString());
+                            if (!context.mounted || created == null) return;
+                            cubit.refreshContent();
+                            context.read<MyTasksCubit>().refresh();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              appSnackBar(
+                                context: context,
+                                tone: created.orderWarning
+                                    ? AppSnackBarTone.info
+                                    : AppSnackBarTone.success,
+                                content: Text(
+                                  created.orderWarning
+                                      ? tr(
+                                          context,
+                                          'Задача создана. Не удалось обновить её порядок в колонке',
+                                        )
+                                      : tr(context, 'Задача создана'),
+                                ),
+                              ),
+                            );
                           },
-                          child: ListView.builder(
-                            padding: const EdgeInsets.only(top: 18, bottom: 28),
-                            itemCount: slots.isEmpty ? 2 : slots.length + 1,
-                            itemBuilder: (context, index) {
-                              if (index == 0) {
-                                return const Padding(
-                                  padding: EdgeInsets.fromLTRB(16, 0, 16, 20),
-                                  child: DashboardInboxComposer(),
-                                );
-                              }
-                              if (slots.isEmpty) {
-                                return Padding(
-                                  padding: EdgeInsets.all(24),
-                                  child: Text(
-                                    tr(
-                                      context,
-                                      'Добавьте виджеты через кнопку редактирования',
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                );
-                              }
-                              final slot = slots[index - 1];
-                              return Container(
-                                key: ValueKey(
-                                  '${state.userId}:${state.workspaceId}:${slot.instanceId}',
-                                ),
-                                decoration: BoxDecoration(
-                                  border: Border(
-                                    top: BorderSide(
-                                      color: Theme.of(context).dividerColor,
-                                    ),
-                                    bottom: index == slots.length
-                                        ? BorderSide(
-                                            color: Theme.of(
-                                              context,
-                                            ).dividerColor,
-                                          )
-                                        : BorderSide.none,
-                                  ),
-                                ),
-                                child: DashboardCollapsibleWidget(
-                                  key: ValueKey('collapse-${slot.instanceId}'),
-                                  title: switch (slot.id) {
-                                    'kpi-group' => tr(context, 'Общие данные'),
-                                    'daily-motivation' => tr(
-                                      context,
-                                      'AI рекомендации',
-                                    ),
-                                    'activity' => tr(
-                                      context,
-                                      'Последняя активность',
-                                    ),
-                                    _ => slot.definition?.title ?? slot.id,
-                                  },
-                                  icon: dashboardWidgetIcon(slot.id),
-                                  child: _widget(
-                                    context,
-                                    slot,
-                                    state,
-                                    projects,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                    name:
+                        profile is ProfileLoaded &&
+                            profile.profile.name.isNotEmpty
+                        ? profile.profile.name
+                        : 'Пользователь',
+                  ),
                 ),
-              ),
-            ],
+                if (state.workspaceId.isNotEmpty &&
+                    sl.isRegistered<DailyQuoteRepository>())
+                  DashboardDailyQuote(
+                    key: ValueKey('quote-${state.userId}-${state.workspaceId}'),
+                    repository: sl<DailyQuoteRepository>(),
+                    workspaceId: state.workspaceId,
+                  ),
+                if (state.editing)
+                  DashboardEditToolbar(
+                    saving: state.saving,
+                    onCancel: cubit.cancelEdit,
+                    onSave: cubit.save,
+                    onAdd: () => showDashboardWidgetPicker(context, cubit),
+                    onReset: () => confirmDashboardReset(context, cubit),
+                  ),
+                if (state.loading || state.saving)
+                  const LinearProgressIndicator(minHeight: 2),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.of(context).canvas,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: state.layout == null && state.error != null
+                        ? Center(
+                            child: TextButton(
+                              onPressed: () => cubit.configure(
+                                state.userId,
+                                state.workspaceId,
+                                refresh: true,
+                              ),
+                              child: Text(
+                                tr(context, 'Повторить загрузку дашборда'),
+                              ),
+                            ),
+                          )
+                        : state.layout == null
+                        ? ListView(
+                            padding: EdgeInsets.zero,
+                            children: [
+                              for (var i = 0; i < 3; i++) ...[
+                                if (i > 0)
+                                  Divider(
+                                    height: 1,
+                                    color: Theme.of(context).dividerColor,
+                                  ),
+                                const DashboardWidgetSkeleton(),
+                              ],
+                            ],
+                          )
+                        : state.editing
+                        ? ReorderableListView.builder(
+                            padding: EdgeInsets.fromLTRB(16, 8, 16, 28),
+                            buildDefaultDragHandles: false,
+                            onReorderItem: cubit.reorder,
+                            itemCount: slots.length,
+                            footer: slots.isEmpty
+                                ? Padding(
+                                    padding: EdgeInsets.all(30),
+                                    child: Text(
+                                      tr(context, 'Добавьте первый виджет'),
+                                    ),
+                                  )
+                                : null,
+                            itemBuilder: (context, index) => Padding(
+                              key: ValueKey(slots[index].instanceId),
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: Material(
+                                color: AppColors.of(context).canvas,
+                                borderRadius: BorderRadius.circular(16),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(
+                                    children: [
+                                      DashboardEditActions(
+                                        slot: slots[index],
+                                        cubit: cubit,
+                                        projects: projects,
+                                        index: index,
+                                        count: slots.length,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: () async {
+                              await cubit.configure(
+                                state.userId,
+                                state.workspaceId,
+                                refresh: true,
+                              );
+                              if (context.mounted) {
+                                await context.read<MyTasksCubit>().refresh();
+                              }
+                            },
+                            child: ListView.builder(
+                              padding: EdgeInsets.only(top: 18, bottom: 28),
+                              itemCount: slots.isEmpty ? 2 : slots.length + 1,
+                              itemBuilder: (context, index) {
+                                if (index == 0) {
+                                  return const Padding(
+                                    padding: EdgeInsets.fromLTRB(16, 0, 16, 20),
+                                    child: DashboardInboxComposer(),
+                                  );
+                                }
+                                if (slots.isEmpty) {
+                                  return Padding(
+                                    padding: EdgeInsets.all(24),
+                                    child: Text(
+                                      tr(
+                                        context,
+                                        'Добавьте виджеты через кнопку редактирования',
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  );
+                                }
+                                final slot = slots[index - 1];
+                                return Container(
+                                  key: ValueKey(
+                                    '${state.userId}:${state.workspaceId}:${slot.instanceId}',
+                                  ),
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      top: BorderSide(
+                                        color: Theme.of(context).dividerColor,
+                                      ),
+                                      bottom: index == slots.length
+                                          ? BorderSide(
+                                              color: Theme.of(
+                                                context,
+                                              ).dividerColor,
+                                            )
+                                          : BorderSide.none,
+                                    ),
+                                  ),
+                                  child: DashboardCollapsibleWidget(
+                                    key: ValueKey(
+                                      'collapse-${slot.instanceId}',
+                                    ),
+                                    title: switch (slot.id) {
+                                      'kpi-group' => tr(
+                                        context,
+                                        'Общие данные',
+                                      ),
+                                      'daily-motivation' => tr(
+                                        context,
+                                        'AI рекомендации',
+                                      ),
+                                      'activity' => tr(
+                                        context,
+                                        'Последняя активность',
+                                      ),
+                                      _ => slot.definition?.title ?? slot.id,
+                                    },
+                                    icon: dashboardWidgetIcon(slot.id),
+                                    child: _widget(
+                                      context,
+                                      slot,
+                                      state,
+                                      projects,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );

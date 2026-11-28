@@ -1,3 +1,9 @@
+import '../../features/calls/data/call_protocol_repository_impl.dart';
+import '../../features/calls/domain/call_protocol_repository.dart';
+import '../../features/calls/presentation/protocol/call_protocol_cubit.dart';
+import '../../features/planner/domain/repositories/planner_week_order_repository.dart';
+import '../../features/planner/data/repositories/planner_week_order_repository_impl.dart';
+import '../../features/planner/presentation/cubit/planner_week_order_cubit.dart';
 import '../../features/dashboard/domain/daily_quote_repository.dart';
 import '../../features/dashboard/data/daily_quote_repository_impl.dart';
 import '../../features/planner/domain/repositories/ai_day_plan_repository.dart';
@@ -99,6 +105,7 @@ final sl = GetIt.instance;
 Future<void> initServiceLocator() async {
   final preferences = await SharedPreferences.getInstance();
   await AppTranslations.load();
+  sl.registerSingleton<SharedPreferences>(preferences);
   sl.registerSingleton<ThemeCubit>(
     ThemeCubit(preferences),
     dispose: (cubit) => cubit.close(),
@@ -129,6 +136,11 @@ Future<void> initServiceLocator() async {
   sl.registerLazySingleton<StorageRepository>(
     () => StorageRepositoryImpl(sl(), sl()),
   );
+
+  sl.registerLazySingleton<PlannerWeekOrderRepository>(
+    () => PlannerWeekOrderRepositoryImpl(preferences, sl()),
+  );
+  sl.registerFactory<PlannerWeekOrderCubit>(() => PlannerWeekOrderCubit(sl()));
 
   sl.registerLazySingleton<DailyQuoteRepository>(
     () => DailyQuoteRepositoryImpl(sl()),
@@ -237,19 +249,19 @@ Future<void> initServiceLocator() async {
   );
   sl.registerFactory<TaskDetailsCubit>(() => TaskDetailsCubit(sl(), sl()));
 
-  sl.registerLazySingleton<CallRepository>(() => CallRepositoryImpl(sl()));
-  sl.registerLazySingleton<CallCubit>(
-    () => CallCubit(
-      sl(),
-      LiveKitCallMedia(
-        beforeCapture: () async {
-          await sl<AssistantVoice>().stop();
-          await sl<AssistantVoice>().stopSpeaking();
-        },
-      ),
-    ),
-    dispose: (cubit) => cubit.close(),
+  sl.registerLazySingleton<CallProtocolRepository>(
+    () => CallProtocolRepositoryImpl(sl()),
   );
+  sl.registerLazySingleton<CallRepository>(() => CallRepositoryImpl(sl()));
+  sl.registerLazySingleton<CallCubit>(() {
+    final media = LiveKitCallMedia(
+      beforeCapture: () async {
+        await sl<AssistantVoice>().stop();
+        await sl<AssistantVoice>().stopSpeaking();
+      },
+    );
+    return CallCubit(sl(), media, protocol: CallProtocolCubit(sl(), media));
+  }, dispose: (cubit) => cubit.close());
 
   // Voice assistant
   sl.registerLazySingleton<AssistantRepository>(

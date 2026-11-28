@@ -85,8 +85,13 @@ class PlannerItemModel extends Equatable {
       scheduledAt: hasTime ? scheduled : null,
       plannedDate: plannedDay,
       durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 30,
-      // A linked task supplies context, not the lifecycle of this day's entry.
-      completed: json['completed'] == true,
+      // Match the web's source of truth when planner entries link tasks.
+      completed: task != null
+          ? task.isDone
+          : inbox is Map
+          ? inbox['detail'] is Map &&
+                (inbox['detail'] as Map)['completed'] == true
+          : json['completed'] == true,
       archived: json['archived'] == true,
       task: task,
       external: json['external'] == true,
@@ -168,7 +173,12 @@ class PlannerItemModel extends Equatable {
     'completed': completed,
     'archived': archived,
     if (task != null) 'task': ProjectTaskDto.fromEntity(task!).toJson(),
-    if (inboxTaskId != null) 'inboxTask': {'id': inboxTaskId, 'title': title},
+    if (inboxTaskId != null)
+      'inboxTask': {
+        'id': inboxTaskId,
+        'title': title,
+        'detail': {'completed': completed},
+      },
   };
 
   PlannerItemModel copyWith({
@@ -212,7 +222,11 @@ class PlannerItemModel extends Equatable {
     durationMinutes: durationMinutes ?? this.durationMinutes,
     completed: completed ?? this.completed,
     archived: archived ?? this.archived,
-    task: task ?? this.task,
+    task:
+        task ??
+        (completed != null
+            ? this.task?.copyWith(progress: completed ? 100 : 0)
+            : this.task),
     external: external ?? this.external,
     allDay: allDay ?? this.allDay,
   );

@@ -1831,6 +1831,45 @@ class _CallMessage extends StatelessWidget {
                 ],
               ),
             ),
+            if (status == 'ended')
+              IconButton(
+                tooltip: tr(context, 'Протокол звонка'),
+                icon: const Icon(Icons.description_outlined, size: 20),
+                onPressed: () async {
+                  try {
+                    final payload = jsonDecode(message.text);
+                    final id = payload is Map ? payload['callId'] : null;
+                    final workspaceId = await sl<WorkspaceSelectionStorage>()
+                        .read();
+                    if (id is! String ||
+                        id.isEmpty ||
+                        workspaceId == null ||
+                        !context.mounted) {
+                      return;
+                    }
+                    await context.push(
+                      '/call/protocol',
+                      extra: CallRoom(
+                        id: id,
+                        workspaceId: workspaceId,
+                        threadId: message.threadId,
+                        title: message.callTitle ?? title,
+                        status: 'ended',
+                      ),
+                    );
+                  } catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            tr(context, 'Протокол звонка недоступен.'),
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
             const SizedBox(width: 14),
           ],
         ),

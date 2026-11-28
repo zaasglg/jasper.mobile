@@ -239,3 +239,51 @@ No verified lessons recorded yet.
 - Evidence: public web module 99174 (`9174-f1cad5768b57300a.js`) and dashboard `em`; `test/features/dashboard/daily_quote_test.dart` verifies workspace scoping, payload parsing and delayed old-workspace replies.
 - Lesson: The dashboard header quotation uses `GET ai/daily-motivation?workspaceId=...` with `quote.text`, `quote.author` and optional `refreshing`. It is separate from the AI recommendations widget. Match the web polling interval of 1500 ms while refreshing and five minutes otherwise; scope UI state to account/workspace and pause polling in the background.
 - Apply when: changing dashboard greeting quotations or daily motivation loading.
+
+### Keep the LiquidGlass shader subtree immutable
+
+- Date: 2026-11-26
+- Scope: UI
+- Evidence: device `RenderBackdropFilter ... hasSize` failure; upstream liquid_glass_fx 0.0.2 LayoutBuilder captures `content` recursively; `test/core/widgets/liquid_glass_layout_test.dart` covers the extracted shader layout at two widths.
+- Lesson: Use the patched local package in `third_party/liquid_glass_fx`. Its shader layout holds the blur subtree as an immutable child and loads the shader with the package-qualified asset key. Skia widget tests exercise only the blur fallback unless the shader layout is tested separately.
+- Apply when: upgrading liquid_glass_fx or changing bottom-navigation shader rendering.
+
+### Lift nested floating actions above the shell navigation
+
+- Date: 2026-11-26
+- Scope: UI
+- Evidence: planner/messenger action hidden behind glass navigation in user screenshot; `app_floating_action_button_location_test.dart` checks visibility and taps with zero and 34-pixel safe insets.
+- Lesson: With MainShell.extendBody enabled, nested Scaffold floating actions can sit behind the shell bar. Use AppFloatingActionButtonLocation, subtracting the added bottom padding beyond the physical viewPadding from the default endFloat offset. Keep the native bottom safe inset counted once.
+- Apply when: adding floating actions to screens hosted below the shell's overlaid navigation.
+
+### Accept week drag tokens before onDragStarted fires
+
+- Date: 2026-11-26
+- Scope: UI
+- Evidence: initial same-day widget drags showed an insertion line but did not commit; `planner_week_drag_test.dart` and the iOS integration suite pass with token-only acceptance and active-drag validation on drop.
+- Lesson: Flutter can hit-test the enclosing day DragTarget before invoking LongPressDraggable.onDragStarted. Validate scope/day with an instance token in onWillAccept, and check the active source again on drop. Requiring a nonnull active source during first entry rejects the entire day until the pointer leaves and re-enters it. Keep the original Wrap stable while showing an insertion marker.
+- Apply when: changing manual ordering or drop regions in PlannerWeekView.
+
+### Call summary generation authorizes a client-built document
+
+- Date: 2026-11-26
+- Scope: feature
+- Evidence: web VideoMeeting/client module 99174, backend video controller/service and `summary-content.ts`; `test/features/calls/call_protocol_test.dart` checks request ordering and payload.
+- Lesson: `POST video/rooms/:id/summary/generate` only authorizes; it does not transcribe or generate content. Save web-compatible `allEntries`, participant metadata and decisions through `POST .../summaries`. The server keeps incremental new entry fingerprints. Browser speech arrives through LiveKit `speech` packets; web `chat` packets have no ID. Do not enable a second mobile microphone recorder without verifying coexistence with LiveKit.
+- Apply when: implementing call protocols, transcription, summary versions or web/mobile call interoperability.
+
+### Match web planner completion by task source
+
+- Date: 2026-11-26
+- Scope: feature
+- Evidence: current public web PlannerDrawer chunk `606` (`completeMutation` and Inbox mapping); `planner_repository_test.dart` covers project/Inbox reload, undo, rejected writes and consumer invalidation.
+- Lesson: Per the user's web-parity decision, linked project completion calls `PATCH project-tasks/:taskId` with progress 100/0. Inbox and standalone completion use `PATCH project-planner/items/:plannerItemId` with completed. Read project completion from task.progress, Inbox completion from inboxTask.detail.completed, and standalone completion from the planner completed field. The proposed independent `/completion` endpoint is no longer used and its backend patch is historical. Notify cached task consumers after a successful project change, without making the planner reload itself mid-save.
+- Apply when: changing planner completion, source identity, serialization or cross-screen status refresh.
+
+### Keep the primary workspace separate from aggregate selection
+
+- Date: 2026-11-27
+- Scope: feature
+- Evidence: public web dashboard workspace selector; `workspace_cubit_test.dart`, `workspace_multi_select_test.dart`, `projects_cubit_test.dart`, and `scoped_dashboard_repository_test.dart`.
+- Lesson: Multiple workspace selection retains a primary workspace for configuration and write context while aggregating projects and dashboard reads across the selected IDs. Refresh the aggregate when IDs change even if the primary stays unchanged. Filter each project response by its requested workspace because an account-wide response can otherwise duplicate projects; keep the primary inside the surviving selection after access changes.
+- Apply when: changing workspace selection, shared dashboard caches, project aggregation, or workspace-scoped writes.

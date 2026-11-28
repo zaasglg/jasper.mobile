@@ -1,3 +1,4 @@
+import 'package:jospar/features/planner/presentation/widgets/planner_day_week_strip.dart';
 import 'package:jospar/features/tasks/data/models/task_detail_model.dart';
 import 'package:jospar/features/planner/presentation/widgets/planner_date_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -76,14 +77,21 @@ void main() {
       expect(find.text('GMT+5'), findsNothing);
       expect(find.byKey(const Key('planner-hour-9')), findsNothing);
 
-      final selectedDate = find.byKey(const Key('planner-selected-date'));
-      final initialText = tester.widget<Text>(selectedDate).data;
+      final selectedDate = find.byType(PlannerDayWeekStrip);
+      final initialDate = tester
+          .widget<PlannerDayWeekStrip>(selectedDate)
+          .selectedDate;
 
       await tester.tap(find.byKey(const Key('planner-next-day')));
       await tester.pumpAndSettle();
 
-      final nextDayText = tester.widget<Text>(selectedDate).data;
-      expect(nextDayText, isNot(initialText));
+      final nextDate = tester
+          .widget<PlannerDayWeekStrip>(selectedDate)
+          .selectedDate;
+      expect(
+        nextDate,
+        DateTime(initialDate.year, initialDate.month, initialDate.day + 1),
+      );
       expect(find.byKey(const Key('planner-today')), findsNothing);
       await tester.tap(find.byKey(const Key('planner-date-picker')));
       await tester.pumpAndSettle();

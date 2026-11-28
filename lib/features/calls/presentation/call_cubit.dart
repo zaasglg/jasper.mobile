@@ -1,3 +1,4 @@
+import 'protocol/call_protocol_cubit.dart';
 import '../data/call_message_changes.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -69,9 +70,11 @@ class CallState extends Equatable {
 }
 
 class CallCubit extends Cubit<CallState> {
-  CallCubit(this.repository, this.media) : super(const CallState()) {
+  CallCubit(this.repository, this.media, {this.protocol})
+    : super(const CallState()) {
     media.addListener(_onMedia);
   }
+  final CallProtocolCubit? protocol;
   final CallRepository repository;
   final CallMedia media;
   bool _polling = false;
@@ -101,6 +104,7 @@ class CallCubit extends Cubit<CallState> {
     if (_starting || _controlling || state.busy || state.incoming != null) {
       return false;
     }
+    protocol?.clear();
     _starting = true;
     final generation = ++_generation;
     emit(CallState(phase: CallPhase.preparing, creator: true, speaker: video));
@@ -141,7 +145,9 @@ class CallCubit extends Cubit<CallState> {
         return false;
       }
       await media.setSpeaker(video);
-      emit(state.copyWith(phase: CallPhase.active, startedAt: DateTime.now()));
+      final startedAt = DateTime.now();
+      emit(state.copyWith(phase: CallPhase.active, startedAt: startedAt));
+      if (state.room case final room?) protocol?.begin(room, startedAt);
       return true;
     } catch (e) {
       await media.disconnect();
@@ -161,6 +167,7 @@ class CallCubit extends Cubit<CallState> {
 
   Future<bool> accept(CallRoom room, {bool creator = false}) async {
     if (_starting || _controlling || state.busy) return false;
+    protocol?.clear();
     _starting = true;
     final generation = ++_generation;
     emit(
@@ -212,7 +219,9 @@ class CallCubit extends Cubit<CallState> {
         return false;
       }
       await media.setSpeaker(room.video);
-      emit(state.copyWith(phase: CallPhase.active, startedAt: DateTime.now()));
+      final startedAt = DateTime.now();
+      emit(state.copyWith(phase: CallPhase.active, startedAt: startedAt));
+      if (state.room case final room?) protocol?.begin(room, startedAt);
       return true;
     } catch (e) {
       await media.disconnect();
@@ -344,6 +353,7 @@ class CallCubit extends Cubit<CallState> {
         clearError: true,
       ),
     );
+    protocol?.end();
     await media.disconnect();
     String? error;
     if (!remote &&
@@ -370,6 +380,7 @@ class CallCubit extends Cubit<CallState> {
 
   Future<void> reset() async {
     ++_generation;
+    protocol?.clear();
     await media.disconnect();
     if (!isClosed) emit(const CallState());
   }
@@ -379,6 +390,7 @@ class CallCubit extends Cubit<CallState> {
     ++_generation;
     media.removeListener(_onMedia);
     await media.disconnect();
+    await protocol?.close();
     media.dispose();
     return super.close();
   }

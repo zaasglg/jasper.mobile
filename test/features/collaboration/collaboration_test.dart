@@ -2,7 +2,11 @@ import 'package:jospar/features/collaboration/data/models/space_member_dto.dart'
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:jospar/core/di/service_locator.dart';
+import 'package:jospar/core/theme/app_theme.dart';
 import 'package:jospar/features/collaboration/domain/entities/space_kind.dart';
 import 'package:jospar/features/collaboration/data/collaboration_repository_impl.dart';
 import 'package:jospar/features/collaboration/domain/collaboration_repository.dart';
@@ -137,6 +141,50 @@ void main() {
       );
     },
   );
+
+  for (final dark in [false, true]) {
+    testWidgets(
+      'ArchiveScreen renders cards, filters by search and restores item, dark: $dark',
+      (tester) async {
+        GoogleFonts.config.allowRuntimeFetching = false;
+        final adapter = _Adapter();
+        final repo = CollaborationRepositoryImpl(
+          Dio()..httpClientAdapter = adapter,
+        );
+        sl.registerFactory<CollaborationRepository>(() => repo);
+        addTearDown(() async {
+          if (sl.isRegistered<CollaborationRepository>()) {
+            await sl.unregister<CollaborationRepository>();
+          }
+        });
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: dark ? AppTheme.dark : AppTheme.light,
+            home: const ArchiveScreen(
+              kind: SpaceKind.project,
+              workspaceId: 'w',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Архив проектов'), findsOneWidget);
+        expect(find.text('Проект'), findsOneWidget);
+        expect(find.text('1'), findsOneWidget);
+        await tester.enterText(find.byKey(const Key('archive-search')), 'нет');
+        await tester.pumpAndSettle();
+        expect(find.text('Ничего не найдено'), findsOneWidget);
+        await tester.tap(find.text('Сбросить поиск'));
+        await tester.pumpAndSettle();
+        expect(find.text('Проект'), findsOneWidget);
+        await tester.tap(find.text('Проект'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Восстановить'));
+        await tester.pumpAndSettle();
+        expect(find.text('Архив пуст'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 class _Adapter implements HttpClientAdapter {

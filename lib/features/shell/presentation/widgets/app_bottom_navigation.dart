@@ -1,3 +1,4 @@
+import 'package:liquid_glass_fx/liquid_glass_fx.dart';
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import '../../../../core/theme/app_ui_tokens.dart';
@@ -17,11 +18,26 @@ class AppBottomNavigation extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    return FTheme(
+    final dark = theme.brightness == Brightness.dark;
+    final highContrast = MediaQuery.highContrastOf(context);
+    final bar = FTheme(
       data: theme.brightness == Brightness.dark
           ? FTheme.neutral.dark.touch
           : FTheme.neutral.light.touch,
       child: FBottomNavigationBar(
+        style: FBottomNavigationBarStyleDelta.delta(
+          decoration: DecorationDelta.boxDelta(
+            color: colors.surface.withValues(
+              alpha: highContrast ? 1 : (dark ? .46 : .28),
+            ),
+            border: Border(
+              top: BorderSide(
+                color: colors.onSurface.withValues(alpha: dark ? .16 : .09),
+                width: .5,
+              ),
+            ),
+          ),
+        ),
         safeAreaBottom: true,
         index: selectedIndex,
         onChange: onSelected,
@@ -110,6 +126,27 @@ class AppBottomNavigation extends StatelessWidget {
             ),
         ],
       ),
+    );
+    if (highContrast) return bar;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            child: LiquidGlass(
+              borderRadius: 0,
+              interactive: false,
+              quality: LiquidGlassQuality.high,
+              blurSigma: 8,
+              refractionStrength: .65,
+              highlightIntensity: .55,
+              chromaticAberration: .03,
+              tint: colors.surface.withValues(alpha: dark ? .12 : .08),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+        bar,
+      ],
     );
   }
 }

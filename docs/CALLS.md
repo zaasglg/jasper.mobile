@@ -87,8 +87,8 @@ Android: разрешение MediaProjection запрашивается пер�
 сервисом. При остановке трансляции тип проекции убирается. Отмена разрешения
 не завершает звонок.
 
-iOS: добавлено ReplayKit-расширение `com.jospar.app.ScreenBroadcast`, встроенное
-в Runner, с общей группой `group.com.jospar.app`. Для запуска на устройстве
+iOS: добавлено ReplayKit-расширение `com.josparbee.app.CallBroadcast`, встроенное
+в Runner, с общей группой `group.com.josparbee.app`. Для запуска на устройстве
 профили подписи Runner и расширения должны содержать эту App Group. В
 системном окне нужно подтвердить начало трансляции. При завершении звонка
 приложение отправляет расширению команду остановки. Этот механизм не требует
@@ -144,3 +144,14 @@ CallKit со звуком и камерой требует проверки на
 API: [Apple CallKit](https://developer.apple.com/documentation/callkit/cxproviderdelegate),
 [Android CallStyle](https://developer.android.com/develop/ui/compose/notifications/call-style),
 [полноэкранные уведомления](https://developer.android.com/develop/ui/views/notifications/time-sensitive).
+
+
+### Подпись iOS (26 ноября 2026)
+
+Runner использует `com.josparbee.app`, виджет — `com.josparbee.app.InboxWidget`,
+а ScreenBroadcast — `com.josparbee.app.CallBroadcast`. Все три targets используют
+одну Team и App Group `group.com.josparbee.app`. Значение
+`RTCScreenSharingExtension` в Runner/Info.plist должно совпадать с Bundle ID
+ScreenBroadcast. Прежние идентификаторы с суффиксами InboxHomeWidget и
+ScreenBroadcast были зарегистрированы другой командой и не подходят для
+текущей подписи.

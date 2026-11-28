@@ -27,7 +27,7 @@ void main() {
                 title: 'Настроить сервер',
                 taskId: 'OR-20',
                 icon: 'code',
-                plannedDate: monday,
+                scheduledAt: DateTime(2026, 11, 16, 7, 45),
               ),
               PlannerItemModel(
                 id: 'inbox',
@@ -48,7 +48,13 @@ void main() {
       await tester.tap(find.byKey(ValueKey('planner-week-$mode')));
       await tester.pumpAndSettle();
       expect(find.text('Запись'), findsOneWidget);
-      expect(find.text('OR-20 Настроить сервер'), findsOneWidget);
+      expect(find.text('Настроить сервер'), findsOneWidget);
+      expect(find.text('OR-20 · 07:45'), findsOneWidget);
+      expect(find.text('OR-20 Настроить сервер'), findsNothing);
+      expect(
+        tester.getTopLeft(find.text('OR-20 · 07:45')).dy,
+        greaterThan(tester.getTopLeft(find.text('Настроить сервер')).dy),
+      );
       expect(find.text('Из инбокса'), findsOneWidget);
       expect(find.byIcon(LucideIcons.inbox), findsOneWidget);
       expect(find.byIcon(LucideIcons.coffee), findsNothing);
@@ -209,7 +215,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(b).dy, greaterThan(tester.getTopLeft(a).dy));
     expect(tester.getSize(a).height, tester.getSize(b).height);
-    await tester.longPress(a);
+    await tester.tap(find.byKey(const ValueKey('planner-week-check-a')));
     expect(toggled, 'a');
     await tester.tap(find.text('Первая задача'));
     expect(opened, 'a');

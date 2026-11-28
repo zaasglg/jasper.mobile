@@ -2,6 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'entities/call_connection.dart';
 
 abstract class CallMedia extends ChangeNotifier {
+  /// Web-compatible LiveKit data messages. No audio is recorded here.
+  Stream<Map<String, dynamic>> get protocolEvents => const Stream.empty();
+  String get localIdentity => '';
+  Map<String, String> get protocolParticipants => const {};
+  Future<void> publishProtocol(Map<String, dynamic> message) async {}
   bool get ended;
   bool get reconnecting;
   bool get microphone;

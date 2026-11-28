@@ -13,6 +13,58 @@ import 'package:jospar/features/projects/presentation/cubit/projects_cubit.dart'
 void main() {
   const workspaceOne = 'w1';
 
+  test(
+    'scoped requests cannot duplicate projects when the server returns the account list',
+    () async {
+      final repository = _ScopedRepository([
+        _project(id: 'a', workspaceId: 'w1'),
+        _project(id: 'b', workspaceId: 'w2'),
+        _project(id: 'c', workspaceId: 'w3'),
+      ]);
+      final cubit = ProjectsCubit(repository);
+      addTearDown(cubit.close);
+      await cubit.loadForWorkspaces({'w1', 'w2'}, primaryId: 'w1');
+      expect(repository.scopes, unorderedEquals(['w1', 'w2']));
+      expect(
+        cubit.state.projects.map((p) => p.id),
+        unorderedEquals(['a', 'b']),
+      );
+    },
+  );
+
+  test(
+    'multiple workspace projects stay combined on refresh and ignore late loads',
+    () async {
+      final repository = _FakeProjectRepository(
+        projects: [
+          _project(id: 'a', workspaceId: 'w1'),
+          _project(id: 'b', workspaceId: 'w2'),
+          _project(id: 'c', workspaceId: 'w3'),
+        ],
+      );
+      final cubit = ProjectsCubit(repository);
+      addTearDown(cubit.close);
+      await cubit.loadForWorkspaces({'w1', 'w2'}, primaryId: 'w1');
+      expect(
+        cubit.state.projects.map((p) => p.id),
+        unorderedEquals(['a', 'b']),
+      );
+      await cubit.loadForWorkspace('w1', refresh: true);
+      expect(
+        cubit.state.projects.map((p) => p.id),
+        unorderedEquals(['a', 'b']),
+      );
+      final pending = Completer<List<ProjectModel>>();
+      repository.nextLoad = pending;
+      final old = cubit.loadForWorkspaces({'w1', 'w2'}, primaryId: 'w1');
+      repository.nextLoad = null;
+      await cubit.loadForWorkspaces({'w2'}, primaryId: 'w2');
+      pending.complete([_project(id: 'a', workspaceId: 'w1')]);
+      await old;
+      expect(cubit.state.projects.single.id, 'b');
+    },
+  );
+
   test('late refresh cannot remove a successfully created project', () async {
     final repository = _FakeProjectRepository();
     final cubit = ProjectsCubit(repository);
@@ -521,5 +573,16 @@ class _FakeProjectTaskRepository implements ProjectTaskRepository {
   ) async {
     requestedIds = projectIds;
     return pending?.future ?? tasks;
+  }
+}
+
+class _ScopedRepository extends _FakeProjectRepository
+    implements ScopedProjectRepository {
+  _ScopedRepository(List<ProjectModel> projects) : super(projects: projects);
+  final scopes = <String>[];
+  @override
+  Future<List<ProjectModel>> getProjectsInWorkspace(String workspaceId) async {
+    scopes.add(workspaceId);
+    return projects;
   }
 }

@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../cubit/planner_week_order_cubit.dart';
+import 'planner_week_reorderable_tasks.dart';
 import 'package:jospar/core/localization/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -15,7 +19,11 @@ class PlannerWeekView extends StatefulWidget {
     required this.onEdit,
     required this.onToggle,
     this.onCreate,
+    this.orderCubit,
+    this.onRemove,
   });
+  final PlannerWeekOrderCubit? orderCubit;
+  final ValueChanged<PlannerItemModel>? onRemove;
   final DateTime selectedDate;
   final List<PlannerItemModel> items;
   final Set<String> busyIds;
@@ -29,83 +37,169 @@ class PlannerWeekView extends StatefulWidget {
 
 class _PlannerWeekViewState extends State<PlannerWeekView> {
   bool _grid = true;
+  final _scroll = ScrollController();
+  final _viewport = GlobalKey();
+  Timer? _autoScroll;
+  Offset? _pointer;
+  ValueChanged<Offset>? _rehit;
+
+  void _startDrag(ValueChanged<Offset> rehit) {
+    _stopDrag();
+    _rehit = rehit;
+    _autoScroll = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      final pointer = _pointer;
+      final box = _viewport.currentContext?.findRenderObject() as RenderBox?;
+      if (pointer == null ||
+          box == null ||
+          !box.hasSize ||
+          !_scroll.hasClients) {
+        return;
+      }
+      final local = box.globalToLocal(pointer);
+      if (local.dx < 0 || local.dx > box.size.width) return;
+      const edge = 64.0;
+      final delta = local.dy < edge
+          ? -((edge - local.dy) / edge).clamp(0, 1) * 14
+          : local.dy > box.size.height - edge
+          ? ((local.dy - box.size.height + edge) / edge).clamp(0, 1) * 14
+          : 0.0;
+      final next = (_scroll.offset + delta).clamp(
+        _scroll.position.minScrollExtent,
+        _scroll.position.maxScrollExtent,
+      );
+      if (next != _scroll.offset) {
+        _scroll.jumpTo(next);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _pointer != null) _rehit?.call(_pointer!);
+        });
+      }
+    });
+  }
+
+  void _stopDrag() {
+    _autoScroll?.cancel();
+    _autoScroll = null;
+    _pointer = null;
+    _rehit = null;
+  }
+
   @override
-  Widget build(BuildContext context) {
+  void dispose() {
+    _stopDrag();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.orderCubit == null
+      ? _buildWeek(context, null)
+      : BlocBuilder<PlannerWeekOrderCubit, PlannerWeekOrderState>(
+          bloc: widget.orderCubit,
+          builder: (context, order) => _buildWeek(context, order),
+        );
+
+  Widget _buildWeek(BuildContext context, PlannerWeekOrderState? order) {
     final date = widget.selectedDate;
     final monday = DateTime(date.year, date.month, date.day - date.weekday + 1);
-    return ListView(
-      key: const Key('planner-week-view'),
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            for (final grid in [true, false])
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: IconButton(
-                  key: ValueKey(
-                    grid ? 'planner-week-grid' : 'planner-week-list',
-                  ),
-                  tooltip: grid ? tr(context, 'Плитки') : tr(context, 'Список'),
-                  isSelected: _grid == grid,
-                  onPressed: () => setState(() => _grid = grid),
-                  style: IconButton.styleFrom(
-                    backgroundColor: _grid == grid
-                        ? AppColors.of(context).subtleSurface
-                        : Colors.transparent,
-                    foregroundColor: AppColors.of(context).ink,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+    return SizedBox.expand(
+      key: _viewport,
+      child: ListView(
+        controller: _scroll,
+        key: const Key('planner-week-view'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              for (final grid in [true, false])
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: IconButton(
+                    key: ValueKey(
+                      grid ? 'planner-week-grid' : 'planner-week-list',
+                    ),
+                    tooltip: grid
+                        ? tr(context, 'Плитки')
+                        : tr(context, 'Список'),
+                    isSelected: _grid == grid,
+                    onPressed: () => setState(() => _grid = grid),
+                    style: IconButton.styleFrom(
+                      backgroundColor: _grid == grid
+                          ? AppColors.of(context).subtleSurface
+                          : Colors.transparent,
+                      foregroundColor: AppColors.of(context).ink,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: Icon(
+                      grid ? LucideIcons.layoutGrid : LucideIcons.list,
+                      size: 18,
                     ),
                   ),
-                  icon: Icon(
-                    grid ? LucideIcons.layoutGrid : LucideIcons.list,
-                    size: 18,
+                ),
+            ],
+          ),
+          if (order?.error != null)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    tr(context, order!.error!),
+                    style: TextStyle(
+                      color: AppColors.of(context).error,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        for (var i = 0; i < 7; i++)
-          Builder(
-            builder: (context) {
-              final day = DateTime(monday.year, monday.month, monday.day + i);
-              final items =
-                  widget.items
-                      .where(
-                        (item) =>
-                            !item.archived &&
-                            item.day != null &&
-                            samePlannerDay(item.day!, day),
-                      )
-                      .toList()
-                    ..sort((a, b) {
-                      final aTime = a.allDay ? null : a.scheduledAt;
-                      final bTime = b.allDay ? null : b.scheduledAt;
-                      if (aTime == null) return bTime == null ? 0 : -1;
-                      if (bTime == null) return 1;
-                      return aTime.compareTo(bTime);
-                    });
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 20),
-                child: _WeekDayCard(
-                  key: ValueKey(plannerDayString(day)),
-                  day: day,
-                  items: items,
-                  grid: _grid,
-                  busyIds: widget.busyIds,
-                  saving: widget.saving,
-                  onEdit: widget.onEdit,
-                  onToggle: widget.onToggle,
-                  onCreate: widget.onCreate,
-                ),
-              );
-            },
-          ),
-      ],
+                if (!order.ready)
+                  TextButton(
+                    onPressed: widget.orderCubit!.initialize,
+                    child: Text(tr(context, 'Повторить')),
+                  ),
+              ],
+            ),
+          const SizedBox(height: 16),
+          for (var i = 0; i < 7; i++)
+            Builder(
+              builder: (context) {
+                final day = DateTime(monday.year, monday.month, monday.day + i);
+                final items = PlannerWeekOrderCubit.ordered(
+                  day,
+                  widget.items,
+                  order?.orders ?? const {},
+                );
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: _WeekDayCard(
+                    key: ValueKey(plannerDayString(day)),
+                    day: day,
+                    items: items,
+                    grid: _grid,
+                    busyIds: widget.busyIds,
+                    saving: widget.saving,
+                    onEdit: widget.onEdit,
+                    onToggle: widget.onToggle,
+                    onCreate: widget.onCreate,
+                    onRemove: widget.onRemove,
+                    orderScope: order?.scope,
+                    reorderEnabled:
+                        order?.ready == true &&
+                        order?.saving != true &&
+                        !widget.saving &&
+                        widget.busyIds.isEmpty,
+                    onReorder: (ids) =>
+                        widget.orderCubit?.reorder(day, ids, widget.items),
+                    onDragStart: _startDrag,
+                    onDragPosition: (pointer) => _pointer = pointer,
+                    onDragEnd: _stopDrag,
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
     );
   }
 }
@@ -121,7 +215,21 @@ class _WeekDayCard extends StatefulWidget {
     required this.onEdit,
     required this.onToggle,
     required this.onCreate,
+    required this.onRemove,
+    required this.orderScope,
+    required this.reorderEnabled,
+    required this.onReorder,
+    required this.onDragStart,
+    required this.onDragPosition,
+    required this.onDragEnd,
   });
+  final String? orderScope;
+  final bool reorderEnabled;
+  final ValueChanged<List<String>> onReorder;
+  final ValueChanged<ValueChanged<Offset>> onDragStart;
+  final ValueChanged<Offset> onDragPosition;
+  final VoidCallback onDragEnd;
+  final ValueChanged<PlannerItemModel>? onRemove;
   final DateTime day;
   final List<PlannerItemModel> items;
   final bool grid, saving;
@@ -277,22 +385,27 @@ class _WeekDayCardState extends State<_WeekDayCard>
                         MediaQuery.textScalerOf(context).scale(13) <= 17
                     ? 2
                     : 1;
-                return Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final item in widget.items)
-                      SizedBox(
-                        width:
-                            (constraints.maxWidth - (columns - 1) * 8) /
-                            columns,
-                        height:
-                            19 +
+                return PlannerWeekReorderableTasks(
+                  items: widget.items,
+                  columns: columns,
+                  spacing: widget.grid ? 8 : 0,
+                  cardHeight: widget.grid
+                      ? 19 +
                             MediaQuery.textScalerOf(context).scale(13) * 2.8 +
-                            MediaQuery.textScalerOf(context).scale(11) * 1.4,
-                        child: _task(item),
-                      ),
-                  ],
+                            MediaQuery.textScalerOf(context).scale(11) * 1.4
+                      : 20 +
+                            (MediaQuery.textScalerOf(context).scale(14) * 1.4)
+                                .ceilToDouble() +
+                            (MediaQuery.textScalerOf(context).scale(12) * 1.4)
+                                .ceilToDouble(),
+                  enabled: widget.reorderEnabled,
+                  scope: widget.orderScope,
+                  onReorder: widget.onReorder,
+                  onDragStart: widget.onDragStart,
+                  onDragPosition: widget.onDragPosition,
+                  onDragEnd: widget.onDragEnd,
+                  cardBuilder: (item, dragBody, feedback) =>
+                      _task(item, dragBody: dragBody, feedback: feedback),
                 );
               },
             ),
@@ -463,79 +576,162 @@ class _WeekDayCardState extends State<_WeekDayCard>
     );
   }
 
-  Widget _task(PlannerItemModel item) {
-    final busy = widget.busyIds.contains(item.id);
+  Widget _task(
+    PlannerItemModel item, {
+    required Widget Function(Widget) dragBody,
+    bool feedback = false,
+  }) {
+    final busy = widget.busyIds.contains(item.id) || widget.saving || feedback;
+    final displayId = item.task?.displayId.trim() ?? '';
+    final identifier = item.taskId == null
+        ? ''
+        : displayId.isNotEmpty
+        ? displayId
+        : item.taskId!.trim();
+    final metadata = [
+      if (identifier.isNotEmpty) identifier,
+      if (item.scheduledAt != null && !item.allDay)
+        plannerClock(plannerLocal(item.scheduledAt!)),
+    ].join(' · ');
     return Material(
-      key: ValueKey('planner-week-item-${item.id}'),
+      key: feedback ? null : ValueKey('planner-week-item-${item.id}'),
       color: widget.grid
           ? AppColors.of(context).subtleSurface
           : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: busy || widget.saving ? null : () => widget.onEdit(item),
-        onLongPress: busy || widget.saving || item.external
-            ? null
-            : () => widget.onToggle(item),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              if (item.inboxTaskId != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(
-                    LucideIcons.inbox,
-                    size: 16,
-                    color: AppColors.of(context).muted,
-                    semanticLabel: tr(context, 'Инбокс'),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: !widget.grid && !feedback && item.id != widget.items.last.id
+              ? Border(
+                  bottom: BorderSide(
+                    color: AppColors.of(context).border,
+                    width: 0.5,
                   ),
-                ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        item.displayTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1.4,
-                          fontWeight: FontWeight.w500,
+                )
+              : null,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!item.external)
+              SizedBox(
+                width: widget.grid ? 36 : 44,
+                child: Checkbox(
+                  key: feedback
+                      ? null
+                      : ValueKey('planner-week-check-${item.id}'),
+                  value: item.completed,
+                  activeColor: AppColors.of(context).accent,
+                  shape: widget.grid
+                      ? null
+                      : RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                  side: widget.grid
+                      ? null
+                      : BorderSide(
                           color: item.completed
-                              ? AppColors.of(context).muted
-                              : AppColors.of(context).ink,
-                          decoration: item.completed
-                              ? TextDecoration.lineThrough
-                              : null,
+                              ? AppColors.of(context).accent
+                              : AppColors.of(context).muted,
+                          width: 1.4,
                         ),
-                      ),
-
-                      if (item.scheduledAt != null && !item.allDay)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 3),
-                          child: Text(
-                            plannerClock(plannerLocal(item.scheduledAt!)),
-                            style: TextStyle(
-                              fontSize: 11,
-                              height: 1.4,
-                              color: AppColors.of(context).muted,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
+                  onChanged: busy ? null : (_) => widget.onToggle(item),
+                  semanticLabel: tr(
+                    context,
+                    item.completed ? 'Вернуть в план' : 'Отметить выполненной',
                   ),
                 ),
               ),
-            ],
-          ),
+            Expanded(
+              child: dragBody(
+                InkWell(
+                  key: feedback
+                      ? null
+                      : ValueKey('planner-week-open-${item.id}'),
+                  onTap: busy ? null : () => widget.onEdit(item),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        if (item.inboxTaskId != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Icon(
+                              LucideIcons.inbox,
+                              size: widget.grid ? 16 : 18,
+                              color: AppColors.of(context).muted,
+                              semanticLabel: tr(context, 'Инбокс'),
+                            ),
+                          ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                item.title,
+                                maxLines: widget.grid ? 2 : 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: widget.grid ? 13 : 14,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w500,
+                                  color: item.completed
+                                      ? AppColors.of(context).muted
+                                      : AppColors.of(context).ink,
+                                  decoration: item.completed
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
+                              if (metadata.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 3),
+                                  child: Text(
+                                    metadata,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: widget.grid ? 11 : 12,
+                                      height: 1.4,
+                                      color: AppColors.of(context).muted,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (!item.external && widget.onRemove != null)
+              SizedBox(
+                width: widget.grid ? 32 : 44,
+                child: IconButton(
+                  key: feedback
+                      ? null
+                      : ValueKey('planner-week-remove-${item.id}'),
+                  tooltip: tr(context, 'Убрать из ежедневника'),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    LucideIcons.x,
+                    size: 16,
+                    color: AppColors.of(context).muted,
+                  ),
+                  onPressed: busy ? null : () => widget.onRemove!(item),
+                ),
+              ),
+          ],
         ),
       ),
     );

@@ -139,6 +139,14 @@ class _CallScreenState extends State<CallScreen> {
                 ),
               ],
             ),
+            actions: [
+              if (cubit.protocol?.state.room != null)
+                IconButton(
+                  tooltip: tr(context, 'Протокол звонка'),
+                  onPressed: () => context.push('/call/protocol'),
+                  icon: const Icon(Icons.description_outlined),
+                ),
+            ],
             leading: IconButton(
               tooltip: state.busy
                   ? tr(context, 'Свернуть звонок')
@@ -180,6 +188,18 @@ class _CallScreenState extends State<CallScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                if (state.phase == CallPhase.ended &&
+                                    cubit.protocol?.state.room != null)
+                                  TextButton.icon(
+                                    onPressed: () =>
+                                        context.push('/call/protocol'),
+                                    icon: const Icon(
+                                      Icons.description_outlined,
+                                    ),
+                                    label: Text(
+                                      tr(context, 'Подготовить протокол'),
+                                    ),
+                                  ),
                                 if (state.error != null)
                                   Text(
                                     tr(context, state.error!),

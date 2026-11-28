@@ -45,7 +45,6 @@ class _Projects extends Cubit<ProjectsState> implements ProjectsCubit {
           projectTaskProgress: {'2': 100},
         ),
       );
-  int archiveCalls = 0;
   @override
   Future<void> loadForWorkspace(
     String workspaceId, {
@@ -61,12 +60,6 @@ class _Projects extends Cubit<ProjectsState> implements ProjectsCubit {
         ],
       ),
     );
-    return null;
-  }
-
-  @override
-  Future<String?> archiveProject(String id) async {
-    archiveCalls++;
     return null;
   }
 
@@ -95,6 +88,103 @@ class _Workspace extends Cubit<WorkspaceState> implements WorkspaceCubit {
 }
 
 void main() {
+  testWidgets(
+    'project workspace labels appear for multiple selection in list and grid',
+    (tester) async {
+      GoogleFonts.config.allowRuntimeFetching = false;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final profile = _Profile();
+      final projects = _Projects();
+      final workspace = _Workspace();
+      addTearDown(profile.close);
+      addTearDown(projects.close);
+      addTearDown(workspace.close);
+      projects.emit(
+        projects.state.copyWith(
+          projects: [
+            projects.state.projects.first,
+            projects.state.projects.last.copyWith(workspaceId: 'other'),
+          ],
+        ),
+      );
+      final single = workspace.state as WorkspaceLoaded;
+      final router = GoRouter(
+        routes: [GoRoute(path: '/', builder: (_, _) => const ProjectsScreen())],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        MultiBlocProvider(
+          providers: [
+            BlocProvider<ProfileCubit>.value(value: profile),
+            BlocProvider<ProjectsCubit>.value(value: projects),
+            BlocProvider<WorkspaceCubit>.value(value: workspace),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('project-workspace-1')), findsNothing);
+      workspace.emit(
+        single.copyWith(
+          workspaces: [
+            ...single.workspaces,
+            const WorkspaceModel(
+              id: 'other',
+              name: 'Другой воркспейс с длинным названием',
+            ),
+          ],
+          selectedIds: {'w', 'other'},
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final view in ['projects-list-view', 'projects-card-view']) {
+        await tester.tap(find.byKey(Key(view)));
+        await tester.pumpAndSettle();
+        final first = find.byKey(const Key('project-workspace-1'));
+        final second = find.byKey(const Key('project-workspace-2'));
+        expect(tester.widget<Text>(first).data, 'Цифровизация');
+        expect(
+          tester.widget<Text>(second).data,
+          'Другой воркспейс с длинным названием',
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('project-row-1')),
+            matching: first,
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('project-row-2')),
+            matching: second,
+          ),
+          findsOneWidget,
+        );
+        final firstRow = find.byKey(const Key('project-row-1'));
+        expect(
+          find.descendant(
+            of: firstRow,
+            matching: find.byType(LinearProgressIndicator),
+          ),
+          findsNothing,
+        );
+        expect(
+          tester.getTopLeft(first).dy,
+          lessThan(tester.getTopLeft(find.text('Орбита')).dy),
+        );
+        expect(tester.takeException(), isNull);
+      }
+      workspace.emit(single);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('project-workspace-1')), findsNothing);
+      expect(find.byKey(const Key('project-workspace-2')), findsNothing);
+    },
+  );
+
   testWidgets('subprojects appear inside parent and remain searchable', (
     tester,
   ) async {
@@ -146,18 +236,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Подпроекты'), findsOneWidget);
     expect(find.byKey(const Key('project-row-2')), findsNothing);
-    expect(find.byKey(const Key('subproject-2')), findsOneWidget);
+    expect(find.byKey(const Key('subproject-2')), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('subproject-2')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('subproject-2')), findsNothing);
+    await tester.tap(find.byKey(const Key('projects-card-view')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('subproject-2')), findsNothing);
     await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('subproject-2')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('projects-card-view')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('subproject-2')), findsOneWidget);
     expect(tester.takeException(), isNull);
+    final subproject = find.byKey(const Key('subproject-2'));
+    final zero = find.descendant(of: subproject, matching: find.text('0%'));
+    final title = find.descendant(
+      of: subproject,
+      matching: find.text('Ботаника'),
+    );
+    expect(
+      (tester.getTopLeft(zero).dy - tester.getTopLeft(title).dy).abs(),
+      lessThan(4),
+    );
+    final heading = find.text('Подпроекты');
+    final count = find.text('· 1');
+    expect(
+      tester.getTopLeft(count).dx - tester.getTopRight(heading).dx,
+      lessThan(12),
+    );
     final group = find.byKey(const ValueKey('group-1-w'));
     final expandedHeight = tester.getSize(group).height;
     await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
@@ -171,6 +280,10 @@ void main() {
     for (final view in ['projects-list-view', 'projects-card-view']) {
       await tester.tap(find.byKey(Key(view)));
       await tester.pumpAndSettle();
+      if (find.byKey(const Key('subproject-2')).evaluate().isEmpty) {
+        await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
+        await tester.pumpAndSettle();
+      }
       final gesture = await tester.startGesture(
         tester.getCenter(find.byKey(const Key('subproject-2'))),
       );
@@ -185,6 +298,10 @@ void main() {
       await tester.pump();
       await gesture.up();
       await tester.pumpAndSettle();
+      if (find.byKey(const Key('subproject-2')).evaluate().isEmpty) {
+        await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
+        await tester.pumpAndSettle();
+      }
       expect(find.byKey(const Key('subproject-2')), findsOneWidget);
       expect(find.byKey(const Key('project-row-2')), findsNothing);
       expect(tester.takeException(), isNull);
@@ -194,6 +311,10 @@ void main() {
     expect(find.text('Editing 1'), findsOneWidget);
     router.pop();
     await tester.pumpAndSettle();
+    if (find.byKey(const Key('subproject-2')).evaluate().isEmpty) {
+      await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
+      await tester.pumpAndSettle();
+    }
     await tester.tap(find.byKey(const Key('project-pin-1')));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Открепить проект'), findsOneWidget);
@@ -201,18 +322,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('project-edit-1')), findsOneWidget);
     expect(find.byKey(const Key('project-pin-1')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('project-archive-1')));
-    await tester.pumpAndSettle();
-    expect(find.text('Архивировать проект?'), findsOneWidget);
-    await tester.tap(find.text('Отмена'));
-    await tester.pumpAndSettle();
-    expect(find.text('Архивировать проект?'), findsNothing);
-    expect(projects.archiveCalls, 0);
-    await tester.tap(find.byKey(const Key('project-archive-1')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Архивировать').last);
-    await tester.pumpAndSettle();
-    expect(projects.archiveCalls, 1);
+    expect(find.byKey(const Key('project-archive-1')), findsNothing);
     await tester.enterText(find.byType(TextField).first, 'Ботаника');
     await tester.pumpAndSettle();
     expect(find.text('Орбита'), findsOneWidget);
@@ -225,8 +335,10 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('projects-list-view')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('toggle-subprojects-1')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('project-edit-1')), findsOneWidget);
-    expect(find.byKey(const Key('project-archive-1')), findsOneWidget);
+    expect(find.byKey(const Key('project-archive-1')), findsNothing);
     await tester.tap(find.byKey(const Key('project-pin-1')));
     await tester.pumpAndSettle();
     expect(projects.state.projects.first.isPinned, isTrue);
@@ -287,7 +399,7 @@ void main() {
     expect(find.text('Ботаника'), findsNothing);
     await tester.tap(find.byKey(const Key('projects-card-view')));
     await tester.pumpAndSettle();
-    expect(find.text('Выполнено'), findsOneWidget);
+    expect(find.text('Выполнено'), findsNothing);
     expect(find.text('Ботаника'), findsNothing);
     await tester.tap(find.byTooltip('Очистить поиск'));
     await tester.pump();

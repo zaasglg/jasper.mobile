@@ -20,6 +20,20 @@ class ProjectsCubit extends Cubit<ProjectsState> {
 
   final ProjectRepository _repository;
   final ProjectTaskRepository? _taskRepository;
+  Set<String> _workspaceIds = {};
+  Set<String> get workspaceIds => Set.unmodifiable(_workspaceIds);
+
+  Future<void> loadForWorkspaces(
+    Set<String> ids, {
+    required String primaryId,
+    bool refresh = false,
+  }) {
+    final sameScope =
+        _workspaceIds.length == ids.length && _workspaceIds.containsAll(ids);
+    _workspaceIds = Set.of(ids);
+    return loadForWorkspace(primaryId, refresh: refresh && sameScope);
+  }
+
   int _loadRevision = 0;
   bool _createInFlight = false;
   bool _moveInFlight = false;
@@ -78,8 +92,10 @@ class ProjectsCubit extends Cubit<ProjectsState> {
         anchorId: move.anchorId,
         placement: move.placement,
       );
-      if (!isClosed && state.workspaceId == workspaceId) {
-        await loadForWorkspace(move.workspaceId, refresh: true);
+      if (!isClosed &&
+          workspaceId != null &&
+          state.workspaceId == workspaceId) {
+        await loadForWorkspace(workspaceId, refresh: true);
       }
       return null;
     } catch (_) {
@@ -180,6 +196,7 @@ class ProjectsCubit extends Cubit<ProjectsState> {
   }
 
   void clearWorkspace() {
+    _workspaceIds = {};
     _loadRevision++;
     _deferredLoad = null;
     if (!isClosed) {
@@ -197,6 +214,8 @@ class ProjectsCubit extends Cubit<ProjectsState> {
     bool refresh = false,
   }) async {
     if (isClosed || workspaceId.isEmpty) return;
+    if (!_workspaceIds.contains(workspaceId)) _workspaceIds = {workspaceId};
+    final scope = Set.of(_workspaceIds);
     if (_createInFlight) {
       _deferredLoad = (workspaceId, refresh);
       if (state.workspaceId != workspaceId) {
@@ -231,10 +250,21 @@ class ProjectsCubit extends Cubit<ProjectsState> {
     );
 
     try {
-      final allProjects = await _repository.getProjects();
+      final repository = _repository;
+      final allProjects = repository is ScopedProjectRepository
+          ? (await Future.wait(
+              scope.map(
+                (id) async =>
+                    (await (repository as ScopedProjectRepository)
+                            .getProjectsInWorkspace(id))
+                        .where((project) => project.workspaceId == id)
+                        .toList(),
+              ),
+            )).expand((projects) => projects).toList()
+          : await repository.getProjects();
       if (revision != _loadRevision || isClosed) return;
       final filtered = allProjects
-          .where((project) => project.workspaceId == workspaceId)
+          .where((project) => scope.contains(project.workspaceId))
           .toList(growable: false);
       final projects = _pinnedFirst(filtered);
       final taskProjectIds = _collectProjectIds(projects);

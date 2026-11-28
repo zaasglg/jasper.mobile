@@ -9,31 +9,39 @@ class QrSessionsCubit extends Cubit<QrSessionsState> {
   final QrSessionsRepository _repository;
 
   Future<void> load() async {
+    if (isClosed) return;
     emit(const QrSessionsLoading());
     try {
-      emit(QrSessionsLoaded(await _repository.getSessions()));
+      final sessions = await _repository.getSessions();
+      if (!isClosed) emit(QrSessionsLoaded(sessions));
     } on QrLoginException catch (error) {
-      emit(QrSessionsFailure(error.message));
+      if (!isClosed) emit(QrSessionsFailure(error.message));
     } catch (_) {
-      emit(const QrSessionsFailure('Не удалось загрузить активные сеансы.'));
+      if (!isClosed) {
+        emit(const QrSessionsFailure('Не удалось загрузить активные сеансы.'));
+      }
     }
   }
 
   Future<void> revoke(String id) async {
+    if (isClosed) return;
     final current = state;
     if (current is! QrSessionsLoaded || current.revokingId != null) return;
     emit(QrSessionsLoaded(current.sessions, revokingId: id));
     try {
       await _repository.revokeSession(id);
+      if (isClosed) return;
       emit(
         QrSessionsLoaded(
           current.sessions.where((session) => session.id != id).toList(),
         ),
       );
     } on QrLoginException catch (error) {
-      emit(QrSessionsFailure(error.message));
+      if (!isClosed) emit(QrSessionsFailure(error.message));
     } catch (_) {
-      emit(const QrSessionsFailure('Не удалось завершить сеанс.'));
+      if (!isClosed) {
+        emit(const QrSessionsFailure('Не удалось завершить сеанс.'));
+      }
     }
   }
 }

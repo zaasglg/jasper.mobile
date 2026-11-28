@@ -1,3 +1,5 @@
+import '../../features/calls/domain/entities/call_room.dart';
+import '../../features/calls/presentation/protocol/call_protocol_screen.dart';
 import '../../features/projects/domain/entities/project_model.dart';
 import '../../features/projects/domain/entities/project_task_model.dart';
 import '../../features/projects/presentation/screens/project_epics_screen.dart';
@@ -73,6 +75,12 @@ final appRouter = GoRouter(
     return null;
   },
   routes: [
+    GoRoute(
+      path: '/call/protocol',
+      builder: (context, state) => CallProtocolScreen(
+        archiveRoom: state.extra is CallRoom ? state.extra as CallRoom : null,
+      ),
+    ),
     GoRoute(path: '/call', builder: (context, state) => const CallScreen()),
     GoRoute(
       path: '/messenger-storage',

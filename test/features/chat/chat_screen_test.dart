@@ -31,11 +31,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    for (final icon in [
-      LucideIcons.menu,
-      LucideIcons.search,
-      LucideIcons.bell,
-    ]) {
+    for (final icon in [LucideIcons.search, LucideIcons.bell]) {
       final widget = tester.widget<Icon>(find.byIcon(icon));
       expect(widget.color, const AppPalette(true).ink);
     }

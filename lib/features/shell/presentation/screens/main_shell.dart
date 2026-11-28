@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../assistant/domain/services/assistant_voice.dart';
 import '../../../assistant/domain/utils/wake_phrase.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -91,7 +92,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         latest.selected != null &&
         latest.selected!.id == previousId &&
         _projectsCubit.state.workspaceId == previousId) {
-      await _projectsCubit.loadForWorkspace(previousId!, refresh: true);
+      await _projectsCubit.loadForWorkspaces(
+        latest.effectiveSelectedIds,
+        primaryId: previousId!,
+        refresh: true,
+      );
     }
   }
 
@@ -309,12 +314,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           final currentId = current is WorkspaceLoaded
               ? current.selected?.id
               : null;
-          return current is WorkspaceLoaded && currentId != previousId;
+          return current is WorkspaceLoaded &&
+              (currentId != previousId ||
+                  previous is! WorkspaceLoaded ||
+                  !setEquals(
+                    previous.effectiveSelectedIds,
+                    current.effectiveSelectedIds,
+                  ));
         },
         listener: (context, state) {
           final selected = (state as WorkspaceLoaded).selected;
           if (selected != null) {
-            context.read<ProjectsCubit>().loadForWorkspace(selected.id);
+            context.read<ProjectsCubit>().loadForWorkspaces(
+              state.effectiveSelectedIds,
+              primaryId: selected.id,
+            );
           } else {
             context.read<ProjectsCubit>().clearWorkspace();
           }
@@ -322,6 +336,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         child: Builder(
           builder: (shellContext) => Scaffold(
             key: MainShell.scaffoldKey,
+            extendBody: true,
             body: Column(
               children: [
                 if (_wakeListening)

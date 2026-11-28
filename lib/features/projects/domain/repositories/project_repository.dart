@@ -16,3 +16,7 @@ abstract interface class ProjectRepository {
 
   Future<ProjectModel> createProject(CreateProjectRequest request);
 }
+
+abstract interface class ScopedProjectRepository {
+  Future<List<ProjectModel>> getProjectsInWorkspace(String workspaceId);
+}

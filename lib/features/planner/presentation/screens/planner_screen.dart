@@ -1,3 +1,6 @@
+import '../cubit/planner_week_order_cubit.dart';
+import '../../../../core/widgets/app_floating_action_button_location.dart';
+import '../widgets/planner_day_week_strip.dart';
 import 'package:jospar/core/localization/app_translations.dart';
 import '../widgets/planner_day_agenda.dart';
 import 'package:forui/forui.dart';
@@ -55,11 +58,15 @@ class _PlannerScreenState extends State<PlannerScreen>
   _View _view = _View.day;
   Timer? _clock;
   PlannerCubit? _cubit;
+  PlannerWeekOrderCubit? _weekOrder;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (sl.isRegistered<PlannerWeekOrderCubit>()) {
+      _weekOrder = sl<PlannerWeekOrderCubit>()..initialize();
+    }
     if (sl.isRegistered<GoogleCalendarRepository>()) {
       _google = GoogleCalendarCubit(sl<GoogleCalendarRepository>());
       _googleSubscription = _google!.stream.listen((_) {
@@ -84,6 +91,7 @@ class _PlannerScreenState extends State<PlannerScreen>
     WidgetsBinding.instance.removeObserver(this);
     _googleSubscription?.cancel();
     _google?.close();
+    _weekOrder?.close();
     _clock?.cancel();
     super.dispose();
   }
@@ -510,6 +518,7 @@ class _PlannerScreenState extends State<PlannerScreen>
     return Scaffold(
       backgroundColor: AppColors.of(context).canvas,
       appBar: const DashboardAppBar(accountTitle: 'Ежедневник'),
+      floatingActionButtonLocation: AppFloatingActionButtonLocation(context),
       floatingActionButton: _cubit == null
           ? null
           : FloatingActionButton(
@@ -580,6 +589,8 @@ class _PlannerScreenState extends State<PlannerScreen>
                     ? _monthGrid(items)
                     : _view == _View.week
                     ? PlannerWeekView(
+                        orderCubit: _weekOrder,
+                        onRemove: (item) => _cubit?.remove(item),
                         selectedDate: _selectedDate,
                         items: items,
                         busyIds: state.busyIds,
@@ -610,18 +621,9 @@ class _PlannerScreenState extends State<PlannerScreen>
                         },
                         child: Column(
                           children: [
-                            SizedBox(
-                              height: 44,
-                              child: Center(
-                                child: Text(
-                                  _heading(_selectedDate),
-                                  key: const Key('planner-selected-date'),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
+                            PlannerDayWeekStrip(
+                              selectedDate: _selectedDate,
+                              onSelected: _selectDate,
                             ),
                             if (items.any(
                               (e) =>

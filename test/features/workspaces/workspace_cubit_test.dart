@@ -17,6 +17,182 @@ void main() {
     FlutterSecureStorage.setMockInitialValues(<String, String>{});
   });
 
+  const multiWorkspaces = [
+    WorkspaceModel(id: 'one', name: 'Первый'),
+    WorkspaceModel(id: 'two', name: 'Второй'),
+    WorkspaceModel(id: 'three', name: 'Третий'),
+  ];
+
+  for (final all in [false, true]) {
+    for (final superseded in [false, true]) {
+      test(
+        'scope write failure restores storage (all: $all, superseded: $superseded)',
+        () async {
+          final storage = _FailingScopeStorage();
+          final repository = _FakeWorkspaceRepository(multiWorkspaces);
+          final cubit = WorkspaceCubit(
+            repository: repository,
+            selectionStorage: storage,
+          );
+          addTearDown(cubit.close);
+          await cubit.load();
+          if (all) await cubit.selectAll();
+          storage.failNextScope = true;
+          final first = cubit.select(multiWorkspaces[1]);
+          await storage.writing.future;
+          expect(await storage.read(), 'two');
+          final newer = superseded
+              ? cubit.select(multiWorkspaces[2])
+              : Future<void>.value();
+          storage.release.complete();
+          await Future.wait([first, newer]);
+
+          final expected = superseded ? 'three' : 'one';
+          final state = cubit.state as WorkspaceLoaded;
+          expect(state.selected?.id, expected);
+          expect(await storage.read(), expected);
+          expect(
+            await storage.readScope(),
+            superseded
+                ? ['three']
+                : all
+                ? <String>[]
+                : ['one'],
+          );
+          expect(state.allSelected, all && !superseded);
+          expect(state.refreshError, superseded ? isNull : isNotNull);
+
+          final restarted = WorkspaceCubit(
+            repository: repository,
+            selectionStorage: storage,
+          );
+          addTearDown(restarted.close);
+          await restarted.load();
+          expect((restarted.state as WorkspaceLoaded).selected?.id, expected);
+          expect(
+            (restarted.state as WorkspaceLoaded).effectiveSelectedIds,
+            state.effectiveSelectedIds,
+          );
+        },
+      );
+    }
+  }
+
+  test(
+    'refresh keeps the primary inside remaining selected workspaces',
+    () async {
+      final repository = _FakeWorkspaceRepository(multiWorkspaces);
+      const storage = WorkspaceSelectionStorage(FlutterSecureStorage());
+      final cubit = WorkspaceCubit(
+        repository: repository,
+        selectionStorage: storage,
+      );
+      addTearDown(cubit.close);
+      await cubit.load();
+      await cubit.select(multiWorkspaces[1]);
+      await cubit.toggle(multiWorkspaces[2]);
+      repository.workspaces = [multiWorkspaces[0], multiWorkspaces[2]];
+      await cubit.load(force: true);
+      expect((cubit.state as WorkspaceLoaded).effectiveSelectedIds, {'three'});
+      expect((cubit.state as WorkspaceLoaded).selected?.id, 'three');
+      expect(await storage.read(), 'three');
+      await cubit.selectAll();
+      repository.workspaces = multiWorkspaces;
+      await cubit.load(force: true);
+      expect((cubit.state as WorkspaceLoaded).effectiveSelectedIds, {
+        'one',
+        'two',
+        'three',
+      });
+    },
+  );
+
+  test(
+    'multiple selection persists and cannot deselect the last workspace',
+    () async {
+      final repository = _FakeWorkspaceRepository(multiWorkspaces);
+      const storage = WorkspaceSelectionStorage(FlutterSecureStorage());
+      final cubit = WorkspaceCubit(
+        repository: repository,
+        selectionStorage: storage,
+      );
+      addTearDown(cubit.close);
+      await cubit.load();
+      await cubit.toggle(multiWorkspaces[1]);
+      expect((cubit.state as WorkspaceLoaded).effectiveSelectedIds, {
+        'one',
+        'two',
+      });
+      final restored = WorkspaceCubit(
+        repository: repository,
+        selectionStorage: storage,
+      );
+      addTearDown(restored.close);
+      await restored.load();
+      expect((restored.state as WorkspaceLoaded).effectiveSelectedIds, {
+        'one',
+        'two',
+      });
+      await restored.toggle(multiWorkspaces.first);
+      await restored.toggle(multiWorkspaces[1]);
+      expect((restored.state as WorkspaceLoaded).effectiveSelectedIds, {'two'});
+      expect((restored.state as WorkspaceLoaded).selected?.id, 'two');
+    },
+  );
+
+  test('all selects every workspace and survives restart', () async {
+    final repository = _FakeWorkspaceRepository(multiWorkspaces);
+    const storage = WorkspaceSelectionStorage(FlutterSecureStorage());
+    final cubit = WorkspaceCubit(
+      repository: repository,
+      selectionStorage: storage,
+    );
+    addTearDown(cubit.close);
+    await cubit.load();
+    await cubit.selectAll();
+    expect((cubit.state as WorkspaceLoaded).areAllSelected, isTrue);
+    final restored = WorkspaceCubit(
+      repository: repository,
+      selectionStorage: storage,
+    );
+    addTearDown(restored.close);
+    await restored.load();
+    expect((restored.state as WorkspaceLoaded).effectiveSelectedIds, {
+      'one',
+      'two',
+      'three',
+    });
+    await restored.toggle(multiWorkspaces[1]);
+    expect((restored.state as WorkspaceLoaded).effectiveSelectedIds, {
+      'one',
+      'three',
+    });
+    expect((restored.state as WorkspaceLoaded).areAllSelected, isFalse);
+  });
+
+  test(
+    'failed multiple selection restores the previous persisted scope',
+    () async {
+      final storage = _DelayedSelectionStorage();
+      final cubit = WorkspaceCubit(
+        repository: _FakeWorkspaceRepository(multiWorkspaces),
+        selectionStorage: storage,
+      );
+      addTearDown(cubit.close);
+      await cubit.load();
+      await cubit.toggle(multiWorkspaces[1]);
+      storage.failures.add('two');
+      storage.release.complete();
+      await cubit.toggle(multiWorkspaces.first);
+      expect((cubit.state as WorkspaceLoaded).effectiveSelectedIds, {
+        'one',
+        'two',
+      });
+      expect(await storage.readScope(), unorderedEquals(['one', 'two']));
+      expect(await storage.read(), 'one');
+    },
+  );
+
   test(
     'rapid selection back to the original workspace persists the last choice',
     () async {
@@ -410,6 +586,24 @@ class _FakeWorkspaceRepository implements WorkspaceRepository {
     if (pendingCreation != null) return pendingCreation!.future;
     return createdWorkspace ??
         WorkspaceModel(id: 'created', name: request.name, color: request.color);
+  }
+}
+
+class _FailingScopeStorage extends WorkspaceSelectionStorage {
+  _FailingScopeStorage() : super(const FlutterSecureStorage());
+  final writing = Completer<void>();
+  final release = Completer<void>();
+  bool failNextScope = false;
+
+  @override
+  Future<void> saveScope(Iterable<String> ids) async {
+    if (failNextScope) {
+      failNextScope = false;
+      writing.complete();
+      await release.future;
+      throw StateError('Scope storage unavailable');
+    }
+    await super.saveScope(ids);
   }
 }
 
